@@ -146,8 +146,9 @@ def extract_vid_id(item):
         if m: return m.group(1)
     return None
 
-def build_dataset(items):
-    result, seen_ids = [], set()
+def build_new_from_eagle(items, existing_by_id):
+    """Build only NEW entries from Eagle items not already in data.json."""
+    result, seen_ids = [], set(existing_by_id.keys())
     for item in items:
         vid_id = extract_vid_id(item)
         if not vid_id: continue
@@ -155,8 +156,18 @@ def build_dataset(items):
         if not tags: continue
         if vid_id in seen_ids: continue
         seen_ids.add(vid_id)
-        result.append({"id": vid_id, "title": item.get("name",""), "channel":"", "tags": tags, "eagle_id": item.get("id","")})
+        result.append({"id": vid_id, "title": item.get("name",""), "channel":"", "views":"",
+                        "tags": tags, "eid": item.get("id","")})
     return result
+
+def merge_dataset(existing, new_items):
+    """Merge new Eagle items into existing dataset, preserving existing entries."""
+    combined = list(existing)
+    existing_ids = {v["id"] for v in existing}
+    for item in new_items:
+        if item["id"] not in existing_ids:
+            combined.append(item)
+    return combined
 
 # ── Auto-sync thread ──────────────────────────────────────────────
 
@@ -171,12 +182,17 @@ def load_dataset():
 def force_sync():
     global _dataset, _last_count
     try:
+        existing_by_id = {v["id"]: v for v in _dataset}
         items = get_all_eagle_items()
-        dataset = build_dataset(items)
-        _dataset = dataset
-        _last_count = len(dataset)
-        DATA_FILE.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",",":")))
-        print(f"[sync] Force sync done: {len(dataset)} thumbnails", flush=True)
+        new_items = build_new_from_eagle(items, existing_by_id)
+        if new_items:
+            merged = merge_dataset(_dataset, new_items)
+            _dataset = merged
+            _last_count = len(merged)
+            DATA_FILE.write_text(json.dumps(merged, ensure_ascii=False, separators=(",",":")))
+            print(f"[sync] Force sync: added {len(new_items)} new → {len(merged)} total", flush=True)
+        else:
+            print(f"[sync] Force sync: no new items (total: {len(_dataset)})", flush=True)
     except Exception as e:
         print(f"[sync] Force sync error: {e}", flush=True)
 
@@ -184,13 +200,15 @@ def sync_loop():
     global _dataset, _last_count
     while True:
         try:
+            existing_by_id = {v["id"]: v for v in _dataset}
             items = get_all_eagle_items()
-            dataset = build_dataset(items)
-            if len(dataset) != _last_count:
-                _dataset = dataset
-                _last_count = len(dataset)
-                DATA_FILE.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",",":")))
-                print(f"[sync] Updated: {len(dataset)} thumbnails", flush=True)
+            new_items = build_new_from_eagle(items, existing_by_id)
+            if new_items:
+                merged = merge_dataset(_dataset, new_items)
+                _dataset = merged
+                _last_count = len(merged)
+                DATA_FILE.write_text(json.dumps(merged, ensure_ascii=False, separators=(",",":")))
+                print(f"[sync] Added {len(new_items)} new thumbnails → {len(merged)} total", flush=True)
         except Exception as e:
             print(f"[sync] Error: {e}", flush=True)
         time.sleep(SYNC_EVERY)
