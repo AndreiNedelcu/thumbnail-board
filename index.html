@@ -423,7 +423,7 @@ function renderLightbox() {
     eagleBtn.classList.remove('no-id');
     eagleBtn.title = '';
     eagleBtn.onclick = () => {
-      window.location.href = `eagle://item/open?id=${v.eid}`;
+      window.location.href = `eagle://item/${v.eid}`;
       showToast('Opening in Eagle…');
     };
   } else {
