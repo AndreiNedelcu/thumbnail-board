@@ -34,7 +34,21 @@
     background:var(--bg); color:var(--text); min-height:100vh;
     font-feature-settings: 'cv02','cv03','cv04','cv11';
     -webkit-font-smoothing: antialiased;
+    position:relative;
   }
+  /* Continuous ambient glow on the whole page (no clipping) */
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% -5%, rgba(58,236,186,0.12), transparent 55%),
+      radial-gradient(ellipse 900px 600px at 85% 8%, rgba(82,74,221,0.14), transparent 55%);
+  }
+  body > * { position:relative; z-index:1; }
+  /* SVG icons inherit color and align nicely */
+  .icon { width:14px; height:14px; flex-shrink:0; }
+  .icon-sm { width:12px; height:12px; }
+  .icon-lg { width:16px; height:16px; }
+  button, a { font-family:inherit; }
 
   /* ── CONTAINER (side margins) ── */
   .container { max-width:1600px; margin:0 auto; padding:0 clamp(20px, 5vw, 64px); }
@@ -43,15 +57,6 @@
   .hero {
     padding:96px 0 48px;
     text-align:center;
-    position:relative;
-    overflow:hidden;
-  }
-  /* Subtle ambient glow — mint top-left, purple bottom-right */
-  .hero::before {
-    content:''; position:absolute; inset:0; pointer-events:none; z-index:-1;
-    background:
-      radial-gradient(ellipse 600px 400px at 20% 0%, rgba(58,236,186,0.10), transparent 60%),
-      radial-gradient(ellipse 600px 400px at 80% 100%, rgba(82,74,221,0.12), transparent 60%);
   }
   .hero-title {
     font-size:clamp(48px, 8vw, 96px);
@@ -187,7 +192,10 @@
   body.select-mode .card .sel-check { display:flex; }
   body.select-mode .card:hover .sel-check { border-color:#fff; background:rgba(0,0,0,.7); }
   .card.selected .sel-check { background:#4fc3f7; border-color:#4fc3f7; }
-  .card.selected .sel-check::after { content:'✓'; color:#fff; font-size:13px; font-weight:800; line-height:1; }
+  .card.selected .sel-check::after {
+    content:''; width:11px; height:11px;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d1117' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/contain no-repeat;
+  }
   .card.selected { outline:2px solid #4fc3f7; }
   body.select-mode .card:hover { outline:1px solid rgba(255,255,255,.3); }
   .size-wrap { display:flex; align-items:center; gap:8px; }
@@ -314,14 +322,16 @@
     transform:translateX(-50%) translateY(16px);
     background:var(--surface);
     color:var(--text-bright);
-    padding:12px 22px; border-radius:12px;
+    padding:12px 20px; border-radius:12px;
     font-family:inherit; font-size:13px; font-weight:600;
     opacity:0; transition:all .3s;
     pointer-events:none;
     border:1px solid var(--border);
     box-shadow:0 12px 40px rgba(0,0,0,0.4);
     white-space:nowrap;
+    display:flex; align-items:center; gap:10px;
   }
+  #toast svg { flex-shrink:0; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
@@ -337,7 +347,10 @@
         <input id="mini-search" type="text" placeholder="Search…" autocomplete="off">
       </div>
       <div class="stats" id="mini-stats"></div>
-      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑ Top</button>
+      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+        Top
+      </button>
     </div>
   </div>
 </header>
@@ -350,7 +363,9 @@
     <div class="hero-search-wrap">
       <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input id="search" type="text" placeholder="Search by tag, title, channel or keyword…" autocomplete="off">
-      <button class="clear-search" id="clear-search" onclick="clearSearch()">×</button>
+      <button class="clear-search" id="clear-search" onclick="clearSearch()" title="Clear">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
     </div>
     <div class="hero-stats" id="stats"></div>
   </div>
@@ -364,12 +379,30 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <input id="size-slider" type="range" min="160" max="480" value="280" oninput="setCardSize(this.value)">
     </div>
-    <button class="tagger-btn" id="shuffle-btn" onclick="shuffleVideos()" title="Randomise order">🔀 Shuffle</button>
-    <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
-    <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">☐ Select</button>
-    <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">🗑 Delete <span id="sel-count">0</span></button>
-    <button class="tagger-btn publish-primary" id="publish-btn" onclick="publishToGithub()">⬆ Publish</button>
-    <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
+    <button class="tagger-btn" id="shuffle-btn" onclick="shuffleVideos()" title="Randomise order">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
+      Shuffle
+    </button>
+    <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Delete unavailable
+    </button>
+    <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">
+      <svg class="icon" id="select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+      <span id="select-label">Select</span>
+    </button>
+    <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      Delete <span id="sel-count">0</span>
+    </button>
+    <button class="tagger-btn publish-primary" id="publish-btn" onclick="publishToGithub()">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+      Publish
+    </button>
+    <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>
+      Tagger
+    </a>
   </div>
   <main>
     <div id="grid"></div>
@@ -381,10 +414,19 @@
   <div class="lb-container">
     <div class="lb-image-wrap">
       <img id="lb-img" src="" alt="">
-      <button class="lb-back" id="lb-back" onclick="lightboxBack()">← Back</button>
-      <button class="lb-close" id="lb-close">✕</button>
-      <button class="lb-nav" id="lb-prev">‹</button>
-      <button class="lb-nav" id="lb-next">›</button>
+      <button class="lb-back" id="lb-back" onclick="lightboxBack()">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Back
+      </button>
+      <button class="lb-close" id="lb-close" title="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <button class="lb-nav" id="lb-prev" title="Previous">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <button class="lb-nav" id="lb-next" title="Next">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
     </div>
     <div class="lb-body">
       <div>
@@ -400,19 +442,19 @@
           YouTube
         </a>
         <button class="lb-btn lb-btn-eagle" id="lb-eagle">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
           Open in Eagle
         </button>
         <button class="lb-btn lb-btn-copy" id="lb-copy">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="3"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
           Copy image
         </button>
         <button class="lb-btn lb-btn-tagger" id="lb-tagger">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           Edit tags
         </button>
         <button class="lb-btn lb-btn-delete" id="lb-delete">
-          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
           Delete
         </button>
       </div>
@@ -638,8 +680,6 @@ function shuffleVideos() {
     [ids[i], ids[j]] = [ids[j], ids[i]];
   }
   shuffleOrder = ids;
-  const btn = document.getElementById('shuffle-btn');
-  if (btn) { btn.textContent = '🔀 Shuffled'; setTimeout(() => btn.textContent = '🔀 Shuffle', 1200); }
   applyFilters();
 }
 
@@ -655,7 +695,7 @@ function updateBrokenBtn() {
   const count = document.querySelectorAll('.card.broken').length;
   const btn = document.getElementById('broken-btn');
   if (count > 0) {
-    btn.textContent = `🗑 Delete ${count} unavailable`;
+    btn.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete ${count} unavailable`;
     btn.classList.add('visible');
   } else {
     btn.classList.remove('visible');
@@ -886,7 +926,7 @@ async function copyImage(videoId, btn) {
     });
     btn.className = 'lb-btn lb-btn-copy copied';
     btn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
-    showToast('Image copied to clipboard ✓');
+    showToast('Image copied to clipboard', 'success');
   } catch(e) {
     window.open(url, '_blank');
     showToast('Opened in new tab — right-click → Copy image');
@@ -894,9 +934,21 @@ async function copyImage(videoId, btn) {
 }
 
 // ── Toast ─────────────────────────────────────────────────────────
-function showToast(msg) {
+// Toast with optional type for icon: 'success' | 'error' | 'info' (default)
+const TOAST_ICONS = {
+  success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3aecba" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+  error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e94560" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
+  info:    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ccdae7" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>'
+};
+function showToast(msg, type='info') {
+  // auto-detect type from legacy emoji prefixes
+  let m = String(msg).trim();
+  if (/^[✅]/.test(m))      { type = 'success'; m = m.replace(/^✅\s*/, ''); }
+  else if (/^[❌⚠️]/.test(m)) { type = 'error';   m = m.replace(/^[❌⚠️]\s*/, ''); }
+  else if (/^[🗑]/.test(m))   { type = 'success'; m = m.replace(/^🗑\s*/, ''); }
+  else if (/^[⏳]/.test(m))   { type = 'info';    m = m.replace(/^⏳\s*/, ''); }
   const t = document.getElementById('toast');
-  t.textContent = msg;
+  t.innerHTML = (TOAST_ICONS[type] || '') + '<span>' + m.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]) + '</span>';
   t.classList.add('show');
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 3000);
@@ -1013,22 +1065,23 @@ async function saveLbTags(v, newTags) {
 }
 
 // ── Publish ───────────────────────────────────────────────────────
+const PUBLISH_BTN_HTML = '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>Publish';
 async function publishToGithub() {
   const btn = document.getElementById('publish-btn');
-  btn.textContent = '⏳ Publishing…';
+  btn.textContent = 'Publishing…';
   btn.style.pointerEvents = 'none';
   try {
     const r = await fetch('http://localhost:3000/api/publish', { method: 'POST' });
     const d = await r.json();
     if (d.ok) {
-      showToast('✅ Published to GitHub Pages!');
+      showToast('Published to GitHub Pages!', 'success');
     } else {
-      showToast('❌ ' + (d.msg || 'Publish failed'));
+      showToast(d.msg || 'Publish failed', 'error');
     }
   } catch {
-    showToast('❌ Server not running — open tagger.command first');
+    showToast('Server not running — open tagger.command first', 'error');
   } finally {
-    btn.textContent = '⬆ Publish';
+    btn.innerHTML = PUBLISH_BTN_HTML;
     btn.style.pointerEvents = '';
   }
 }
@@ -1043,7 +1096,15 @@ function toggleSelectMode() {
   document.body.classList.toggle('select-mode', selectMode);
   const btn = document.getElementById('select-btn');
   btn.classList.toggle('active', selectMode);
-  btn.textContent = selectMode ? '✕ Cancel' : '☐ Select';
+  const icon = document.getElementById('select-icon');
+  const label = document.getElementById('select-label');
+  if (selectMode) {
+    icon.innerHTML = '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>';
+    label.textContent = 'Cancel';
+  } else {
+    icon.innerHTML = '<rect x="3" y="3" width="18" height="18" rx="3"/>';
+    label.textContent = 'Select';
+  }
   updateSelBar();
   renderGrid();
 }

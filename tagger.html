@@ -94,7 +94,8 @@
   #done-screen.show { display:flex; }
 
   /* TOAST */
-  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface3); color:var(--text); padding:8px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; border:1px solid var(--border); z-index:99; white-space:nowrap; }
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface); color:var(--text-bright); padding:10px 18px; border-radius:10px; font-size:13px; font-weight:600; opacity:0; transition:all .25s; pointer-events:none; border:1px solid var(--border); z-index:99; white-space:nowrap; display:flex; align-items:center; gap:9px; box-shadow:0 10px 30px rgba(0,0,0,.4); }
+  #toast svg { flex-shrink:0; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
@@ -109,8 +110,14 @@
   <div class="header-actions">
     <button class="btn btn-ghost" id="btn-back" onclick="goBack()" disabled>← Back</button>
     <button class="btn btn-ghost" onclick="skip()">Skip →</button>
-    <button class="btn btn-eagle" id="btn-eagle" onclick="openInEagle()" disabled title="Open in Eagle">🦅 Eagle</button>
-    <button class="btn btn-publish" id="btn-publish" onclick="publishToGithub()" title="Save & publish to GitHub">⬆ Publish</button>
+    <button class="btn btn-eagle" id="btn-eagle" onclick="openInEagle()" disabled title="Open in Eagle">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
+      Eagle
+    </button>
+    <button class="btn btn-publish" id="btn-publish" onclick="publishToGithub()" title="Save & publish to GitHub">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+      Publish
+    </button>
     <button class="btn btn-save" id="btn-save" onclick="saveTags()" disabled>Save tags</button>
   </div>
 </header>
@@ -126,7 +133,10 @@
     <div class="thumb-title" id="ttitle"></div>
     <div class="thumb-meta">
       <span id="tviews"></span>
-      <a class="thumb-link" id="turl" href="#" target="_blank">Open in YouTube ↗</a>
+      <a class="thumb-link" id="turl" href="#" target="_blank">
+        Open in YouTube
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-left:2px"><path d="M7 7h10v10"/><path d="m7 17 10-10"/></svg>
+      </a>
     </div>
     <div class="sel-wrap" id="sel-tags"></div>
   </div>
@@ -134,7 +144,11 @@
 </main>
 
 <div id="done-screen">
-  <div style="font-size:52px">🎉</div>
+  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="url(#sparkleGrad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <defs><linearGradient id="sparkleGrad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3aecba"/><stop offset="1" stop-color="#524add"/></linearGradient></defs>
+    <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
+    <path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/>
+  </svg>
   <h2 style="font-size:21px;font-weight:700">All tagged!</h2>
   <p style="color:var(--muted);font-size:14px;text-align:center">Every thumbnail has official tags now.<br>Website syncs automatically.</p>
   <a href="/" style="margin-top:8px;color:#7c4dff;font-size:13px;text-decoration:none;border:1px solid #7c4dff44;padding:6px 16px;border-radius:8px">← Back to Thumbnail Board</a>
@@ -345,7 +359,10 @@ function render() {
   }
   document.getElementById('ttitle').textContent = current.name || '';
   const vm = (current.annotation||'').match(/Views:\s*([\d.KMB]+)/);
-  document.getElementById('tviews').textContent = vm ? `👁 ${vm[1]}` : '';
+  const tv = document.getElementById('tviews');
+  if (vm) {
+    tv.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>' + vm[1];
+  } else { tv.textContent = ''; }
 
   // Create buttons for any existing tags not in the predefined list
   selected.forEach(tag => {
@@ -436,7 +453,7 @@ function openInEagle() {
 // ── Publish to GitHub ─────────────────────────────────────────────
 async function publishToGithub() {
   const btn = document.getElementById('btn-publish');
-  btn.disabled = true; btn.textContent = '⬆ Publishing…';
+  btn.disabled = true; btn.textContent = 'Publishing…';
   try {
     const r = await fetch(`${SERVER}/api/publish`, { method:'POST' });
     const d = await r.json();
@@ -445,7 +462,8 @@ async function publishToGithub() {
   } catch(e) {
     toast(`❌ ${e.message}`);
   } finally {
-    btn.disabled = false; btn.textContent = '⬆ Publish';
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>Publish';
   }
 }
 
@@ -487,9 +505,18 @@ async function saveTags() {
   } finally { btn.textContent='Save tags'; refreshBtns(); }
 }
 
-function toast(msg) {
+const TOAST_ICONS = {
+  success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3aecba" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+  error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e94560" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
+  info:    ''
+};
+function toast(msg, type='info') {
+  let m = String(msg).trim();
+  if (/^[✅]/.test(m))         { type = 'success'; m = m.replace(/^✅\s*/, ''); }
+  else if (/^[❌⚠️]/.test(m))    { type = 'error';   m = m.replace(/^[❌⚠️]\s*/, ''); }
   const t = document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
+  t.innerHTML = (TOAST_ICONS[type] || '') + '<span>' + m.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'})[c]) + '</span>';
+  t.classList.add('show');
   clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 3000);
 }
 
