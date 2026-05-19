@@ -296,8 +296,10 @@ function render() {
   }
 
   current = queue[idx];
-  // Restore previously selected tags for this item (if navigating back)
-  selected = savedSelections[current.id] ? new Set(savedSelections[current.id]) : new Set();
+  // Pre-load: saved selection > existing Eagle tags > empty
+  selected = savedSelections[current.id]
+    ? new Set(savedSelections[current.id])
+    : new Set(current.tags || []);
   document.getElementById('main').style.display = 'grid';
 
   // Image
@@ -312,6 +314,18 @@ function render() {
   document.getElementById('ttitle').textContent = current.name || '';
   const vm = (current.annotation||'').match(/Views:\s*([\d.KMB]+)/);
   document.getElementById('tviews').textContent = vm ? `👁 ${vm[1]}` : '';
+
+  // Create buttons for any existing tags not in the predefined list
+  selected.forEach(tag => {
+    if (!document.querySelector(`.tag-btn[data-tag="${tag}"]`)) {
+      const parts = tag.split('-');
+      const cat = parts[0].toUpperCase();
+      const sub = parts.slice(1).join('-');
+      const cfg = CATS[cat] || { color:'#888', bg:'#333' };
+      const grid = document.getElementById(`grid-${cat}`);
+      if (grid) grid.insertAdjacentHTML('beforeend', tagBtnHtml(tag, sub, cfg));
+    }
+  });
 
   // Reset + re-apply selected state on buttons
   document.querySelectorAll('.tag-btn').forEach(b => {
@@ -347,7 +361,10 @@ function refreshProgress() {
 }
 
 function refreshBtns() {
-  document.getElementById('btn-save').disabled = selected.size === 0;
+  // Allow save if tags changed vs original, or if anything is selected
+  const orig = new Set(current?.tags || []);
+  const changed = selected.size !== orig.size || [...selected].some(t => !orig.has(t)) || [...orig].some(t => !selected.has(t));
+  document.getElementById('btn-save').disabled = !changed && selected.size === 0;
   document.getElementById('btn-back').disabled = history.length === 0;
   document.getElementById('btn-eagle').disabled = !current;
 }
