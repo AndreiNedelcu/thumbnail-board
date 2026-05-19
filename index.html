@@ -84,9 +84,9 @@
 
   /* ── GRID ── */
   main { padding:16px 20px; }
-  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,260px),1fr)); gap:10px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,260px),1fr)); gap:16px; }
   .card {
-    position:relative; border-radius:var(--radius); overflow:hidden;
+    position:relative; overflow:hidden;
     background:var(--surface); cursor:pointer; aspect-ratio:16/9;
     transition:transform .2s, box-shadow .2s;
   }
