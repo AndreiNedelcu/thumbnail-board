@@ -247,6 +247,28 @@ def sync_loop():
             print(f"[sync] Error: {e}", flush=True)
         time.sleep(SYNC_EVERY)
 
+# ── Auto-publish ──────────────────────────────────────────────────
+def auto_publish():
+    """Commit + push data.json in a background thread (non-blocking)."""
+    def _run():
+        try:
+            repo = Path(__file__).parent
+            subprocess.run(["git", "add", "data.json"], cwd=repo, check=True)
+            diff = subprocess.run(["git", "diff", "--cached", "--stat"],
+                                  cwd=repo, capture_output=True, text=True)
+            if not diff.stdout.strip():
+                print("[publish] Nothing new to push", flush=True)
+                return
+            count = len(_dataset)
+            subprocess.run(["git", "commit", "-m",
+                            f"data: auto-sync {count} thumbnails"],
+                           cwd=repo, check=True)
+            subprocess.run(["git", "push"], cwd=repo, check=True)
+            print(f"[publish] Auto-pushed data.json ({count} items)", flush=True)
+        except Exception as e:
+            print(f"[publish] Auto-publish error: {e}", flush=True)
+    threading.Thread(target=_run, daemon=True).start()
+
 # ── HTTP Handler ─────────────────────────────────────────────────
 
 MIME = {".html":"text/html",".js":"application/javascript",
@@ -358,6 +380,7 @@ class Handler(BaseHTTPRequestHandler):
                 if updated:
                     DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
                     print(f"[update] Synced tags for eid={eagle_id} vid={vid} → data.json", flush=True)
+                    auto_publish()  # push to GitHub Pages in background
             self.send_json(result)
             return
 
@@ -398,6 +421,7 @@ class Handler(BaseHTTPRequestHandler):
             _dataset.append(entry)
             DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
             print(f"[add] {vid_id} — {title[:40]}", flush=True)
+            auto_publish()  # push to GitHub Pages in background
             self.send_json({"ok": True, "entry": entry})
             return
 
