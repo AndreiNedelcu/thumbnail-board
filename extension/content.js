@@ -588,17 +588,9 @@ function injectCardButton(thumbContainer, watchLink) {
 }
 
 function scanCards() {
-  // Strategy: find every /watch?v= anchor that actually wraps a thumbnail
-  // (has an image-like element inside). Skip shorts.
-  // We anchor positioning to the <a> itself (the actual thumbnail image)
-  // because ytd-thumbnail can wrap a larger area, throwing off `bottom`.
-  const links = document.querySelectorAll('a[href*="/watch?v="]');
-  for (const a of links) {
-    if (/\/shorts\//.test(a.href)) continue;
-    if (!a.querySelector('img, yt-image, yt-thumbnail-view-model, .yt-core-image, .shortsLockupViewModelHostThumbnailContainer')) continue;
-    injectCardButton(a, a);
-  }
-  // Also try to inject into YT's inline-preview controls stack if present
+  // We only inject into YouTube's own inline-preview controls stack
+  // (.ytInlinePlayerControlsTopRightControls). That gives one well-
+  // integrated button per hover — no duplicates, no conflicts.
   document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
 }
 
@@ -669,24 +661,19 @@ cardObserver.observe(document.body, { childList: true, subtree: true });
 function injectIntoYTControls(ytContainer) {
   if (!ytContainer || ytContainer.querySelector('.tb-yt-btn')) return;
 
-  // Find the video ID from the card surrounding this preview.
-  // Walk up the DOM tree until we hit something containing a /watch link.
+  // Walk up the DOM tree until we find an ancestor containing a /watch link.
   let cur = ytContainer.parentElement;
   let link = null;
+  let card = null;
   while (cur && cur !== document.body) {
     link = cur.querySelector('a[href*="/watch?v="]');
-    if (link) break;
+    if (link) { card = cur; break; }
     cur = cur.parentElement;
   }
   if (!link) return;
   const m = link.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (!m) return;
   const vid = m[1];
-
-  // Hide the absolute fallback button so we don't show two icons at once
-  const card = cur;
-  const absoluteBtn = card.querySelector(`.tb-card-btn[data-vid="${vid}"]`);
-  if (absoluteBtn) absoluteBtn.classList.add('tb-hidden-by-yt');
 
   const btn = document.createElement('button');
   btn.className = 'tb-yt-btn';
@@ -714,15 +701,6 @@ const ytObserver = new MutationObserver((muts) => {
       } else if (node.querySelectorAll) {
         node.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
       }
-    }
-    // When the YT controls disappear, un-hide the absolute fallback button
-    for (const node of mut.removedNodes) {
-      if (node.nodeType !== 1) continue;
-      const isHost = node.classList?.contains('ytInlinePlayerControlsTopRightControls');
-      const had = isHost || node.querySelector?.('.ytInlinePlayerControlsTopRightControls');
-      if (!had) continue;
-      // Reveal any tb-card-btn that was hidden
-      document.querySelectorAll('.tb-card-btn.tb-hidden-by-yt').forEach(b => b.classList.remove('tb-hidden-by-yt'));
     }
   }
   // Defensive: always re-scan for any controls we missed
