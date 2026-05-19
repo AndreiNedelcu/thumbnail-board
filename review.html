@@ -75,13 +75,17 @@
   .tags-head { font-size:11px; color:var(--muted); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
   .tags-list { display:flex; flex-wrap:wrap; gap:6px; min-height:36px; padding:12px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; }
   .tag-chip {
-    display:inline-flex; align-items:center; gap:5px;
+    display:inline-flex; align-items:center; gap:6px;
     padding:5px 11px; border-radius:14px; font-size:12px; font-weight:600;
     background:var(--surface3); color:var(--bright); border:1px solid transparent;
+  }
+  .tag-chip .tag-dot {
+    width:7px; height:7px; border-radius:50%; flex-shrink:0;
   }
   .tag-chip .x {
     cursor:pointer; opacity:.6; line-height:1; font-size:14px;
     width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center;
+    margin-left:2px;
   }
   .tag-chip .x:hover { opacity:1; }
   .tag-add {
@@ -310,11 +314,21 @@ function render() {
   document.getElementById('plabel').textContent = `${idx+1} of ${items.length} pending`;
 }
 
+function tagColor(t) {
+  const dash = t.indexOf('-');
+  if (dash < 1) return '#333';
+  const cat = t.slice(0, dash).toUpperCase();
+  return (CATS[cat] && CATS[cat].color) || '#333';
+}
+
 function renderTags() {
   const it = items[idx];
-  document.getElementById('tags').innerHTML = (it.tags||[]).map(t => `
-    <span class="tag-chip">${esc(t)}<span class="x" onclick="removeTag('${esc(t)}')">×</span></span>
-  `).join('') || '<span style="color:var(--muted);font-size:13px;padding:6px 4px">no tags</span>';
+  document.getElementById('tags').innerHTML = (it.tags||[]).map(t => {
+    const col = tagColor(t);
+    return `<span class="tag-chip" style="background:${col}22;border:1px solid ${col}66;color:#fff">
+      <span class="tag-dot" style="background:${col}"></span>${esc(t)}<span class="x" onclick="removeTag('${esc(t)}')">×</span>
+    </span>`;
+  }).join('') || '<span style="color:var(--muted);font-size:13px">no tags</span>';
 }
 
 function esc(s) { return String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]); }
@@ -322,6 +336,8 @@ function esc(s) { return String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt
 function removeTag(t) {
   items[idx].tags = (items[idx].tags||[]).filter(x => x !== t);
   renderTags();
+  // Re-render suggestions so the removed tag reappears in its section
+  renderSuggestions(document.getElementById('tagInput').value);
 }
 
 function renderSuggestions(q) {
