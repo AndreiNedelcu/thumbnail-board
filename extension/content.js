@@ -153,7 +153,10 @@ async function refreshSavedIds() {
 
 // ── Thumbnail download + Ollama call ──────────────────────────────
 async function fetchThumbnailBase64(videoId) {
-  for (const quality of ['maxresdefault', 'mqdefault']) {
+  // hqdefault is 480x360 ~30KB — Ollama inference is much faster than
+  // sending maxresdefault (1280x720 ~80KB). Quality is enough for tag
+  // detection. Fall back to mqdefault, then maxres if both fail.
+  for (const quality of ['hqdefault', 'mqdefault', 'maxresdefault']) {
     try {
       const r = await fetch(`https://img.youtube.com/vi/${videoId}/${quality}.jpg`);
       if (!r.ok) continue;
@@ -232,6 +235,7 @@ async function saveVideo(info, progress = () => {}) {
     throw new Error('Already saving this one…');
   }
   saving.add(info.id);
+  refreshQueueIndicator();
   // Auth
   if (SERVER === WORKER_URL && !AUTH_TOKEN) {
     await loadAuthToken();
@@ -278,7 +282,23 @@ async function saveVideo(info, progress = () => {}) {
     throw new Error(d.msg || 'Publish failed');
   } finally {
     saving.delete(info.id);
+    refreshQueueIndicator();
   }
+}
+
+/** Persistent bottom-right indicator showing how many saves are in flight.
+ *  Visible across SPA navigation so you know stuff is still happening even
+ *  when you scroll/navigate away from the card you clicked. */
+function refreshQueueIndicator() {
+  const n = saving.size;
+  let el = document.getElementById('tb-queue');
+  if (n === 0) { el?.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'tb-queue';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `${ICONS.spinnerSm}<span>Saving ${n}…</span>`;
 }
 
 // ── Watch-page floating button ────────────────────────────────────
@@ -423,10 +443,13 @@ function openMenu(btn, info) {
   // We use fixed positioning so it floats above YouTube's overlays
   const mw = menu.offsetWidth;
   const mh = menu.offsetHeight;
+  // Anchor: open to the right of the button (button is in card's top-left).
   let top  = r.bottom + 6;
-  let left = r.right  - mw;
-  if (left < 8) left = r.left;
+  let left = r.left;
+  if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+  if (left < 8) left = 8;
   if (top + mh > window.innerHeight - 8) top = r.top - mh - 6;
+  if (top < 8) top = 8;
   menu.style.top  = `${top}px`;
   menu.style.left = `${left}px`;
   menu.style.visibility = 'visible';
