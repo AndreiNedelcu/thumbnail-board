@@ -64,19 +64,26 @@ function getVideoInfo() {
   const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
     || document.title.replace(' - YouTube','').trim();
   const channel = document.querySelector('ytd-channel-name yt-formatted-string a, #channel-name a')?.textContent?.trim() || '';
-  // Use YouTube's dedicated view count element — most reliable, avoids date confusion
+  // Read viewCount from YouTube's embedded JSON data — immune to DOM changes
   let views = '';
-  const viewCountEl = document.querySelector(
-    'ytd-video-view-count-renderer span.view-count, ytd-video-view-count-renderer .yt-spec-button-shape-next, ytd-video-view-count-renderer span'
-  );
-  if (viewCountEl) {
-    views = viewCountEl.textContent.trim().replace(/\s*views?/i,'').trim();
-  }
-  // Fallback: find an info string that starts with a digit (not a month name)
+  try {
+    for (const script of document.querySelectorAll('script:not([src])')) {
+      const t = script.textContent;
+      if (!t.includes('viewCount')) continue;
+      const m = t.match(/"viewCount"\s*:\s*"(\d+)"/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (n >= 1000000)      views = (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        else if (n >= 1000)    views = (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+        else                   views = n.toString();
+        break;
+      }
+    }
+  } catch {}
+  // Fallback: dedicated renderer element
   if (!views) {
-    const infoStrings = [...document.querySelectorAll('#info-strings yt-formatted-string')];
-    const viewsEl = infoStrings.find(el => /^\s*[\d,\.]+\s*[KkMmBb]?\s*views?/i.test(el.textContent));
-    if (viewsEl) views = viewsEl.textContent.trim().replace(/\s*views?/i,'').trim();
+    const el = document.querySelector('ytd-video-view-count-renderer span');
+    if (el) views = el.textContent.trim().replace(/\s*views?/i,'').trim();
   }
   return { id, title, channel, views };
 }
