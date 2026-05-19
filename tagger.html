@@ -3,33 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thumbnail Tagger</title>
+<title>Thumbnail Tagger · theSeniorDev</title>
 <link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --surface3:#2a2a2a;
-    --border:rgba(255,255,255,0.08); --text:#f0f0f0; --muted:#666;
+    --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
+    --border:rgba(204,218,231,0.08); --text:#ccdae7; --text-bright:#ffffff; --muted:#6e7d8c;
+    --mint:#3aecba; --purple:#524add;
+    --brand-grad:linear-gradient(135deg,#3aecba 0%,#524add 100%);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; }
-  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
+  body {
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    background:var(--bg); color:var(--text);
+    display:flex; flex-direction:column;
+    -webkit-font-smoothing:antialiased;
+  }
 
   /* HEADER */
   header { flex-shrink:0; padding:11px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:rgba(13,13,13,.97); }
-  .logo { font-size:14px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
-  .logo span { color:#e94560; }
+  .logo { font-size:14px; font-weight:800; letter-spacing:2px; white-space:nowrap; color:var(--text-bright); }
+  .logo span { background:var(--brand-grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .progress-wrap { flex:1; max-width:260px; }
   .progress-bar { height:4px; background:var(--surface3); border-radius:2px; overflow:hidden; margin-bottom:4px; }
-  .progress-fill { height:100%; background:#e94560; border-radius:2px; transition:width .4s; }
+  .progress-fill { height:100%; background:var(--brand-grad); border-radius:2px; transition:width .4s; }
   .progress-label { font-size:11px; color:var(--muted); }
   .header-actions { display:flex; gap:6px; margin-left:auto; align-items:center; }
   .btn { padding:6px 13px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
   .btn-ghost { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
   .btn-ghost:hover:not(:disabled) { color:var(--text); }
   .btn-ghost:disabled { opacity:.3; cursor:not-allowed; }
-  .btn-save { background:#e94560; color:#fff; padding:6px 16px; }
-  .btn-save:hover:not(:disabled) { background:#c73050; }
-  .btn-save:disabled { background:#2a2a2a; color:#555; cursor:not-allowed; }
+  .btn-save { background:var(--brand-grad); color:#0d1117; padding:6px 16px; font-weight:700; }
+  .btn-save:hover:not(:disabled) { box-shadow:0 6px 20px rgba(58,236,186,0.25); transform:translateY(-1px); }
+  .btn-save:disabled { background:var(--surface3); color:var(--muted); cursor:not-allowed; }
   .btn-eagle { background:var(--surface2); color:#7c4dff; border:1px solid #7c4dff44; }
   .btn-eagle:hover:not(:disabled) { background:#7c4dff22; }
   .btn-eagle:disabled { opacity:.3; cursor:not-allowed; }
@@ -78,7 +88,7 @@
 
   /* LOADING / DONE */
   #loading { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:10px; }
-  .spinner { width:26px; height:26px; border:3px solid var(--border); border-top-color:#e94560; border-radius:50%; animation:spin .8s linear infinite; }
+  .spinner { width:26px; height:26px; border:3px solid var(--border); border-top-color:var(--mint); border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   #done-screen { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
   #done-screen.show { display:flex; }
@@ -187,6 +197,16 @@ async function loadItems() {
     items.forEach(item => {
       const entry = boardByEid.get(item.id) || boardByVid.get(extractVid(item));
       if (entry) item.tags = entry.tags || item.tags;
+      
+      // Extract custom tags to global CATS
+      (item.tags || []).forEach(t => {
+        const parts = t.split('-');
+        const cat = parts[0].toUpperCase();
+        const sub = parts.slice(1).join('-');
+        if (CATS[cat] && !CATS[cat].subs.includes(sub)) {
+          CATS[cat].subs.push(sub);
+        }
+      });
     });
 
     // Build set of video IDs already tagged in data.json (source of truth)
@@ -230,6 +250,7 @@ async function loadItems() {
       queue = items.filter(i => !isDone(i));
       idx = 0;
     }
+    buildPanel(); // Rebuild panel with custom tags extracted from items
     render();
   } catch(e) {
     msg(`❌ Cannot reach server (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
@@ -286,6 +307,7 @@ function addCustomTag(cat) {
   if (!grid.querySelector(`[data-tag="${full}"]`)) {
     const cfg = CATS[cat];
     grid.insertAdjacentHTML('beforeend', tagBtnHtml(full, raw, cfg));
+    if (!CATS[cat].subs.includes(raw)) CATS[cat].subs.push(raw);
   }
   // Auto-select it
   const btn = document.querySelector(`[data-tag="${full}"]`);
