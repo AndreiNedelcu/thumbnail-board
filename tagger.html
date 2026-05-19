@@ -43,8 +43,6 @@
   .btn-eagle { background:var(--surface2); color:#7c4dff; border:1px solid #7c4dff44; }
   .btn-eagle:hover:not(:disabled) { background:#7c4dff22; }
   .btn-eagle:disabled { opacity:.3; cursor:not-allowed; }
-  .btn-publish { background:var(--surface2); color:#26a69a; border:1px solid #26a69a44; }
-  .btn-publish:hover { background:#26a69a22; }
 
   /* LAYOUT */
   main { flex:1; min-height:0; display:grid; grid-template-columns:1fr 360px; overflow:hidden; }
@@ -113,10 +111,6 @@
     <button class="btn btn-eagle" id="btn-eagle" onclick="openInEagle()" disabled title="Open in Eagle">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg>
       Eagle
-    </button>
-    <button class="btn btn-publish" id="btn-publish" onclick="publishToGithub()" title="Save & publish to GitHub">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-      Publish
     </button>
     <button class="btn btn-save" id="btn-save" onclick="saveTags()" disabled>Save tags</button>
   </div>
@@ -451,20 +445,14 @@ function openInEagle() {
 }
 
 // ── Publish to GitHub ─────────────────────────────────────────────
+// publishToGithub kept as no-op safety net; auto-publish handles every save.
 async function publishToGithub() {
-  const btn = document.getElementById('btn-publish');
-  btn.disabled = true; btn.textContent = 'Publishing…';
   try {
     const r = await fetch(`${SERVER}/api/publish`, { method:'POST' });
     const d = await r.json();
-    if (d.ok) toast(`✅ Published! ${d.msg||''}`);
-    else toast(`❌ ${d.msg||'Publish failed'}`);
-  } catch(e) {
-    toast(`❌ ${e.message}`);
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>Publish';
-  }
+    if (d.ok) toast(d.msg || 'Published', 'success');
+    else toast(d.msg || 'Publish failed', 'error');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ── Save ──────────────────────────────────────────────────────────
