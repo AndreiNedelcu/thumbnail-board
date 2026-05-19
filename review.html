@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Auto-tag Review · theSeniorDev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
+    --border:rgba(204,218,231,0.08); --border-h:rgba(204,218,231,0.18);
+    --text:#ccdae7; --bright:#fff; --muted:#6e7d8c;
+    --mint:#3aecba; --purple:#524add;
+    --grad:linear-gradient(135deg,#3aecba 0%,#524add 100%);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body {
+    font-family:'Inter',sans-serif; background:var(--bg); color:var(--text);
+    -webkit-font-smoothing:antialiased; position:relative;
+  }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% -5%, rgba(58,236,186,0.12), transparent 55%),
+      radial-gradient(ellipse 900px 600px at 85% 8%, rgba(82,74,221,0.14), transparent 55%);
+  }
+  body > * { position:relative; z-index:1; }
+
+  header {
+    padding:20px 32px; display:flex; align-items:center; gap:20px;
+    border-bottom:1px solid var(--border);
+  }
+  .logo { font-weight:800; font-size:14px; letter-spacing:1.8px; color:var(--bright); }
+  .logo span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .progress { flex:1; max-width:380px; }
+  .progress-bar { height:4px; background:var(--surface3); border-radius:2px; overflow:hidden; margin-bottom:5px; }
+  .progress-fill { height:100%; background:var(--grad); transition:width .3s; }
+  .progress-label { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+
+  main {
+    max-width:1100px; margin:0 auto; padding:40px 24px 80px;
+    display:grid; grid-template-columns:1fr 380px; gap:32px;
+  }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+
+  .thumb-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    overflow:hidden; box-shadow:0 16px 48px rgba(0,0,0,.4);
+  }
+  .thumb-card img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#000; }
+  .thumb-meta { padding:18px 20px; }
+  .thumb-title { font-size:15px; font-weight:700; line-height:1.4; color:var(--bright); margin-bottom:6px; }
+  .thumb-sub { font-size:12px; color:var(--muted); font-weight:500; }
+  .thumb-link {
+    display:inline-flex; align-items:center; gap:5px; margin-top:10px;
+    font-size:12px; color:var(--mint); font-weight:600; text-decoration:none;
+  }
+
+  .tags-panel { display:flex; flex-direction:column; gap:18px; }
+  .tags-head { font-size:11px; color:var(--muted); font-weight:700; letter-spacing:1.5px; text-transform:uppercase; }
+  .tags-list { display:flex; flex-wrap:wrap; gap:6px; min-height:36px; padding:12px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; }
+  .tag-chip {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:5px 11px; border-radius:14px; font-size:12px; font-weight:600;
+    background:var(--surface3); color:var(--bright); border:1px solid transparent;
+  }
+  .tag-chip .x {
+    cursor:pointer; opacity:.6; line-height:1; font-size:14px;
+    width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center;
+  }
+  .tag-chip .x:hover { opacity:1; }
+  .tag-add {
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    color:var(--bright); font-family:inherit; font-size:13px; padding:11px 14px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .tag-add:focus { border-color:var(--mint); box-shadow:0 0 0 3px rgba(58,236,186,0.08); }
+  .tag-suggestions { display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow-y:auto; padding:4px 0; }
+  .tag-sug {
+    padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600;
+    background:var(--surface3); color:var(--muted); border:1px solid transparent;
+    cursor:pointer; transition:all .12s;
+  }
+  .tag-sug:hover { color:var(--bright); border-color:var(--border-h); }
+
+  .actions { display:flex; gap:10px; margin-top:8px; }
+  .btn {
+    flex:1; padding:13px; border-radius:10px; border:none;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+    transition:all .15s; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn-approve { background:var(--grad); color:#0d1117; }
+  .btn-approve:hover { box-shadow:0 8px 24px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .btn-reject { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+  .btn-reject:hover { background:rgba(233,69,96,.08); color:#e94560; border-color:rgba(233,69,96,.3); }
+  .btn-skip { background:var(--surface2); color:var(--text); border:1px solid var(--border); flex:0 0 auto; padding:13px 22px; }
+  .btn-skip:hover { background:var(--surface3); color:var(--bright); }
+
+  #empty { text-align:center; padding:120px 24px; color:var(--muted); grid-column:1/-1; }
+  #empty h2 { font-size:24px; color:var(--bright); margin-bottom:8px; font-weight:800; letter-spacing:-0.5px; }
+
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
+    font-size:13px; font-weight:600; border:1px solid var(--border);
+    opacity:0; transition:all .25s; pointer-events:none; display:flex; align-items:center; gap:9px;
+    box-shadow:0 12px 32px rgba(0,0,0,.4); z-index:100;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">REVIEW<span>QUEUE</span></div>
+  <div class="progress">
+    <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+    <div class="progress-label" id="plabel">Loading…</div>
+  </div>
+</header>
+
+<main id="main">
+  <div class="thumb-card">
+    <img id="thumb" src="">
+    <div class="thumb-meta">
+      <div class="thumb-title" id="title"></div>
+      <div class="thumb-sub" id="channel"></div>
+      <a class="thumb-link" id="yt" target="_blank">View on YouTube ↗</a>
+    </div>
+  </div>
+
+  <div class="tags-panel">
+    <div>
+      <div class="tags-head" style="margin-bottom:8px">AI-suggested tags · click × to remove</div>
+      <div class="tags-list" id="tags"></div>
+    </div>
+    <div>
+      <div class="tags-head" style="margin-bottom:8px">Add tag</div>
+      <input class="tag-add" id="tagInput" placeholder="search… e.g. mood-happy" autocomplete="off" data-1p-ignore>
+      <div class="tag-suggestions" id="sugs" style="margin-top:8px"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-reject" onclick="reject()">Reject</button>
+      <button class="btn btn-skip" onclick="next()" title="Decide later">Skip</button>
+      <button class="btn btn-approve" onclick="approve()">Approve & Publish</button>
+    </div>
+  </div>
+
+  <div id="empty" style="display:none">
+    <h2>All clear</h2>
+    <p>No items pending review. Run <code>auto_tag.py</code> to fill the queue.</p>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+const ALL_TAGS = (() => {
+  const C = {
+    style:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'],
+    mood:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'],
+    text:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'],
+    element:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'],
+    camera:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'],
+    subject:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'],
+    formation:['flat-lay','line','grid','v'],
+    topic:['comparison','product-showcase','space','secret','social-media','size'],
+    callout:['magnifier'],
+    backdrop:['dark','light','blurry'],
+    channel:['theseniordev-main','theseniordev-podcast'],
+  };
+  return Object.entries(C).flatMap(([cat,subs]) => subs.map(s => `${cat}-${s}`));
+})();
+
+let items = [];
+let idx = 0;
+let initialTotal = 0;
+
+async function load() {
+  const r = await fetch('/api/review-items');
+  items = await r.json();
+  initialTotal = items.length;
+  if (!items.length) {
+    document.querySelector('.thumb-card').style.display = 'none';
+    document.querySelector('.tags-panel').style.display = 'none';
+    document.getElementById('empty').style.display = 'block';
+    document.getElementById('plabel').textContent = 'Queue empty';
+    return;
+  }
+  render();
+}
+
+function render() {
+  const it = items[idx];
+  if (!it) { document.getElementById('plabel').textContent = 'Done'; return; }
+  document.getElementById('thumb').src = `https://img.youtube.com/vi/${it.id}/maxresdefault.jpg`;
+  document.getElementById('thumb').onerror = function() { this.src = `https://img.youtube.com/vi/${it.id}/mqdefault.jpg`; this.onerror = null; };
+  document.getElementById('title').textContent = it.title || it.id;
+  document.getElementById('channel').textContent = (it.channel || '') + (it.views ? ` · ${it.views} views` : '');
+  document.getElementById('yt').href = `https://www.youtube.com/watch?v=${it.id}`;
+  renderTags();
+  document.getElementById('tagInput').value = '';
+  renderSuggestions('');
+  const done = initialTotal - items.length + idx;
+  document.getElementById('pfill').style.width = `${initialTotal ? done*100/initialTotal : 0}%`;
+  document.getElementById('plabel').textContent = `${idx+1} of ${items.length} pending`;
+}
+
+function renderTags() {
+  const it = items[idx];
+  document.getElementById('tags').innerHTML = (it.tags||[]).map(t => `
+    <span class="tag-chip">${esc(t)}<span class="x" onclick="removeTag('${esc(t)}')">×</span></span>
+  `).join('') || '<span style="color:var(--muted);font-size:13px;padding:6px 4px">no tags</span>';
+}
+
+function esc(s) { return String(s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]); }
+
+function removeTag(t) {
+  items[idx].tags = (items[idx].tags||[]).filter(x => x !== t);
+  renderTags();
+}
+
+function renderSuggestions(q) {
+  const cur = new Set(items[idx]?.tags || []);
+  const ql = q.toLowerCase();
+  const matches = ALL_TAGS.filter(t => !cur.has(t) && t.includes(ql)).slice(0, 30);
+  document.getElementById('sugs').innerHTML = matches.map(t =>
+    `<span class="tag-sug" onclick="addTag('${esc(t)}')">${esc(t)}</span>`
+  ).join('');
+}
+
+function addTag(t) {
+  if (!items[idx].tags) items[idx].tags = [];
+  if (!items[idx].tags.includes(t)) items[idx].tags.push(t);
+  renderTags();
+  renderSuggestions(document.getElementById('tagInput').value);
+}
+
+document.getElementById('tagInput').addEventListener('input', e => renderSuggestions(e.target.value));
+document.getElementById('tagInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = e.target.value.trim().toLowerCase();
+    if (v && ALL_TAGS.includes(v)) addTag(v);
+    e.target.value = ''; renderSuggestions('');
+  }
+});
+
+async function approve() {
+  const it = items[idx];
+  const r = await fetch('/api/approve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(it) });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Published', 'success');
+    items.splice(idx, 1);
+    if (idx >= items.length) idx = Math.max(0, items.length - 1);
+    if (!items.length) return load();
+    render();
+  } else {
+    toast(d.msg || 'Publish failed', 'error');
+  }
+}
+
+async function reject() {
+  const it = items[idx];
+  const r = await fetch('/api/reject', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(it) });
+  const d = await r.json();
+  if (d.ok) {
+    toast('Rejected', 'info');
+    items.splice(idx, 1);
+    if (idx >= items.length) idx = Math.max(0, items.length - 1);
+    if (!items.length) return load();
+    render();
+  }
+}
+
+function next() {
+  idx = (idx + 1) % items.length;
+  render();
+}
+
+function toast(msg, type='info') {
+  const icons = {
+    success: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3aecba" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>',
+    error:   '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e94560" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
+    info:    ''
+  };
+  const t = document.getElementById('toast');
+  t.innerHTML = (icons[type] || '') + '<span>' + esc(msg) + '</span>';
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key === 'ArrowRight' || e.key === 'Enter') approve();
+  if (e.key === 'ArrowLeft') reject();
+  if (e.key === 's' || e.key === 'S') next();
+});
+
+load();
+</script>
+</body>
+</html>
