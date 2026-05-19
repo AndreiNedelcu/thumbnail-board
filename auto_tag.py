@@ -342,19 +342,24 @@ def main():
             if ok:
                 published, msg = publish_to_worker(entry, auth_token)
                 if published:
-                    # Log for audit but don't write to pending_review.json
                     pub_log = json.loads(AUTO_PUBLISHED_FILE.read_text()) if AUTO_PUBLISHED_FILE.exists() else []
                     pub_log.append({**entry, "result": msg})
                     AUTO_PUBLISHED_FILE.write_text(json.dumps(pub_log, ensure_ascii=False, indent=2))
                     print(f"           🚀 auto-published: {tags}")
                     continue
-                # publish failed — fall back to review queue
                 print(f"           ⚠ publish failed ({msg}) — queuing for review")
             else:
                 print(f"           👀 needs human ({reason}) — queuing for review")
-        # Default path: write to pending_review.json
-        review.append(entry)
-        REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
+        # Append to pending_review.json — re-read from disk to avoid clobbering
+        # concurrent removals by review.py.
+        try:
+            current = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
+        except Exception:
+            current = []
+        # Don't duplicate
+        if not any(r.get("id") == entry["id"] for r in current):
+            current.append(entry)
+            REVIEW_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2))
         if not args.auto_approve:
             print(f"           ✓ {tags}")
 

@@ -94,15 +94,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             print(f"[approve] network error for {entry.get('id')}: {e}", file=sys.stderr)
             return self._json({"ok": False, "msg": str(e)}, 500)
         print(f"[approve] worker response for {entry.get('id')}: {resp}", file=sys.stderr)
-        if not resp.get("ok"):
+        msg = resp.get("msg", "") or ""
+        # "Already in board" means we ALREADY published this — treat as success and clean up
+        is_ok_or_already = resp.get("ok") or "Already" in msg
+        if not is_ok_or_already:
             return self._json(resp, 400)
         # Record what AI said vs what user kept — feedback for next batch
-        self._record_feedback(entry, "approved")
+        if resp.get("ok"):
+            self._record_feedback(entry, "approved")
         # Remove from pending_review.json
         review = json.loads(REVIEW_FILE.read_text())
         review = [r for r in review if r["id"] != entry["id"]]
         REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
-        return self._json({"ok": True})
+        return self._json({"ok": True, "msg": msg or "ok"})
 
     def _handle_reject(self, entry):
         rejected = json.loads(REJECTED_FILE.read_text()) if REJECTED_FILE.exists() else []
