@@ -457,13 +457,15 @@ function openMenu(btn, info) {
   // We use fixed positioning so it floats above YouTube's overlays
   const mw = menu.offsetWidth;
   const mh = menu.offsetHeight;
-  // Button is now at the bottom-right of the card — open the menu
-  // UPWARDS and align its right edge with the button's right edge.
+  // Open the menu UPWARDS and align its right edge with the right edge
+  // of YouTube's controls stack (or the button's right edge as fallback).
+  // Using the stack as anchor matches the visual right edge that the
+  // user perceives — the column of YT buttons.
+  const ytStack = btn.closest('.ytInlinePlayerControlsTopRightControls');
+  const anchorR = ytStack ? ytStack.getBoundingClientRect().right : r.right;
   let top  = r.top - mh - 6;
-  let left = r.right - mw;
-  // Flip downwards if there's no room above
+  let left = anchorR - mw + 2;   // +2 compensates for menu's 1px border
   if (top < 8) top = r.bottom + 6;
-  // Keep within viewport horizontally
   if (left < 8) left = 8;
   if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
   if (top + mh > window.innerHeight - 8) top = window.innerHeight - mh - 8;
