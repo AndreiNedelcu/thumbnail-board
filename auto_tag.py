@@ -55,10 +55,32 @@ CATS = {
     "BACKDROP":  ["dark","light","blurry"],
 }
 
-ALL_VALID = set()
-for cat, subs in CATS.items():
-    for s in subs:
-        ALL_VALID.add(f"{cat.lower()}-{s}")
+def build_all_valid():
+    """All valid tag strings from current CATS dict."""
+    out = set()
+    for cat, subs in CATS.items():
+        for s in subs:
+            out.add(f"{cat.lower()}-{s}")
+    return out
+
+def discover_custom_tags(board: list, feedback: list) -> int:
+    """Mutates CATS to include any custom tags found in published board
+    items or in recent human approvals. Returns count of new additions."""
+    added = 0
+    sources = list(board) + [{"tags": f.get("final_tags", [])} for f in feedback]
+    for v in sources:
+        for t in (v.get("tags") or []):
+            dash = t.find("-")
+            if dash < 1: continue
+            cat = t[:dash].upper()
+            sub = t[dash+1:]
+            if cat not in CATS: continue
+            if sub not in CATS[cat]:
+                CATS[cat].append(sub)
+                added += 1
+    return added
+
+ALL_VALID = build_all_valid()
 
 # ── Helpers ──────────────────────────────────────────────────────────
 def download_thumb_b64(video_id: str) -> str | None:
@@ -163,11 +185,13 @@ def build_taxonomy_str() -> str:
         out.append(f"  {cat.lower()}: " + ", ".join(f"{cat.lower()}-{s}" for s in subs))
     return "\n".join(out)
 
-TAXONOMY_STR = build_taxonomy_str()
+# Computed at runtime in main() AFTER discover_custom_tags
+TAXONOMY_STR = ""
 
 def call_ollama(model: str, image_b64: str, title: str,
                 positive: list, corrections: list) -> list:
     """Call Ollama with the image + prompt. Returns list of tag strings."""
+    # TAXONOMY_STR is mutated in main() once we've discovered custom tags
     prompt = PROMPT_TEMPLATE.format(taxonomy=TAXONOMY_STR)
     if title:
         prompt += f"\n\nVideo title (context): {title}"
@@ -246,6 +270,15 @@ def main():
     review  = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
     skip    = set(json.loads(SKIP_FILE.read_text()) if SKIP_FILE.exists() else [])
     feedback = load_feedback()
+
+    # Discover custom tags from data.json and previous feedback,
+    # add them to the taxonomy so the AI knows they exist
+    new_tags_added = discover_custom_tags(board, feedback)
+    global ALL_VALID, TAXONOMY_STR
+    ALL_VALID = build_all_valid()
+    TAXONOMY_STR = build_taxonomy_str()
+    if new_tags_added:
+        print(f"📚 Discovered {new_tags_added} custom tags from board + feedback")
 
     # Also skip items already published (in data.json now)
     published = set(v["id"] for v in board)
