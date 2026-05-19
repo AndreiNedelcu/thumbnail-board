@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Thumbnail Board",
-  "version": "2.0",
-  "description": "Save YouTube thumbnails to your Thumbnail Board with tags",
+  "version": "3.0",
+  "description": "One-click save: AI tags any YouTube thumbnail and publishes to your Thumbnail Board",
   "permissions": ["activeTab", "scripting", "tabs", "storage"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "http://localhost:3000/*",
-    "https://*.workers.dev/*"
+    "http://localhost:11434/*",
+    "https://*.workers.dev/*",
+    "https://img.youtube.com/*"
   ],
   "background": {
     "service_worker": "background.js"

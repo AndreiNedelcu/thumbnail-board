@@ -1,65 +1,49 @@
-// ── Thumbnail Board Extension ─────────────────────────────────────
-// Tries Cloudflare Worker first, falls back to localhost if unreachable.
-// CHANGE WORKER_URL after deploying the Worker.
+// ── Thumbnail Board Extension · AI auto-tag ────────────────────────
+// One-click flow: scrape page → ask local Ollama for tags → POST to Worker.
+// No manual tag picker. No Eagle. Just speed.
+
 const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
 const LOCAL_URL  = 'http://localhost:3000';
-let SERVER = WORKER_URL;  // updated by health check below
-let AUTH_TOKEN = '';      // loaded from chrome.storage
+const OLLAMA_URL = 'http://localhost:11434';
+const MODEL      = 'qwen2.5vl:7b';
 
+let SERVER = WORKER_URL;
+let AUTH_TOKEN = '';
+let currentVideoId = null;
+let saving = false;
+
+// ── Taxonomy (must match Worker canonicaliseTags + auto_tag.py) ───
 const CATS = {
-  STYLE:     { color:'#e94560', bg:'#533483', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
-  MOOD:      { color:'#4caf50', bg:'#2d6a2d', subs:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'] },
-  TEXT:      { color:'#7c4dff', bg:'#4527a0', subs:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'] },
-  ELEMENT:   { color:'#ff6d00', bg:'#bf360c', subs:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'] },
-  CAMERA:    { color:'#00bcd4', bg:'#006064', subs:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'] },
-  SUBJECT:   { color:'#ffab40', bg:'#e65100', subs:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'] },
-  FORMATION: { color:'#ab47bc', bg:'#6a1b9a', subs:['flat-lay','line','grid','v'] },
-  TOPIC:     { color:'#26a69a', bg:'#004d40', subs:['comparison','product-showcase','space','secret','social-media','size'] },
-  CALLOUT:   { color:'#d4e157', bg:'#827717', subs:['magnifier'] },
-  BACKDROP:  { color:'#ec407a', bg:'#880e4f', subs:['dark','light','blurry'] },
-  CHANNEL:   { color:'#00bcd4', bg:'#006064', subs:['theseniordev-main','theseniordev-podcast'] },
+  STYLE:     ['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'],
+  MOOD:      ['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'],
+  TEXT:      ['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'],
+  ELEMENT:   ['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'],
+  CAMERA:    ['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'],
+  SUBJECT:   ['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'],
+  FORMATION: ['flat-lay','line','grid','v'],
+  TOPIC:     ['comparison','product-showcase','space','secret','social-media','size'],
+  CALLOUT:   ['magnifier'],
+  BACKDROP:  ['dark','light','blurry'],
 };
+const ALL_VALID = new Set(
+  Object.entries(CATS).flatMap(([cat, subs]) => subs.map(s => `${cat.toLowerCase()}-${s}`))
+);
+const TAXONOMY_STR = Object.entries(CATS)
+  .map(([cat, subs]) => `  ${cat.toLowerCase()}: ${subs.map(s => `${cat.toLowerCase()}-${s}`).join(', ')}`)
+  .join('\n');
 
-let selected = new Set();
-let videoData = { id:'', title:'', channel:'', views:'' };
-let panelOpen = false;
-let currentVideoId = null; // set by init() when successfully detected
-
+// ── Video metadata scraping ───────────────────────────────────────
 function getVideoId() {
   const RE = /[?&]v=([A-Za-z0-9_-]{11})|\/shorts\/([A-Za-z0-9_-]{11})/;
-
-  // 1. YouTube DOM element — most reliable, doesn't depend on URL parsing
   const watchEl = document.querySelector('ytd-watch-flexy, ytd-watch-two');
-  if (watchEl) {
-    const vid = watchEl.getAttribute('video-id');
-    if (vid) return vid;
-  }
-
-  // 2. URL parameter
-  let m = location.href.match(RE);
-  if (m) return m[1] || m[2];
-
-  // 3. document.URL
-  m = document.URL.match(RE);
-  if (m) return m[1] || m[2];
-
-  // 4. canonical link tag
-  const canonical = document.querySelector('link[rel="canonical"]');
-  if (canonical?.href) {
-    m = canonical.href.match(RE);
-    if (m) return m[1] || m[2];
-  }
-
-  // 5. og:url meta tag
-  const ogUrl = document.querySelector('meta[property="og:url"]');
-  if (ogUrl?.content) {
-    m = ogUrl.content.match(RE);
-    if (m) return m[1] || m[2];
-  }
-
-  // 6. Last resort: ID stored when init() last ran successfully
+  if (watchEl) { const v = watchEl.getAttribute('video-id'); if (v) return v; }
+  let m = location.href.match(RE);             if (m) return m[1] || m[2];
+  m = document.URL.match(RE);                  if (m) return m[1] || m[2];
+  const canon = document.querySelector('link[rel="canonical"]');
+  if (canon?.href) { m = canon.href.match(RE); if (m) return m[1] || m[2]; }
+  const og = document.querySelector('meta[property="og:url"]');
+  if (og?.content) { m = og.content.match(RE); if (m) return m[1] || m[2]; }
   if (currentVideoId) return currentVideoId;
-
   return null;
 }
 
@@ -69,7 +53,7 @@ function getVideoInfo() {
   const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
     || document.title.replace(' - YouTube','').trim();
   const channel = document.querySelector('ytd-channel-name yt-formatted-string a, #channel-name a')?.textContent?.trim() || '';
-  // Read viewCount from YouTube's embedded JSON data — immune to DOM changes
+  // viewCount from embedded JSON
   let views = '';
   try {
     for (const script of document.querySelectorAll('script:not([src])')) {
@@ -78,14 +62,13 @@ function getVideoInfo() {
       const m = t.match(/"viewCount"\s*:\s*"(\d+)"/);
       if (m) {
         const n = parseInt(m[1], 10);
-        if (n >= 1000000)      views = (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
-        else if (n >= 1000)    views = (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
-        else                   views = n.toString();
+        if (n >= 1_000_000) views = (n/1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+        else if (n >= 1_000) views = (n/1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+        else views = n.toString();
         break;
       }
     }
   } catch {}
-  // Fallback: dedicated renderer element
   if (!views) {
     const el = document.querySelector('ytd-video-view-count-renderer span');
     if (el) views = el.textContent.trim().replace(/\s*views?/i,'').trim();
@@ -106,7 +89,6 @@ async function saveAuthToken(t) {
   try { await chrome.storage.local.set({ tbAuthToken: AUTH_TOKEN }); } catch {}
 }
 
-/** Pick best reachable endpoint. Tries Worker, falls back to localhost. */
 async function detectServer() {
   try {
     const r = await fetch(`${WORKER_URL}/api/health`, { method:'GET' });
@@ -116,11 +98,9 @@ async function detectServer() {
     const r = await fetch(`${LOCAL_URL}/api/data`, { method:'GET' });
     if (r.ok) { SERVER = LOCAL_URL; return; }
   } catch {}
-  // Default to worker if neither responded (server.py might still be starting)
   SERVER = WORKER_URL;
 }
 
-/** Wrapper around fetch that adds auth header when targeting the Worker. */
 async function tbFetch(path, options = {}) {
   const headers = { ...(options.headers || {}) };
   if (SERVER === WORKER_URL && (options.method || 'GET').toUpperCase() !== 'GET') {
@@ -132,312 +112,221 @@ async function tbFetch(path, options = {}) {
 
 async function checkInBoard(id) {
   try {
-    // Always read data.json from the public GitHub Pages (or local server) — no auth needed
     const r = await tbFetch(`/api/data`);
     const data = await r.json();
     return data.some(v => v.id === id);
   } catch { return false; }
 }
 
-// ── Build UI ──────────────────────────────────────────────────────
-function buildPanel() {
-  const btn = document.createElement('button');
-  btn.id = 'tb-btn';
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
-  document.body.appendChild(btn);
-
-  const panel = document.createElement('div');
-  panel.id = 'tb-panel';
-  panel.innerHTML = `
-    <div id="tb-panel-header">
-      <div class="tb-logo">THUMBNAIL<span>BOARD</span></div>
-      <button id="tb-close">×</button>
-    </div>
-    <div id="tb-thumb-row">
-      <img id="tb-thumb" src="" alt="">
-      <div class="tb-meta">
-        <div class="tb-title" id="tb-title"></div>
-        <div class="tb-channel" id="tb-channel"></div>
-      </div>
-    </div>
-    <div id="tb-tags-scroll"></div>
-    <div id="tb-sel-preview"><span class="tb-empty-sel">No tags selected</span></div>
-    <div id="tb-panel-footer">
-      <button id="tb-cancel-btn">Cancel</button>
-      <button id="tb-save-btn" disabled>Save to Board</button>
-    </div>`;
-  document.body.appendChild(panel);
-
-  const toast = document.createElement('div');
-  toast.id = 'tb-toast';
-  document.body.appendChild(toast);
-
-  buildTagPanel();
-
-  // Event listeners (no inline onclick — required for content scripts)
-  btn.addEventListener('click', () => togglePanel());
-  document.getElementById('tb-close').addEventListener('click', closePanel);
-  document.getElementById('tb-cancel-btn').addEventListener('click', closePanel);
-  document.getElementById('tb-save-btn').addEventListener('click', saveToBoard);
-}
-
-function buildTagPanel() {
-  const scroll = document.getElementById('tb-tags-scroll');
-  scroll.innerHTML = '';
-
-  Object.entries(CATS).forEach(([cat, cfg]) => {
-    const sec = document.createElement('div');
-    sec.className = 'tb-cat-section';
-
-    // Title row
-    const titleRow = document.createElement('div');
-    titleRow.className = 'tb-cat-title';
-    titleRow.innerHTML = `<span class="tb-cat-dot" style="background:${cfg.color}"></span>${cat}`;
-    const addBtn = document.createElement('button');
-    addBtn.className = 'tb-cat-add-btn';
-    addBtn.textContent = '+ add';
-    addBtn.addEventListener('click', () => toggleCustomInput(cat));
-    titleRow.appendChild(addBtn);
-    sec.appendChild(titleRow);
-
-    // Tag grid
-    const grid = document.createElement('div');
-    grid.className = 'tb-tag-grid';
-    grid.id = `tb-grid-${cat}`;
-    cfg.subs.forEach(sub => {
-      const tag = `${cat.toLowerCase()}-${sub}`;
-      const tagBtn = document.createElement('button');
-      tagBtn.className = 'tb-tag-btn';
-      tagBtn.dataset.tag = tag;
-      tagBtn.textContent = sub;
-      tagBtn.addEventListener('click', () => toggleTag(tag, tagBtn, cfg.bg, cfg.color));
-      grid.appendChild(tagBtn);
-    });
-    sec.appendChild(grid);
-
-    // Custom input row
-    const customRow = document.createElement('div');
-    customRow.className = 'tb-custom-row';
-    customRow.id = `tb-custom-${cat}`;
-    const inp = document.createElement('input');
-    inp.className = 'tb-custom-inp';
-    inp.id = `tb-inp-${cat}`;
-    inp.placeholder = 'e.g. neon';
-    inp.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); addCustomTag(cat); }
-      e.stopPropagation();
-    });
-    const addTagBtn = document.createElement('button');
-    addTagBtn.className = 'tb-custom-add';
-    addTagBtn.textContent = 'Add';
-    addTagBtn.addEventListener('click', () => addCustomTag(cat));
-    customRow.appendChild(inp);
-    customRow.appendChild(addTagBtn);
-    sec.appendChild(customRow);
-
-    scroll.appendChild(sec);
-  });
-}
-
-function toggleCustomInput(cat) {
-  const row = document.getElementById(`tb-custom-${cat}`);
-  const inp = document.getElementById(`tb-inp-${cat}`);
-  const open = row.classList.toggle('open');
-  if (open) inp.focus();
-}
-
-function addCustomTag(cat) {
-  const inp = document.getElementById(`tb-inp-${cat}`);
-  const raw = inp.value.trim().toLowerCase().replace(/\s+/g,'-');
-  if (!raw) return;
-  const tag = `${cat.toLowerCase()}-${raw}`;
-  const grid = document.getElementById(`tb-grid-${cat}`);
-  if (!grid.querySelector(`[data-tag="${tag}"]`)) {
-    const cfg = CATS[cat];
-    const tagBtn = document.createElement('button');
-    tagBtn.className = 'tb-tag-btn';
-    tagBtn.dataset.tag = tag;
-    tagBtn.textContent = raw;
-    tagBtn.addEventListener('click', () => toggleTag(tag, tagBtn, cfg.bg, cfg.color));
-    grid.appendChild(tagBtn);
-  }
-  const btn = grid.querySelector(`[data-tag="${tag}"]`);
-  if (btn && !selected.has(tag)) toggleTag(tag, btn, CATS[cat].bg, CATS[cat].color);
-  inp.value = '';
-  document.getElementById(`tb-custom-${cat}`).classList.remove('open');
-}
-
-function toggleTag(tag, btn, bg, color) {
-  if (selected.has(tag)) {
-    selected.delete(tag);
-    btn.classList.remove('sel');
-    btn.style.cssText = '';
-  } else {
-    selected.add(tag);
-    btn.classList.add('sel');
-    btn.style.background = bg;
-    btn.style.color = '#fff';
-    btn.style.borderColor = 'transparent';
-  }
-  refreshPreview();
-}
-
-function untagSelected(tag) {
-  selected.delete(tag);
-  const btn = document.querySelector(`.tb-tag-btn[data-tag="${tag}"]`);
-  if (btn) { btn.classList.remove('sel'); btn.style.cssText = ''; }
-  refreshPreview();
-}
-
-function refreshPreview() {
-  const preview = document.getElementById('tb-sel-preview');
-  if (!selected.size) {
-    preview.innerHTML = '<span class="tb-empty-sel">No tags selected</span>';
-  } else {
-    preview.innerHTML = [...selected].map(t => {
-      const cat = t.split('-')[0].toUpperCase();
-      const cfg = CATS[cat] || { bg:'#333' };
-      return `<span class="tb-sel-tag" style="background:${cfg.bg}">${t} <span class="tb-sel-x" data-untag="${t}">×</span></span>`;
-    }).join('');
-    // Attach untag listeners
-    preview.querySelectorAll('.tb-sel-x').forEach(x => {
-      x.addEventListener('click', () => untagSelected(x.dataset.untag));
-    });
-  }
-  document.getElementById('tb-save-btn').disabled = selected.size === 0;
-}
-
-async function togglePanel() {
-  if (panelOpen) { closePanel(); return; }
-
-  // If local detection fails, ask background.js for the confirmed tab URL
-  let info = getVideoInfo();
-  if (!info || !info.id) {
+// ── Thumbnail download + Ollama call ──────────────────────────────
+async function fetchThumbnailBase64(videoId) {
+  for (const quality of ['maxresdefault', 'mqdefault']) {
     try {
-      const resp = await new Promise((resolve, reject) => {
-        chrome.runtime.sendMessage({ type: 'TB_GET_URL' }, r => {
-          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
-          else resolve(r);
-        });
+      const r = await fetch(`https://img.youtube.com/vi/${videoId}/${quality}.jpg`);
+      if (!r.ok) continue;
+      const blob = await r.blob();
+      if (blob.size < 2000) continue;  // YouTube's grey placeholder is tiny
+      return await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result.split(',')[1]); // strip data:image/jpeg;base64,
+        fr.onerror = rej;
+        fr.readAsDataURL(blob);
       });
-      if (resp?.url) {
-        const m = resp.url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-        if (m) { currentVideoId = m[1]; info = getVideoInfo(); }
-      }
     } catch {}
   }
+  return null;
+}
 
-  if (!info || !info.id) {
-    showToast('❌ Could not detect video ID — try refreshing the page');
-    return;
+function buildOllamaPrompt(title) {
+  return `You are an expert at categorising YouTube thumbnails for a curated reference board.
+
+You must pick tags from this fixed taxonomy. Tags are written as \`category-subtag\` and you may ONLY use these:
+
+${TAXONOMY_STR}
+
+Rules:
+- Output a JSON object with one key: "tags" (an array of strings).
+- Each string MUST exactly match one from the list above (case-sensitive).
+- Choose 3-8 tags total. Be selective: only tags that clearly apply.
+- Do NOT invent new tags. Do NOT omit the category prefix.
+- No other text outside the JSON.
+
+Example output: {"tags": ["style-colorful", "mood-dramatic", "text-number", "element-celebrity"]}
+
+Video title (context): ${title || '(unknown)'}
+
+Now classify this thumbnail.`;
+}
+
+async function callOllama(imageB64, title) {
+  const r = await fetch(`${OLLAMA_URL}/api/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      prompt: buildOllamaPrompt(title),
+      images: [imageB64],
+      stream: false,
+      format: 'json',
+      options: { temperature: 0.2 },
+    }),
+  });
+  if (!r.ok) throw new Error(`Ollama HTTP ${r.status}`);
+  const j = await r.json();
+  const raw = (j.response || '').trim();
+  let obj;
+  try { obj = JSON.parse(raw); }
+  catch {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Ollama returned non-JSON');
+    obj = JSON.parse(m[0]);
   }
-  videoData = info;
-  document.getElementById('tb-thumb').src = `https://img.youtube.com/vi/${videoData.id}/maxresdefault.jpg`;
-  document.getElementById('tb-title').textContent = videoData.title;
-  document.getElementById('tb-channel').textContent = videoData.channel;
-  selected.clear();
-  document.querySelectorAll('.tb-tag-btn.sel').forEach(b => { b.classList.remove('sel'); b.style.cssText = ''; });
-  refreshPreview();
-  document.getElementById('tb-panel').classList.add('open');
-  panelOpen = true;
+  if (!obj || !Array.isArray(obj.tags)) throw new Error('Ollama returned no tags array');
+  const tags = obj.tags.filter(t => typeof t === 'string' && ALL_VALID.has(t));
+  if (!tags.length) throw new Error('No valid tags returned');
+  return tags;
 }
 
-function closePanel() {
-  document.getElementById('tb-panel').classList.remove('open');
-  panelOpen = false;
-}
+// ── Main one-click flow ───────────────────────────────────────────
+async function saveWithAI() {
+  if (saving) return;
+  const btn = document.getElementById('tb-btn');
 
-async function saveToBoard() {
-  if (!selected.size) return;
-  const btn = document.getElementById('tb-save-btn');
-  btn.disabled = true; btn.textContent = 'Saving…';
-  // Ensure we have an auth token if we're hitting the cloud Worker
+  const info = getVideoInfo();
+  if (!info || !info.id) { setBtnState('error', 'No video ID'); return; }
+
+  // Auth (only needed on cloud)
   if (SERVER === WORKER_URL && !AUTH_TOKEN) {
     await loadAuthToken();
     if (!AUTH_TOKEN) {
       const t = prompt('Paste your Thumbnail Board access token:');
       if (t) await saveAuthToken(t);
     }
-    if (!AUTH_TOKEN) {
-      showToast('❌ No access token — get one from your board owner');
-      btn.disabled = false; btn.textContent = 'Save to Board';
-      return;
-    }
+    if (!AUTH_TOKEN) { setBtnState('error', 'Token required'); return; }
   }
+
+  saving = true;
   try {
-    const r = await tbFetch(`/api/add`, {
+    // Step 1: thumbnail
+    setBtnState('loading', 'Loading thumbnail…');
+    const b64 = await fetchThumbnailBase64(info.id);
+    if (!b64) { throw new Error('thumbnail not available (private/deleted)'); }
+
+    // Step 2: Ollama
+    setBtnState('loading', 'Analyzing with AI…');
+    let tags;
+    try { tags = await callOllama(b64, info.title); }
+    catch (e) {
+      // Distinguish "Ollama not running" from other errors
+      if (String(e).match(/Failed to fetch|NetworkError|ECONNREFUSED/i)) {
+        throw new Error('Ollama not running on localhost:11434');
+      }
+      throw e;
+    }
+
+    // Step 3: publish to board
+    setBtnState('loading', 'Publishing…');
+    const r = await tbFetch('/api/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...videoData, tags: [...selected] })
+      body: JSON.stringify({ ...info, tags }),
     });
     const d = await r.json();
     if (d.ok) {
-      showToast(`✅ Saved with ${selected.size} tags!`);
-      closePanel();
-      const floatBtn = document.getElementById('tb-btn');
-      floatBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
-      floatBtn.classList.add('in-board');
+      setBtnState('in-board', `Saved · ${tags.length} tags`);
+      showToast(`Saved with ${tags.length} tags: ${tags.join(', ')}`, 'success');
     } else if (r.status === 401) {
       AUTH_TOKEN = '';
       try { await chrome.storage.local.remove(['tbAuthToken']); } catch {}
-      showToast('❌ Invalid token — try Save again to re-enter it');
+      throw new Error('Invalid token — click again to re-enter');
+    } else if (d.msg && /already/i.test(d.msg)) {
+      setBtnState('in-board', 'Already in board');
     } else {
-      showToast(`❌ ${d.msg || 'Error saving'}`);
+      throw new Error(d.msg || 'Publish failed');
     }
-  } catch(e) {
-    showToast('❌ Cannot reach server');
+  } catch (e) {
+    console.error('[ThumbnailBoard]', e);
+    setBtnState('error', String(e).replace('Error: ', '').slice(0, 60));
+    showToast(String(e).replace('Error: ', ''), 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Save to Board';
+    saving = false;
   }
 }
 
-function showToast(msg) {
+// ── Button + toast UI ─────────────────────────────────────────────
+const ICONS = {
+  ai: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>',
+  spinner: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="tb-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  error: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
+};
+
+function setBtnState(state, label) {
+  const btn = document.getElementById('tb-btn');
+  if (!btn) return;
+  btn.className = '';                     // reset
+  btn.dataset.state = state;
+  btn.classList.add(`tb-state-${state}`);
+  const icon = state === 'loading' ? ICONS.spinner
+              : state === 'in-board' ? ICONS.check
+              : state === 'error' ? ICONS.error
+              : ICONS.ai;
+  btn.innerHTML = `${icon}<span>${label}</span>`;
+}
+
+function buildButton() {
+  if (document.getElementById('tb-btn')) return;
+  const btn = document.createElement('button');
+  btn.id = 'tb-btn';
+  document.body.appendChild(btn);
+  btn.addEventListener('click', saveWithAI);
+
+  const toast = document.createElement('div');
+  toast.id = 'tb-toast';
+  document.body.appendChild(toast);
+
+  setBtnState('idle', 'Save with AI');
+}
+
+function showToast(msg, type = 'info') {
   const t = document.getElementById('tb-toast');
+  if (!t) return;
+  t.dataset.type = type;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+  t._timer = setTimeout(() => t.classList.remove('show'), 4000);
 }
 
+// ── Init + SPA navigation ─────────────────────────────────────────
 function isWatchPage() {
   return location.href.includes('youtube.com/watch');
 }
 
-function init() {
+async function init() {
   const existing = document.getElementById('tb-btn');
   if (!isWatchPage()) {
-    // Hide button and clear state when navigating away from a video page
     if (existing) existing.style.display = 'none';
-    if (panelOpen) closePanel();
     currentVideoId = null;
     return;
   }
   const id = getVideoId();
   if (!id) return;
-  currentVideoId = id; // store for use in togglePanel()
+  currentVideoId = id;
 
-  // Show button (it may have been hidden)
-  if (existing) existing.style.display = '';
-  if (existing) {
-    // Already injected — just update state
-    existing.classList.remove('in-board');
-    existing.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
-    if (panelOpen) closePanel();
-  } else {
-    buildPanel();
-  }
+  if (!existing) buildButton();
+  const btn = document.getElementById('tb-btn');
+  btn.style.display = '';
 
+  // Default state — but check if already in board first
+  setBtnState('idle', 'Save with AI');
   checkInBoard(id).then(inBoard => {
-    const btn = document.getElementById('tb-btn');
-    if (!btn) return;
-    if (inBoard) {
-      btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
-      btn.classList.add('in-board');
+    if (inBoard && document.getElementById('tb-btn')?.dataset.state === 'idle') {
+      setBtnState('in-board', 'In Board');
     }
   });
 }
 
-// Handle SPA navigation via URL changes
 let lastUrl = location.href;
 new MutationObserver(() => {
   if (location.href !== lastUrl) {
@@ -446,11 +335,8 @@ new MutationObserver(() => {
   }
 }).observe(document.body, { childList: true, subtree: true });
 
-// Also listen for YouTube's custom navigation event
 document.addEventListener('yt-navigate-finish', () => setTimeout(init, 800));
 
-// Listen for URL change messages from background.js
-// background.js sends the confirmed tab URL so we can cache it
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'TB_URL_CHANGED') {
     if (msg.url) {
@@ -461,7 +347,6 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-// Kick off: detect best endpoint + load token, then init
 (async () => {
   await Promise.all([detectServer(), loadAuthToken()]);
   setTimeout(init, 1500);
