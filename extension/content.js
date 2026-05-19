@@ -1,7 +1,7 @@
 // ── Thumbnail Board Extension ─────────────────────────────────────
 // Tries Cloudflare Worker first, falls back to localhost if unreachable.
 // CHANGE WORKER_URL after deploying the Worker.
-const WORKER_URL = 'https://thumbnail-board-api.theseniordev.workers.dev';
+const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
 const LOCAL_URL  = 'http://localhost:3000';
 let SERVER = WORKER_URL;  // updated by health check below
 let AUTH_TOKEN = '';      // loaded from chrome.storage

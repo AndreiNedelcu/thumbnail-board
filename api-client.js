@@ -11,7 +11,7 @@
 (function () {
   // CHANGE THIS after deploying the Worker — the URL wrangler prints.
   // Until then, the cloud fallback won't be reachable.
-  const WORKER_URL = 'https://thumbnail-board-api.theseniordev.workers.dev';
+  const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
 
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   const API_BASE = isLocal ? '' : WORKER_URL;
