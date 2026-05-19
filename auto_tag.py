@@ -24,7 +24,8 @@ ROOT = Path(__file__).parent
 PENDING_FILE   = ROOT / "eagle-pending.json"
 BOARD_FILE     = ROOT / "data.json"
 REVIEW_FILE    = ROOT / "pending_review.json"
-SKIP_FILE      = ROOT / "auto_tag_skip.json"  # ids we permanently couldn't process
+SKIP_FILE      = ROOT / "auto_tag_skip.json"   # ids we permanently couldn't process
+FEEDBACK_FILE  = ROOT / "auto_tag_feedback.json"  # what AI said vs what user kept
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
@@ -74,13 +75,34 @@ def download_thumb_b64(video_id: str) -> str | None:
             continue
     return None
 
-def build_few_shot(board: list, k: int = 6) -> list:
-    """Pick k well-tagged board entries with thumbnails as in-context examples."""
-    # Bias toward items with 4-10 official tags (good signal, not over-tagged)
-    candidates = [v for v in board if 3 <= len(v.get("tags",[])) <= 10
-                  and all(t in ALL_VALID for t in v.get("tags",[]))]
-    random.shuffle(candidates)
-    return candidates[:k]
+def load_feedback() -> list:
+    """Past entries with both AI suggestion and final human-approved tags."""
+    if not FEEDBACK_FILE.exists(): return []
+    try: return json.loads(FEEDBACK_FILE.read_text())
+    except: return []
+
+def build_few_shot(board: list, k: int = 6) -> tuple[list, list]:
+    """Build positive + corrective few-shot.
+    Returns (positive_examples, correction_examples).
+    - positive: recently approved (high signal) + random board fallback
+    - correction: items where AI was wrong and user fixed them (most teaching)
+    """
+    feedback = load_feedback()
+    # Prefer the most recent corrections (last 30) — those teach the most
+    corrections = [f for f in feedback[-30:] if f.get("ai_tags") != f.get("final_tags")]
+    # And the most recent approved items as "good" examples
+    recent_good = [{"title": f.get("title",""), "tags": f.get("final_tags",[])}
+                   for f in feedback[-20:]]
+
+    if not recent_good:
+        # Fallback to board entries when we have no feedback yet
+        candidates = [v for v in board if 3 <= len(v.get("tags",[])) <= 10
+                      and all(t in ALL_VALID for t in v.get("tags",[]))]
+        random.shuffle(candidates)
+        recent_good = candidates[:k]
+
+    random.shuffle(recent_good)
+    return recent_good[:k], corrections[-3:]  # 3 corrections is enough to nudge
 
 PROMPT_TEMPLATE = """You are an expert at categorising YouTube thumbnails for a curated reference board.
 
@@ -107,16 +129,26 @@ def build_taxonomy_str() -> str:
 
 TAXONOMY_STR = build_taxonomy_str()
 
-def call_ollama(model: str, image_b64: str, title: str, few_shot: list) -> list:
+def call_ollama(model: str, image_b64: str, title: str,
+                positive: list, corrections: list) -> list:
     """Call Ollama with the image + prompt. Returns list of tag strings."""
-    # Build a compact message — Qwen2.5-VL handles images well via the images field
     prompt = PROMPT_TEMPLATE.format(taxonomy=TAXONOMY_STR)
     if title:
         prompt += f"\n\nVideo title (context): {title}"
-    if few_shot:
-        prompt += "\n\nReference examples from this exact board (titles + final tags):"
-        for ex in few_shot[:4]:  # short
+    if positive:
+        prompt += "\n\nReference (good examples from this board):"
+        for ex in positive[:4]:
             prompt += f"\n  - \"{ex.get('title','')[:70]}\" → {ex.get('tags',[])}"
+    if corrections:
+        prompt += "\n\nIMPORTANT — past mistakes you must avoid:"
+        for c in corrections:
+            removed = [t for t in c.get("ai_tags", []) if t not in c.get("final_tags", [])]
+            added   = [t for t in c.get("final_tags", []) if t not in c.get("ai_tags", [])]
+            if removed or added:
+                line = f"\n  - For \"{c.get('title','')[:60]}\":"
+                if removed: line += f"\n      You picked {removed} but those were WRONG, the user removed them."
+                if added:   line += f"\n      You missed {added} but those WERE correct."
+                prompt += line
 
     payload = {
         "model": model,
@@ -148,23 +180,33 @@ def call_ollama(model: str, image_b64: str, title: str, few_shot: list) -> list:
 # ── Main ─────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--limit", type=int, default=0, help="Process only first N (0 = all)")
-    ap.add_argument("--resume", action="store_true", help="Skip items already in pending_review.json")
+    ap.add_argument("--batch", type=int, default=10,
+                    help="Process N items then stop (default 10). Use 0 for all.")
+    ap.add_argument("--limit", type=int, default=0, help="Alias for --batch")
+    ap.add_argument("--resume", action="store_true", default=True,
+                    help="Skip items already in pending_review.json (default on)")
     ap.add_argument("--model", default="qwen2.5vl:7b")
     args = ap.parse_args()
+    if args.limit and not args.batch:
+        args.batch = args.limit
 
     pending = json.loads(PENDING_FILE.read_text())
     board   = json.loads(BOARD_FILE.read_text())
     review  = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
     skip    = set(json.loads(SKIP_FILE.read_text()) if SKIP_FILE.exists() else [])
+    feedback = load_feedback()
 
-    done_ids = set(r["id"] for r in review) if args.resume else set()
+    # Also skip items already published (in data.json now)
+    published = set(v["id"] for v in board)
+    done_ids = set(r["id"] for r in review) | published
     todo = [p for p in pending if p["id"] not in done_ids and p["id"] not in skip]
-    if args.limit > 0:
-        todo = todo[:args.limit]
+    if args.batch > 0:
+        todo = todo[:args.batch]
 
-    print(f"📊 Pending total: {len(pending)} | already reviewed: {len(done_ids)} | skipped: {len(skip)} | to do now: {len(todo)}")
-    print(f"🤖 Model: {args.model}")
+    print(f"📊 Total pending: {len([p for p in pending if p['id'] not in done_ids and p['id'] not in skip])}")
+    print(f"   In queue for review: {len(review)} | Published: {len(published)} | Skipped: {len(skip)}")
+    print(f"   Feedback entries (used for learning): {len(feedback)}")
+    print(f"🤖 Model: {args.model}    Batch: {len(todo)}")
     print(f"📝 Output: {REVIEW_FILE.name}\n")
 
     t0 = time.time()
@@ -185,9 +227,9 @@ def main():
             fails += 1
             continue
 
-        few = build_few_shot(board, k=6)
+        positive, corrections = build_few_shot(board, k=6)
         try:
-            tags = call_ollama(args.model, img_b64, title, few)
+            tags = call_ollama(args.model, img_b64, title, positive, corrections)
         except Exception as e:
             print(f"           ❌ Ollama error: {e}")
             fails += 1
@@ -207,15 +249,19 @@ def main():
             "channel": item.get("channel",""),
             "views": item.get("views",""),
             "tags": tags,
+            "ai_tags": list(tags),  # original — review will compare against this
             "auto_tagged_at": int(time.time()),
         }
         review.append(entry)
         REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
         print(f"           ✓ {tags}")
 
-    print(f"\n✅ Done. {len(review)} items in {REVIEW_FILE.name} ready for human review")
+    print(f"\n✅ Batch done. {len(review)} items waiting in {REVIEW_FILE.name}")
     print(f"   Errors: {fails}")
-    print(f"   Next: python3 review.py")
+    print(f"   Next:")
+    print(f"     export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+    print(f"     python3 review.py     # review this batch")
+    print(f"     python3 auto_tag.py   # then run again — next batch learns from your corrections")
 
 if __name__ == "__main__":
     main()

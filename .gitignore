@@ -1,0 +1,9 @@
+__pycache__/
+.DS_Store
+worker/.wrangler/
+pending_review.json
+pending_rejected.json
+auto_tag_feedback.json
+auto_tag_skip.json
+patch_tags.py
+sync.py.disabled

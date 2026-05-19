@@ -17,6 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 REVIEW_FILE   = ROOT / "pending_review.json"
 REJECTED_FILE = ROOT / "pending_rejected.json"
+FEEDBACK_FILE = ROOT / "auto_tag_feedback.json"  # learning signal for next batch
 
 WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
 AUTH_TOKEN = os.environ.get("TB_AUTH_TOKEN") or ""
@@ -53,8 +54,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._handle_reject(body)
         return self._json({"ok": False, "msg": "Not found"}, 404)
 
+    def _record_feedback(self, entry, outcome):
+        """Append a teaching example so the next auto_tag batch learns from it."""
+        fb = json.loads(FEEDBACK_FILE.read_text()) if FEEDBACK_FILE.exists() else []
+        fb.append({
+            "id": entry.get("id"),
+            "title": entry.get("title", ""),
+            "ai_tags": entry.get("ai_tags") or [],
+            "final_tags": entry.get("tags") or [],
+            "outcome": outcome,         # "approved" or "rejected"
+            "ts": int(__import__("time").time()),
+        })
+        FEEDBACK_FILE.write_text(json.dumps(fb, ensure_ascii=False, indent=2))
+
     def _handle_approve(self, entry):
-        # POST to worker /api/add
         payload = json.dumps(entry).encode()
         req = urllib.request.Request(
             f"{WORKER_URL}/api/add",
@@ -68,6 +81,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return self._json({"ok": False, "msg": str(e)}, 500)
         if not resp.get("ok"):
             return self._json(resp, 400)
+        # Record what AI said vs what user kept — feedback for next batch
+        self._record_feedback(entry, "approved")
         # Remove from pending_review.json
         review = json.loads(REVIEW_FILE.read_text())
         review = [r for r in review if r["id"] != entry["id"]]
@@ -78,6 +93,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         rejected = json.loads(REJECTED_FILE.read_text()) if REJECTED_FILE.exists() else []
         rejected.append(entry)
         REJECTED_FILE.write_text(json.dumps(rejected, ensure_ascii=False, indent=2))
+        # Record as feedback too — telling AI "these tags weren't good enough"
+        self._record_feedback(entry, "rejected")
         review = json.loads(REVIEW_FILE.read_text())
         review = [r for r in review if r["id"] != entry["id"]]
         REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
