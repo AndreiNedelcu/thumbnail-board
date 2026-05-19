@@ -317,6 +317,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(result)
             return
 
+        if path == "/api/delete":
+            vid_id = body.get("id", "")
+            if not vid_id:
+                self.send_json({"ok": False, "msg": "No id provided"})
+                return
+            before = len(_dataset)
+            new_dataset = [v for v in _dataset if v.get("id") != vid_id]
+            if len(new_dataset) == before:
+                self.send_json({"ok": False, "msg": "Video not found"})
+                return
+            global _dataset
+            _dataset = new_dataset
+            DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
+            print(f"[delete] Removed {vid_id} → {len(_dataset)} total", flush=True)
+            self.send_json({"ok": True, "msg": f"Deleted {vid_id}"})
+            return
+
         if path == "/api/publish":
             # Commit + push data.json to GitHub
             try:

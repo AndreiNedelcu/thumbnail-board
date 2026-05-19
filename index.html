@@ -136,6 +136,22 @@
   .lb-btn-copy  { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
   .lb-btn-copy:hover { background:var(--surface3); }
   .lb-btn-copy.copied { background:#1a3a1a; color:#4caf50; border-color:#4caf5055; }
+  .lb-btn-delete { background:transparent; color:#666; border:1px solid #333; margin-left:auto; }
+  .lb-btn-delete:hover { background:#2a0a0a; color:#e94560; border-color:#e9456044; }
+
+  /* Confirm modal */
+  #confirm-modal { display:none; position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.75); backdrop-filter:blur(6px); align-items:center; justify-content:center; }
+  #confirm-modal.show { display:flex; }
+  .confirm-box { background:#1a1a1a; border:1px solid rgba(255,255,255,.1); border-radius:14px; padding:28px 32px; max-width:380px; width:90%; text-align:center; box-shadow:0 24px 64px rgba(0,0,0,.6); }
+  .confirm-box h3 { font-size:17px; font-weight:700; margin-bottom:8px; }
+  .confirm-box p { font-size:13px; color:var(--muted); line-height:1.5; margin-bottom:22px; }
+  .confirm-box p strong { color:var(--text); }
+  .confirm-actions { display:flex; gap:10px; justify-content:center; }
+  .confirm-cancel { padding:9px 22px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+  .confirm-cancel:hover { color:var(--text); }
+  .confirm-delete { padding:9px 22px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:#e94560; color:#fff; border:none; }
+  .confirm-delete:hover { background:#c73050; }
+  .confirm-delete:disabled { opacity:.5; cursor:not-allowed; }
 
   .lb-tags-section h4, .lb-related h4 { font-size:11px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:10px; }
   .lb-tags { display:flex; flex-wrap:wrap; gap:6px; }
@@ -207,6 +223,10 @@
         <button class="lb-btn lb-btn-copy" id="lb-copy">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy image
+        </button>
+        <button class="lb-btn lb-btn-delete" id="lb-delete">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+          Delete
         </button>
       </div>
       <div class="lb-tags-section">
@@ -467,6 +487,9 @@ function renderLightbox() {
   copyBtn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy image`;
   copyBtn.onclick = () => copyImage(v.id, copyBtn);
 
+  // Delete button
+  document.getElementById('lb-delete').onclick = () => showDeleteConfirm(v.id, v.title || v.id);
+
   // Nav
   document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
   document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
@@ -574,6 +597,64 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+
+// ── Delete ────────────────────────────────────────────────────────
+let _deleteId = null;
+
+function showDeleteConfirm(videoId, title) {
+  _deleteId = videoId;
+  document.getElementById('confirm-title').textContent = title || videoId;
+  document.getElementById('confirm-modal').classList.add('show');
+}
+
+function hideDeleteConfirm() {
+  _deleteId = null;
+  document.getElementById('confirm-modal').classList.remove('show');
+}
+
+async function confirmDelete() {
+  if (!_deleteId) return;
+  const btn = document.getElementById('confirm-delete-btn');
+  btn.disabled = true; btn.textContent = 'Deleting…';
+  try {
+    const r = await fetch('http://localhost:3000/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: _deleteId })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Remove from local array and re-render
+      const idx = videos.findIndex(v => v.id === _deleteId);
+      if (idx !== -1) videos.splice(idx, 1);
+      hideDeleteConfirm();
+      closeLightbox();
+      applyFilters();
+      showToast('Thumbnail deleted');
+    } else {
+      showToast('❌ ' + (d.msg || 'Delete failed'));
+    }
+  } catch(e) {
+    showToast('❌ Server not running — open via tagger.command to delete');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Delete';
+  }
+}
+
+document.getElementById('confirm-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirm-modal')) hideDeleteConfirm();
+});
 </script>
+
+<div id="confirm-modal">
+  <div class="confirm-box">
+    <h3>Delete thumbnail?</h3>
+    <p>This will remove <strong id="confirm-title"></strong> from the board. You can always re-add it by tagging it in Eagle.</p>
+    <div class="confirm-actions">
+      <button class="confirm-cancel" onclick="hideDeleteConfirm()">Cancel</button>
+      <button class="confirm-delete" id="confirm-delete-btn" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
