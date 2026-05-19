@@ -248,26 +248,38 @@ def sync_loop():
         time.sleep(SYNC_EVERY)
 
 # ── Auto-publish ──────────────────────────────────────────────────
+_publish_timer = None
+_publish_lock = threading.Lock()
+
+def _do_publish():
+    """Actual git add+commit+push. Runs from a debounced timer thread."""
+    try:
+        repo = Path(__file__).parent
+        subprocess.run(["git", "add", "data.json"], cwd=repo, check=True)
+        diff = subprocess.run(["git", "diff", "--cached", "--stat"],
+                              cwd=repo, capture_output=True, text=True)
+        if not diff.stdout.strip():
+            print("[publish] Nothing new to push", flush=True)
+            return
+        count = len(_dataset)
+        subprocess.run(["git", "commit", "-m",
+                        f"data: auto-sync {count} thumbnails"],
+                       cwd=repo, check=True)
+        subprocess.run(["git", "push"], cwd=repo, check=True)
+        print(f"[publish] Auto-pushed data.json ({count} items)", flush=True)
+    except Exception as e:
+        print(f"[publish] Auto-publish error: {e}", flush=True)
+
 def auto_publish():
-    """Commit + push data.json in a background thread (non-blocking)."""
-    def _run():
-        try:
-            repo = Path(__file__).parent
-            subprocess.run(["git", "add", "data.json"], cwd=repo, check=True)
-            diff = subprocess.run(["git", "diff", "--cached", "--stat"],
-                                  cwd=repo, capture_output=True, text=True)
-            if not diff.stdout.strip():
-                print("[publish] Nothing new to push", flush=True)
-                return
-            count = len(_dataset)
-            subprocess.run(["git", "commit", "-m",
-                            f"data: auto-sync {count} thumbnails"],
-                           cwd=repo, check=True)
-            subprocess.run(["git", "push"], cwd=repo, check=True)
-            print(f"[publish] Auto-pushed data.json ({count} items)", flush=True)
-        except Exception as e:
-            print(f"[publish] Auto-publish error: {e}", flush=True)
-    threading.Thread(target=_run, daemon=True).start()
+    """Debounced publish: rapid calls within 3s collapse into a single push.
+    Lets bulk operations (20 deletes etc.) make ONE commit, not 20."""
+    global _publish_timer
+    with _publish_lock:
+        if _publish_timer is not None:
+            _publish_timer.cancel()
+        _publish_timer = threading.Timer(3.0, _do_publish)
+        _publish_timer.daemon = True
+        _publish_timer.start()
 
 # ── HTTP Handler ─────────────────────────────────────────────────
 
@@ -458,6 +470,7 @@ class Handler(BaseHTTPRequestHandler):
             _dataset = new_dataset
             DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
             print(f"[delete] Removed {vid_id} → {len(_dataset)} total", flush=True)
+            auto_publish()  # debounced — bulk delete → one push
             self.send_json({"ok": True, "msg": f"Deleted {vid_id}"})
             return
 
