@@ -21,26 +21,40 @@ let panelOpen = false;
 let currentVideoId = null; // set by init() when successfully detected
 
 function getVideoId() {
-  // Most reliable: URL parameter
-  let m = location.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-  if (m) return m[1];
-  // Fallback: document.URL (sometimes differs from location.href in content scripts)
-  m = document.URL.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-  if (m) return m[1];
-  // Fallback: canonical link
+  const RE = /[?&]v=([A-Za-z0-9_-]{11})|\/shorts\/([A-Za-z0-9_-]{11})/;
+
+  // 1. YouTube DOM element — most reliable, doesn't depend on URL parsing
+  const watchEl = document.querySelector('ytd-watch-flexy, ytd-watch-two');
+  if (watchEl) {
+    const vid = watchEl.getAttribute('video-id');
+    if (vid) return vid;
+  }
+
+  // 2. URL parameter
+  let m = location.href.match(RE);
+  if (m) return m[1] || m[2];
+
+  // 3. document.URL
+  m = document.URL.match(RE);
+  if (m) return m[1] || m[2];
+
+  // 4. canonical link tag
   const canonical = document.querySelector('link[rel="canonical"]');
   if (canonical?.href) {
-    m = canonical.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-    if (m) return m[1];
+    m = canonical.href.match(RE);
+    if (m) return m[1] || m[2];
   }
-  // Fallback: og:url meta tag
+
+  // 5. og:url meta tag
   const ogUrl = document.querySelector('meta[property="og:url"]');
   if (ogUrl?.content) {
-    m = ogUrl.content.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-    if (m) return m[1];
+    m = ogUrl.content.match(RE);
+    if (m) return m[1] || m[2];
   }
-  // Last resort: use ID stored when init() last ran successfully
+
+  // 6. Last resort: ID stored when init() last ran successfully
   if (currentVideoId) return currentVideoId;
+
   return null;
 }
 
