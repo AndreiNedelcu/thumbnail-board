@@ -20,34 +20,74 @@
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 
-  /* ── HEADER ── */
-  header {
-    position:sticky; top:0; z-index:50;
-    background:rgba(13,13,13,0.97); backdrop-filter:blur(14px);
+  /* ── CONTAINER (side margins) ── */
+  .container { max-width:1600px; margin:0 auto; padding:0 clamp(20px, 5vw, 64px); }
+
+  /* ── HERO ── */
+  .hero {
+    padding:80px 0 48px;
+    text-align:center;
     border-bottom:1px solid var(--border);
-    padding:12px 20px; display:flex; flex-direction:column; gap:10px;
   }
-  .header-top { display:flex; align-items:center; gap:14px; }
-  .logo { font-size:17px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
-  .logo span { color:#e94560; }
-  .search-wrap { flex:1; position:relative; max-width:460px; }
-  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+  .hero-title {
+    font-size:clamp(42px, 7vw, 84px);
+    font-weight:900;
+    letter-spacing:-2px;
+    line-height:1.02;
+    background:linear-gradient(135deg, #fff 0%, #888 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    margin-bottom:14px;
+  }
+  .hero-title span { background:linear-gradient(135deg, #e94560 0%, #c73050 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero-sub { font-size:16px; color:var(--muted); margin-bottom:36px; font-weight:500; letter-spacing:.3px; }
+  .hero-search-wrap {
+    max-width:640px; margin:0 auto;
+    position:relative;
+  }
+  .hero-search-wrap .search-icon { position:absolute; left:20px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
   #search {
     width:100%; background:var(--surface2); border:1px solid var(--border);
-    border-radius:8px; color:var(--text); font-size:14px;
-    padding:8px 32px 8px 34px; outline:none; transition:border-color .2s;
+    border-radius:14px; color:var(--text); font-size:16px;
+    padding:18px 48px 18px 52px; outline:none;
+    transition:border-color .2s, box-shadow .2s, background .2s;
   }
-  #search:focus { border-color:#e94560; }
+  #search:focus { border-color:#e94560; background:var(--surface); box-shadow:0 0 0 4px rgba(233,69,96,.08); }
   #search::placeholder { color:var(--muted); }
   .clear-search {
-    position:absolute; right:10px; top:50%; transform:translateY(-50%);
-    background:none; border:none; color:var(--muted); font-size:16px;
+    position:absolute; right:16px; top:50%; transform:translateY(-50%);
+    background:var(--surface3); border:none; color:var(--muted); font-size:14px;
     cursor:pointer; display:none; line-height:1;
+    width:24px; height:24px; border-radius:50%;
+    align-items:center; justify-content:center;
   }
-  .clear-search:hover { color:var(--text); }
-  .stats { font-size:12px; color:var(--muted); white-space:nowrap; margin-left:auto; }
-  .tagger-btn { display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:color .15s; }
-  .tagger-btn:hover { color:var(--text); }
+  .clear-search:hover { color:var(--text); background:#3a3a3a; }
+  .hero-stats { font-size:13px; color:var(--muted); margin-top:18px; }
+
+  /* ── STICKY MINI HEADER (appears on scroll) ── */
+  header {
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,13,13,0.85); backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+    padding:10px 0;
+    transform:translateY(-100%); transition:transform .25s ease;
+  }
+  header.visible { transform:translateY(0); }
+  .header-top { display:flex; align-items:center; gap:12px; }
+  .logo { font-size:14px; font-weight:800; letter-spacing:1.8px; white-space:nowrap; }
+  .logo span { color:#e94560; }
+  .mini-search-wrap { flex:1; position:relative; max-width:380px; margin:0 auto; }
+  .mini-search-wrap .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
+  #mini-search {
+    width:100%; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:13px;
+    padding:7px 32px 7px 32px; outline:none;
+  }
+  #mini-search:focus { border-color:#e94560; }
+  .stats { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .tagger-btn { display:flex; align-items:center; gap:5px; padding:6px 12px; border-radius:8px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:all .15s; cursor:pointer; }
+  .tagger-btn:hover { color:var(--text); border-color:rgba(255,255,255,.18); }
   .broken-btn { display:none; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:transparent; border:1px solid #e9456044; color:#e94560; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s; }
   .broken-btn:hover { background:#e9456022; }
   .broken-btn.visible { display:flex; }
@@ -82,54 +122,33 @@
   #size-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#e94560; cursor:pointer; }
   #size-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#e94560; border:none; cursor:pointer; }
 
-  /* ── CATEGORY FILTERS ── */
-  .cat-bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
-  .cat-btn {
-    display:flex; align-items:center; gap:5px;
-    padding:5px 13px; border-radius:20px; font-size:12px; font-weight:700;
-    letter-spacing:0.7px; border:1px solid var(--border); cursor:pointer;
-    transition:all .15s; background:var(--surface2); color:var(--muted);
-    white-space:nowrap;
+  /* ── TOOLBAR (above grid) ── */
+  .toolbar {
+    display:flex; align-items:center; gap:10px;
+    padding:22px 0 18px; flex-wrap:wrap;
   }
-  .cat-btn:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
-  .cat-btn.active { color:#fff; border-color:transparent; }
-  .cat-btn .arrow { font-size:10px; transition:transform .2s; }
-  .cat-btn.expanded .arrow { transform:rotate(90deg); }
-
-  /* Subcategory drawer */
-  .subcat-drawer {
-    overflow:hidden; max-height:0; transition:max-height .25s ease;
-    display:flex; flex-wrap:wrap; gap:6px; padding:0 2px;
-  }
-  .subcat-drawer.open { max-height:200px; padding-top:8px; }
-  .sub-btn {
-    padding:3px 11px; border-radius:14px; font-size:11px; font-weight:600;
-    border:1px solid transparent; cursor:pointer; transition:all .15s;
-    background:var(--surface3); color:var(--muted);
-  }
-  .sub-btn:hover { color:#fff; }
-  .sub-btn.active { color:#fff; border-color:transparent; }
+  .toolbar-spacer { flex:1; }
 
   /* ── GRID ── */
-  main { padding:16px 20px; }
-  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,260px),1fr)); gap:16px; }
+  main { padding:0 0 60px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,280px),1fr)); gap:18px; }
   .card {
-    position:relative; overflow:hidden;
+    position:relative; overflow:hidden; border-radius:12px;
     background:var(--surface); cursor:pointer; aspect-ratio:16/9;
     transition:transform .2s, box-shadow .2s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(0,0,0,.6); z-index:2; }
+  .card:hover { transform:translateY(-4px); box-shadow:0 16px 40px rgba(0,0,0,.5); z-index:2; }
   .card.broken { outline:2px solid #e9456055; }
-  .card.broken::after { content:'unavailable'; position:absolute; top:6px; left:6px; background:#e94560; color:#fff; font-size:9px; font-weight:800; letter-spacing:1px; padding:2px 6px; border-radius:4px; text-transform:uppercase; }
+  .card.broken::after { content:'unavailable'; position:absolute; top:8px; left:8px; background:#e94560; color:#fff; font-size:9px; font-weight:800; letter-spacing:1px; padding:3px 7px; border-radius:5px; text-transform:uppercase; }
   .card img { width:100%; height:100%; object-fit:cover; display:block; }
   .card-overlay {
     position:absolute; inset:0;
-    background:linear-gradient(to top,rgba(0,0,0,.88) 0%,transparent 55%);
+    background:linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 55%);
     opacity:0; transition:opacity .2s;
-    display:flex; align-items:flex-end; padding:10px;
+    display:flex; align-items:flex-end; padding:12px;
   }
   .card:hover .card-overlay { opacity:1; }
-  .card-title { font-size:12px; font-weight:600; line-height:1.35; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card-title { font-size:13px; font-weight:600; line-height:1.35; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
   /* ── EMPTY ── */
   #empty { display:none; text-align:center; padding:80px 20px; color:var(--muted); }
@@ -216,33 +235,54 @@
 </head>
 <body>
 
-<header>
-  <div class="header-top">
-    <div class="logo">THUMBNAIL<span>BOARD</span></div>
-    <div class="search-wrap">
-      <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="search" type="text" placeholder="Search by tag, title or channel…" autocomplete="off">
+<!-- Sticky mini header (only shows when scrolled past hero) -->
+<header id="mini-header">
+  <div class="container">
+    <div class="header-top">
+      <div class="logo">THUMBNAIL<span>BOARD</span></div>
+      <div class="mini-search-wrap">
+        <svg class="search-icon" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="mini-search" type="text" placeholder="Search…" autocomplete="off">
+      </div>
+      <div class="stats" id="mini-stats"></div>
+      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑ Top</button>
+    </div>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="container">
+    <h1 class="hero-title">THUMBNAIL<span>BOARD</span></h1>
+    <p class="hero-sub">Explore reference thumbnails · curated by @theseniordev</p>
+    <div class="hero-search-wrap">
+      <svg class="search-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input id="search" type="text" placeholder="Search by tag, title, channel or keyword…" autocomplete="off">
       <button class="clear-search" id="clear-search" onclick="clearSearch()">×</button>
     </div>
-    <div class="stats" id="stats"></div>
+    <div class="hero-stats" id="stats"></div>
+  </div>
+</section>
+
+<!-- Main content -->
+<div class="container">
+  <div class="toolbar">
+    <div class="toolbar-spacer"></div>
     <div class="size-wrap">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <input id="size-slider" type="range" min="160" max="480" value="260" oninput="setCardSize(this.value)">
+      <input id="size-slider" type="range" min="160" max="480" value="280" oninput="setCardSize(this.value)">
     </div>
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
     <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">☐ Select</button>
     <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">🗑 Delete <span id="sel-count">0</span></button>
-    <button class="tagger-btn" id="publish-btn" onclick="publishToGithub()" style="cursor:pointer;">⬆ Publish</button>
+    <button class="tagger-btn" id="publish-btn" onclick="publishToGithub()">⬆ Publish</button>
     <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
   </div>
-  <div class="cat-bar" id="cat-bar"></div>
-  <div class="subcat-drawer" id="subcat-drawer"></div>
-</header>
-
-<main>
-  <div id="grid"></div>
-  <div id="empty"><h2>No results</h2><p>Try a different search or clear the filters</p></div>
-</main>
+  <main>
+    <div id="grid"></div>
+    <div id="empty"><h2>No results</h2><p>Try a different search or clear the filters</p></div>
+  </main>
+</div>
 
 <div id="lightbox">
   <div class="lb-container">
@@ -337,13 +377,49 @@ let expandedCat = null;
 async function init() {
   const res = await fetch('data.json?v=' + Date.now());
   allVideos = await res.json();
-  buildCatBar();
+
+  // Dynamically extract custom tags from data.json
+  allVideos.forEach(v => {
+    (v.tags || []).forEach(tag => {
+      const parts = tag.split('-');
+      const cat = parts[0].toUpperCase();
+      if (CATS[cat] && !CATS[cat].subs.includes(tag)) {
+        CATS[cat].subs.push(tag);
+      }
+    });
+  });
+
+  if (typeof updateAllTags === 'function') updateAllTags();
   applyFilters();
 }
 
-// ── Category bar ──────────────────────────────────────────────────
+// Show sticky mini-header when scrolled past hero
+window.addEventListener('scroll', () => {
+  const hero = document.querySelector('.hero');
+  const mini = document.getElementById('mini-header');
+  if (!hero || !mini) return;
+  mini.classList.toggle('visible', hero.getBoundingClientRect().bottom < 0);
+});
+
+// Sync mini-search ↔ main search (both ways)
+document.addEventListener('DOMContentLoaded', () => {
+  const mini = document.getElementById('mini-search');
+  if (mini) {
+    mini.addEventListener('input', e => {
+      const v = e.target.value;
+      const main = document.getElementById('search');
+      main.value = v;
+      searchQuery = v;
+      document.getElementById('clear-search').style.display = v ? '' : 'none';
+      applyFilters();
+    });
+  }
+});
+
+// ── Category bar (no-op — kept for compatibility) ─────────────────
 function buildCatBar() {
   const bar = document.getElementById('cat-bar');
+  if (!bar) return;
 
   // ALL button
   const allBtn = document.createElement('button');
@@ -512,7 +588,10 @@ function setCardSize(val) {
 function renderGrid() {
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
-  document.getElementById('stats').textContent = `${visibleVideos.length} thumbnails`;
+  const statsText = `${visibleVideos.length} thumbnails`;
+  document.getElementById('stats').textContent = statsText;
+  const miniStats = document.getElementById('mini-stats');
+  if (miniStats) miniStats.textContent = statsText;
 
   if (!visibleVideos.length) {
     grid.innerHTML = '';
@@ -688,6 +767,8 @@ function showToast(msg) {
 document.getElementById('search').addEventListener('input', e => {
   searchQuery = e.target.value;
   document.getElementById('clear-search').style.display = searchQuery ? '' : 'none';
+  const mini = document.getElementById('mini-search');
+  if (mini) mini.value = searchQuery;
   applyFilters();
 });
 document.getElementById('lb-close').onclick = closeLightbox;
@@ -706,22 +787,11 @@ document.addEventListener('keydown', e => {
 init();
 
 // ── Tag editing in lightbox ───────────────────────────────────────
-const ALL_TAGS = (() => {
-  const CATS = {
-    style:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'],
-    mood:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'],
-    text:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'],
-    element:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'],
-    camera:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'],
-    subject:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'],
-    formation:['flat-lay','line','grid','v'],
-    topic:['comparison','product-showcase','space','secret','social-media','size'],
-    callout:['magnifier'],
-    backdrop:['dark','light','blurry'],
-    channel:['theseniordev-main','theseniordev-podcast'],
-  };
-  return Object.entries(CATS).flatMap(([cat, subs]) => subs.map(s => `${cat}-${s}`));
-})();
+let ALL_TAGS = [];
+function updateAllTags() {
+  ALL_TAGS = Object.values(CATS).flatMap(c => c.subs);
+}
+updateAllTags();
 
 function renderLbTags(v) {
   document.getElementById('lb-tags').innerHTML = (v.tags||[]).map(t => {
@@ -763,6 +833,14 @@ document.getElementById('lb-tag-search').addEventListener('keydown', e => {
 async function addLbTag(tag) {
   const v = videos[currentIndex];
   if (!v || (v.tags||[]).includes(tag)) return;
+
+  const parts = tag.split('-');
+  const validPrefixes = new Set(Object.keys(CATS).map(k => k.toLowerCase()));
+  if (!validPrefixes.has(parts[0])) {
+    showToast('❌ El tag debe incluir una categoría (ej. style-nuevo)');
+    return;
+  }
+
   const newTags = [...(v.tags||[]), tag];
   await saveLbTags(v, newTags);
   document.getElementById('lb-tag-search').value = '';
