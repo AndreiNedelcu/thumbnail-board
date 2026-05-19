@@ -247,9 +247,26 @@ function refreshPreview() {
 
 async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
-  const info = getVideoInfo();
+
+  // If local detection fails, ask background.js for the confirmed tab URL
+  let info = getVideoInfo();
   if (!info || !info.id) {
-    showToast('❌ No ID. URL: ' + location.href.slice(0, 120) + ' | stored: ' + currentVideoId);
+    try {
+      const resp = await new Promise((resolve, reject) => {
+        chrome.runtime.sendMessage({ type: 'TB_GET_URL' }, r => {
+          if (chrome.runtime.lastError) reject(chrome.runtime.lastError);
+          else resolve(r);
+        });
+      });
+      if (resp?.url) {
+        const m = resp.url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+        if (m) { currentVideoId = m[1]; info = getVideoInfo(); }
+      }
+    } catch {}
+  }
+
+  if (!info || !info.id) {
+    showToast('❌ Could not detect video ID — try refreshing the page');
     return;
   }
   videoData = info;
@@ -353,9 +370,16 @@ new MutationObserver(() => {
 // Also listen for YouTube's custom navigation event
 document.addEventListener('yt-navigate-finish', () => setTimeout(init, 800));
 
-// Listen for URL change messages from background.js (avoids double-injection)
+// Listen for URL change messages from background.js
+// background.js sends the confirmed tab URL so we can cache it
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'TB_URL_CHANGED') setTimeout(init, 800);
+  if (msg.type === 'TB_URL_CHANGED') {
+    if (msg.url) {
+      const m = msg.url.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+      if (m) currentVideoId = m[1];
+    }
+    setTimeout(init, 800);
+  }
 });
 
 setTimeout(init, 1500);
