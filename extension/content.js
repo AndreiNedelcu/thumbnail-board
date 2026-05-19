@@ -248,6 +248,13 @@ function refreshPreview() {
 async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
 
+  // DEBUG — remove after diagnosis
+  const watchEl = document.querySelector('ytd-watch-flexy, ytd-watch-two');
+  alert('href: ' + location.href.slice(0,80) +
+        '\ndocURL: ' + document.URL.slice(0,80) +
+        '\nwatchEl: ' + (watchEl ? watchEl.getAttribute('video-id') : 'NOT FOUND') +
+        '\nstored: ' + currentVideoId);
+
   // If local detection fails, ask background.js for the confirmed tab URL
   let info = getVideoInfo();
   if (!info || !info.id) {
