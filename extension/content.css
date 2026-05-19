@@ -4,36 +4,37 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  z-index: 2147483646;       /* above YouTube's own overlays */
+  z-index: 2147483646;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 18px;
+  padding: 10px 18px;
   border: none;
   border-radius: 50px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: 'Roboto', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .2px;
+  font-weight: 600;
+  letter-spacing: .15px;
   cursor: pointer;
-  color: #0d1117;
-  background: linear-gradient(135deg, #3aecba 0%, #524add 100%);
-  box-shadow: 0 8px 28px rgba(58, 236, 186, .35), 0 2px 6px rgba(0, 0, 0, .3);
-  transition: transform .15s, box-shadow .15s, opacity .2s;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  transition: background .15s, transform .15s, color .15s;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 #tb-btn:hover:not([data-state="loading"]) {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 36px rgba(58, 236, 186, .45), 0 4px 10px rgba(0, 0, 0, .3);
+  background: rgba(0, 0, 0, 0.95);
+  transform: translateY(-1px);
 }
 #tb-btn:active { transform: translateY(0); }
 #tb-btn span { white-space: nowrap; }
 #tb-btn svg { flex-shrink: 0; }
 
-/* Loading state */
 #tb-btn.tb-state-loading {
   cursor: progress;
-  background: linear-gradient(135deg, #3aecba 0%, #524add 100%);
-  color: #0d1117;
+  background: rgba(0, 0, 0, 0.9);
+  color: #ffffff;
 }
 .tb-spin {
   animation: tb-spin 0.85s linear infinite;
@@ -41,50 +42,46 @@
 }
 @keyframes tb-spin { to { transform: rotate(360deg); } }
 
-/* In-board (saved/already present) */
 #tb-btn.tb-state-in-board {
-  background: rgba(58, 236, 186, .12);
+  background: rgba(0, 0, 0, 0.78);
   color: #3aecba;
-  box-shadow: 0 4px 16px rgba(58, 236, 186, .15);
-  border: 1px solid rgba(58, 236, 186, .35);
 }
 #tb-btn.tb-state-in-board:hover {
-  background: rgba(58, 236, 186, .18);
+  background: rgba(0, 0, 0, 0.92);
 }
 
-/* Error */
 #tb-btn.tb-state-error {
-  background: #e94560;
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(233, 69, 96, .35);
+  background: rgba(233, 69, 96, 0.92);
+  color: #ffffff;
 }
 
-/* ── Per-card button on every YouTube thumbnail ── */
-/* Top-LEFT (YouTube puts its menus top-right, this avoids overlap).
-   Hover-only by default, "saved" state stays as a permanent badge. */
+/* ── Per-card button — native YouTube look ── */
+/* Round, dark, semi-transparent — matches YouTube's hover overlay
+   controls. Top-left to avoid overlap with YT's top-right menu. */
 .tb-card-btn {
   position: absolute;
   top: 8px;
   left: 8px;
   z-index: 50;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #0d1117;
-  background: linear-gradient(135deg, #3aecba 0%, #524add 100%);
-  opacity: 0;                  /* hidden by default */
-  transform: translateY(-2px);
-  transition: opacity .15s, transform .15s, background .15s, box-shadow .15s;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.75);
+  opacity: 0;
+  transform: scale(.92);
+  transition: opacity .15s ease, transform .15s ease, background .15s ease;
   font-family: inherit;
-  pointer-events: none;        /* not clickable when invisible */
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
 }
-/* Reveal on hover of the card (any common YouTube renderer) */
+/* Show on hover of any common YouTube card renderer */
 ytd-thumbnail:hover > .tb-card-btn,
 .tb-card-btn:hover,
 ytd-rich-item-renderer:hover .tb-card-btn,
@@ -95,41 +92,40 @@ ytd-rich-grid-media:hover .tb-card-btn,
 yt-lockup-view-model:hover .tb-card-btn,
 ytm-rich-item-renderer:hover .tb-card-btn {
   opacity: 1;
-  transform: translateY(0);
+  transform: scale(1);
   pointer-events: auto;
 }
 .tb-card-btn:hover {
-  transform: translateY(0) scale(1.06);
-  box-shadow: 0 6px 22px rgba(58, 236, 186, .4);
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.08);
+}
+.tb-card-btn:active {
+  transform: scale(.96);
 }
 .tb-card-btn[data-state="loading"] {
   opacity: 1 !important;
   pointer-events: auto !important;
-  transform: translateY(0) !important;
+  transform: scale(1) !important;
   cursor: progress;
 }
-/* "Saved" state: permanently visible (small badge marking in-board items). */
+/* Saved — permanently visible "in board" badge, still YT-style */
 .tb-card-btn[data-state="saved"] {
-  opacity: 0.95 !important;
+  opacity: 0.92 !important;
   pointer-events: auto !important;
-  transform: translateY(0) !important;
-  background: rgba(13, 17, 23, .85);
+  transform: scale(1) !important;
+  background: rgba(0, 0, 0, 0.78);
   color: #3aecba;
-  border: 1.5px solid rgba(58, 236, 186, .65);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, .35);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
 }
 .tb-card-btn[data-state="saved"]:hover {
-  background: rgba(58, 236, 186, .15);
   opacity: 1 !important;
+  background: rgba(0, 0, 0, 0.92);
 }
 .tb-card-btn[data-state="error"] {
-  background: #e94560;
+  background: rgba(233, 69, 96, 0.92);
   color: #fff;
   opacity: 1 !important;
   pointer-events: auto !important;
-  transform: translateY(0) !important;
+  transform: scale(1) !important;
 }
 
 /* ── Floating queue indicator (bottom-right) ── */
