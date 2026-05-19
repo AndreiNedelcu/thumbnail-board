@@ -1,8 +1,4 @@
 // ── Thumbnail Board Extension ─────────────────────────────────────
-// Guard against double-injection (manifest content_scripts + background.js)
-if (window.__tbLoaded) { setTimeout(init, 800); return; }
-window.__tbLoaded = true;
-
 const SERVER = 'http://localhost:3000';
 
 const CATS = {
@@ -338,5 +334,10 @@ new MutationObserver(() => {
 
 // Also listen for YouTube's custom navigation event
 document.addEventListener('yt-navigate-finish', () => setTimeout(init, 800));
+
+// Listen for URL change messages from background.js (avoids double-injection)
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'TB_URL_CHANGED') setTimeout(init, 800);
+});
 
 setTimeout(init, 1500);
