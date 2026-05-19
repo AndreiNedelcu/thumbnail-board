@@ -48,6 +48,11 @@
   .stats { font-size:12px; color:var(--muted); white-space:nowrap; margin-left:auto; }
   .tagger-btn { display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:color .15s; }
   .tagger-btn:hover { color:var(--text); }
+  .size-wrap { display:flex; align-items:center; gap:7px; }
+  .size-wrap svg { color:var(--muted); flex-shrink:0; }
+  #size-slider { -webkit-appearance:none; appearance:none; width:80px; height:3px; background:var(--surface3); border-radius:2px; outline:none; cursor:pointer; }
+  #size-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:#e94560; cursor:pointer; }
+  #size-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:#e94560; border:none; cursor:pointer; }
 
   /* ── CATEGORY FILTERS ── */
   .cat-bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
@@ -79,7 +84,7 @@
 
   /* ── GRID ── */
   main { padding:16px 20px; }
-  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,260px),1fr)); gap:10px; }
   .card {
     position:relative; border-radius:var(--radius); overflow:hidden;
     background:var(--surface); cursor:pointer; aspect-ratio:16/9;
@@ -159,6 +164,10 @@
       <button class="clear-search" id="clear-search" onclick="clearSearch()">×</button>
     </div>
     <div class="stats" id="stats"></div>
+    <div class="size-wrap">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+      <input id="size-slider" type="range" min="160" max="480" value="260" oninput="setCardSize(this.value)">
+    </div>
     <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
@@ -367,6 +376,16 @@ function clearSearch() {
   document.getElementById('clear-search').style.display = 'none';
   applyFilters();
 }
+
+function setCardSize(val) {
+  document.documentElement.style.setProperty('--card-size', val + 'px');
+  localStorage.setItem('cardSize', val);
+}
+// Restore saved size
+(function() {
+  const saved = localStorage.getItem('cardSize');
+  if (saved) { document.documentElement.style.setProperty('--card-size', saved + 'px'); document.getElementById('size-slider').value = saved; }
+})();
 
 // ── Grid ──────────────────────────────────────────────────────────
 function renderGrid() {
