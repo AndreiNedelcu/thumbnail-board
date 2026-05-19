@@ -148,6 +148,15 @@
   }
   .btn-approve { background:var(--grad); color:#0d1117; }
   .btn-approve:hover { box-shadow:0 8px 24px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .btn-approve-all {
+    margin-top:6px; padding:10px 14px; border-radius:10px;
+    background:transparent; color:var(--mint); border:1px solid rgba(58,236,186,.3);
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    transition:all .15s;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .btn-approve-all:hover { background:rgba(58,236,186,.08); border-color:var(--mint); }
+  .btn-approve-all:disabled { opacity:.5; cursor:not-allowed; }
   .btn-reject { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
   .btn-reject:hover { background:rgba(233,69,96,.08); color:#e94560; border-color:rgba(233,69,96,.3); }
   .btn-skip { background:var(--surface2); color:var(--text); border:1px solid var(--border); flex:0 0 auto; padding:13px 22px; }
@@ -196,6 +205,10 @@
       <button class="btn btn-skip" onclick="next()" title="Decide later">Skip</button>
       <button class="btn btn-approve" onclick="approve()">Approve & Publish</button>
     </div>
+    <button class="btn-approve-all" onclick="approveAll()" title="Approve every item still in the queue with the tags shown">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 13 19"/></svg>
+      Approve all remaining
+    </button>
   </div>
 
   <div class="tags-panel">
@@ -455,6 +468,38 @@ async function approve() {
   } else {
     toast(d.msg || 'Publish failed', 'error');
   }
+}
+
+async function approveAll() {
+  if (!items.length) return;
+  if (!confirm(`Approve and publish all ${items.length} items as-shown?`)) return;
+  const btn = document.querySelector('.btn-approve-all');
+  btn.disabled = true;
+  let ok = 0, fail = 0;
+  const total = items.length;
+  // Iterate over a copy because we mutate `items`
+  const snapshot = [...items];
+  for (let i = 0; i < snapshot.length; i++) {
+    const it = snapshot[i];
+    btn.textContent = `Publishing ${i + 1}/${total}…`;
+    try {
+      const r = await fetch('/api/approve', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(it) });
+      const d = await r.json();
+      if (d.ok) {
+        ok++;
+        const j = items.findIndex(x => x.id === it.id);
+        if (j !== -1) items.splice(j, 1);
+      } else {
+        fail++;
+      }
+    } catch { fail++; }
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polyline points="20 6 9 17 4 12"/><polyline points="20 12 13 19"/></svg>Approve all remaining';
+  toast(`Done · ${ok} published${fail ? `, ${fail} failed` : ''}`, fail ? 'error' : 'success');
+  idx = 0;
+  if (!items.length) return load();
+  render();
 }
 
 async function reject() {

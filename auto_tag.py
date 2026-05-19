@@ -16,7 +16,7 @@ Usage:
   python3 auto_tag.py --model qwen2.5vl:7b
 """
 from __future__ import annotations
-import argparse, base64, json, random, re, sys, time
+import argparse, base64, json, os, random, re, sys, time
 from pathlib import Path
 from urllib.request import urlopen, Request
 
@@ -24,10 +24,12 @@ ROOT = Path(__file__).parent
 PENDING_FILE   = ROOT / "eagle-pending.json"
 BOARD_FILE     = ROOT / "data.json"
 REVIEW_FILE    = ROOT / "pending_review.json"
-SKIP_FILE      = ROOT / "auto_tag_skip.json"   # ids we permanently couldn't process
-FEEDBACK_FILE  = ROOT / "auto_tag_feedback.json"  # what AI said vs what user kept
+SKIP_FILE      = ROOT / "auto_tag_skip.json"
+FEEDBACK_FILE  = ROOT / "auto_tag_feedback.json"
+AUTO_PUBLISHED_FILE = ROOT / "auto_published_log.json"  # audit log when --auto-approve
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
+WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
 
 # ── Tag schema (must match server.py / Worker canonicaliseTags) ──────
 CATS = {
@@ -80,6 +82,40 @@ def load_feedback() -> list:
     if not FEEDBACK_FILE.exists(): return []
     try: return json.loads(FEEDBACK_FILE.read_text())
     except: return []
+
+def looks_confident(tags: list, min_tags: int, max_tags: int) -> tuple[bool, str]:
+    """Heuristic sanity check on AI output. Returns (ok, reason_if_not)."""
+    if not tags:                       return False, "no tags"
+    if len(tags) < min_tags:           return False, f"only {len(tags)} tags (min {min_tags})"
+    if len(tags) > max_tags:           return False, f"too many ({len(tags)}, max {max_tags})"
+    # Mandatory: at least one STYLE tag (every thumbnail has a style)
+    if not any(t.startswith("style-") for t in tags):
+        return False, "no style-* tag"
+    return True, ""
+
+def publish_to_worker(entry: dict, auth_token: str) -> tuple[bool, str]:
+    """POST to /api/add. Returns (success, message)."""
+    payload = json.dumps(entry).encode()
+    req = Request(
+        f"{WORKER_URL}/api/add",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "X-Auth-Token": auth_token,
+            "User-Agent": "ThumbnailBoardAutoTag/1.0",
+        },
+    )
+    try:
+        with urlopen(req, timeout=30) as r:
+            resp = json.loads(r.read())
+        if resp.get("ok"):
+            return True, "published"
+        msg = resp.get("msg", "")
+        if "Already" in msg:
+            return True, "already in board"
+        return False, msg
+    except Exception as e:
+        return False, str(e)
 
 def build_few_shot(board: list, k: int = 6) -> tuple[list, list]:
     """Build positive + corrective few-shot.
@@ -186,9 +222,24 @@ def main():
     ap.add_argument("--resume", action="store_true", default=True,
                     help="Skip items already in pending_review.json (default on)")
     ap.add_argument("--model", default="qwen2.5vl:7b")
+    ap.add_argument("--auto-approve", action="store_true", dest="auto_approve",
+                    help="Publish directly to the board if AI output passes sanity checks. "
+                         "Items that fail checks still go to pending_review.json.")
+    ap.add_argument("--min-tags", type=int, default=3,
+                    help="Minimum tags for auto-approve (default 3)")
+    ap.add_argument("--max-tags", type=int, default=10,
+                    help="Maximum tags for auto-approve (default 10)")
     args = ap.parse_args()
     if args.limit and not args.batch:
         args.batch = args.limit
+
+    auth_token = ""
+    if args.auto_approve:
+        auth_token = os.environ.get("TB_AUTH_TOKEN", "")
+        if not auth_token:
+            print("⚠ --auto-approve needs TB_AUTH_TOKEN env var:")
+            print("   export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+            sys.exit(1)
 
     pending = json.loads(PENDING_FILE.read_text())
     board   = json.loads(BOARD_FILE.read_text())
@@ -249,19 +300,43 @@ def main():
             "channel": item.get("channel",""),
             "views": item.get("views",""),
             "tags": tags,
-            "ai_tags": list(tags),  # original — review will compare against this
+            "ai_tags": list(tags),
             "auto_tagged_at": int(time.time()),
         }
+
+        if args.auto_approve:
+            ok, reason = looks_confident(tags, args.min_tags, args.max_tags)
+            if ok:
+                published, msg = publish_to_worker(entry, auth_token)
+                if published:
+                    # Log for audit but don't write to pending_review.json
+                    pub_log = json.loads(AUTO_PUBLISHED_FILE.read_text()) if AUTO_PUBLISHED_FILE.exists() else []
+                    pub_log.append({**entry, "result": msg})
+                    AUTO_PUBLISHED_FILE.write_text(json.dumps(pub_log, ensure_ascii=False, indent=2))
+                    print(f"           🚀 auto-published: {tags}")
+                    continue
+                # publish failed — fall back to review queue
+                print(f"           ⚠ publish failed ({msg}) — queuing for review")
+            else:
+                print(f"           👀 needs human ({reason}) — queuing for review")
+        # Default path: write to pending_review.json
         review.append(entry)
         REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
-        print(f"           ✓ {tags}")
+        if not args.auto_approve:
+            print(f"           ✓ {tags}")
 
-    print(f"\n✅ Batch done. {len(review)} items waiting in {REVIEW_FILE.name}")
-    print(f"   Errors: {fails}")
-    print(f"   Next:")
-    print(f"     export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
-    print(f"     python3 review.py     # review this batch")
-    print(f"     python3 auto_tag.py   # then run again — next batch learns from your corrections")
+    if args.auto_approve:
+        pub_count = len(json.loads(AUTO_PUBLISHED_FILE.read_text())) if AUTO_PUBLISHED_FILE.exists() else 0
+        print(f"\n✅ Batch done. {pub_count} total auto-published. {len(review)} need human review.")
+        print(f"   Errors: {fails}")
+        print(f"   Next: python3 review.py    # check the queued ones")
+    else:
+        print(f"\n✅ Batch done. {len(review)} items waiting in {REVIEW_FILE.name}")
+        print(f"   Errors: {fails}")
+        print(f"   Next:")
+        print(f"     export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+        print(f"     python3 review.py     # review this batch")
+        print(f"     python3 auto_tag.py   # next batch learns from your corrections")
 
 if __name__ == "__main__":
     main()

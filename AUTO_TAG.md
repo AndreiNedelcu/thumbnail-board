@@ -58,13 +58,33 @@ Next round's prompt includes "past mistakes you must avoid" with your fixes.
 
 ## When to fully automate
 
-After ~5 rounds of feedback (~50 items reviewed), the model often hits 90%+ agreement
-with you. At that point you can:
+After ~30 manually-reviewed items, the model has enough feedback to be trusted on
+items where its output looks reasonable. Three escalation tiers:
 
-1. Skim through batches of 50 instead of reviewing every tag
-2. Or use "approve all" buttons we can add to review.html later
-3. Or run `auto_tag.py --batch 0` and trust the output — risk-free because
-   nothing publishes without explicit approval
+**Tier 1 — Approve-all in review.html**
+Run `auto_tag.py --batch 50` (or higher), open `review.py`, scan quickly, then
+click "Approve all remaining" once you're confident the queue is fine.
+
+**Tier 2 — Auto-approve flag**
+Skip the review queue entirely for items that pass a sanity filter:
+```bash
+export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+python3 auto_tag.py --batch 50 --auto-approve
+```
+Items with 3-10 valid tags and at least one `style-*` go straight to the board.
+Anything that fails the check still queues for review.
+
+**Tier 3 — Full background run**
+For the entire backlog at once:
+```bash
+export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+./run_all.sh          # runs in background, logs to /tmp/tb-auto-tag.log
+./run_all.sh log      # watch progress
+./run_all.sh stop     # stop the run
+./run_all.sh --strict # tighter filter (4-8 tags) for safer auto-approve
+```
+Add `--strict` if you want only the cleanest auto-approves and prefer to review
+borderline cases later.
 
 ## State files
 
