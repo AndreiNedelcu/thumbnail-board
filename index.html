@@ -230,6 +230,7 @@
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
     <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">☐ Select</button>
     <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">🗑 Delete <span id="sel-count">0</span></button>
+    <button class="tagger-btn" id="publish-btn" onclick="publishToGithub()" style="cursor:pointer;">⬆ Publish</button>
     <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
@@ -780,6 +781,27 @@ async function saveLbTags(v, newTags) {
     showToast('⚠️ Saved locally — start tagger.command to sync to Eagle');
   }
   applyFilters(); // re-render grid in background
+}
+
+// ── Publish ───────────────────────────────────────────────────────
+async function publishToGithub() {
+  const btn = document.getElementById('publish-btn');
+  btn.textContent = '⏳ Publishing…';
+  btn.style.pointerEvents = 'none';
+  try {
+    const r = await fetch('http://localhost:3000/api/publish', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      showToast('✅ Published to GitHub Pages!');
+    } else {
+      showToast('❌ ' + (d.msg || 'Publish failed'));
+    }
+  } catch {
+    showToast('❌ Server not running — open tagger.command first');
+  } finally {
+    btn.textContent = '⬆ Publish';
+    btn.style.pointerEvents = '';
+  }
 }
 
 // ── Select mode ───────────────────────────────────────────────────
