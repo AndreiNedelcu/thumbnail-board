@@ -501,11 +501,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
         Views
       </button>
-      <button class="sort-btn" data-sort="shuffle" onclick="setSort('shuffle')" title="Random order">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
-        Shuffle
-      </button>
     </div>
+    <button class="tagger-btn" id="shuffle-btn" onclick="setSort('shuffle')" title="Re-shuffle (click again to re-randomise)">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
+      Shuffle
+    </button>
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       Delete unavailable
@@ -708,9 +708,10 @@ function applySort(arr) {
 }
 
 function setSort(name) {
-  currentSort = name;
-  if (name === 'shuffle' && !shuffleOrder) {
-    // Build a one-time shuffle order
+  // Each click on Shuffle generates a NEW random order, even if already
+  // in shuffle mode. The other sorts are deterministic, so clicking
+  // them again is a no-op.
+  if (name === 'shuffle') {
     const ids = allVideos.map(v => v.id);
     for (let i = ids.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -718,7 +719,8 @@ function setSort(name) {
     }
     shuffleOrder = ids;
   }
-  // Update button visuals
+  currentSort = name;
+  // Highlight the active sort in the segmented control
   document.querySelectorAll('.sort-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.sort === name);
   });
@@ -777,8 +779,13 @@ async function init() {
 
   // Restore scroll position after the grid has rendered + images allocated
   if (savedScrollY > 0) {
-    // Wait a tick so layout is settled
     setTimeout(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' }), 50);
+  }
+
+  // If the URL contained a video id (#v=...), reopen that lightbox
+  const hashMatch = location.hash.match(/v=([A-Za-z0-9_-]{11})/);
+  if (hashMatch) {
+    setTimeout(() => openLightboxByVideoId(hashMatch[1]), 80);
   }
 }
 
@@ -1039,6 +1046,9 @@ function openLightbox(index) {
   lb.classList.add('open');
   lb.scrollTop = 0;
   document.body.style.overflow = 'hidden';
+  // Persist in URL so reloading keeps you in the lightbox
+  const v = visibleVideos[index];
+  if (v) history.replaceState(null, '', '#v=' + v.id);
 }
 
 function closeLightbox() {
@@ -1046,6 +1056,23 @@ function closeLightbox() {
   document.body.style.overflow = '';
   lbHistory = []; // clear history on close
   closeEditPanel();
+  // Strip the #v=... fragment so the next reload doesn't reopen it
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+}
+
+// Open the lightbox by video ID — pulls from allVideos if not currently
+// in visibleVideos (e.g. a filter/search is active that excludes it).
+function openLightboxByVideoId(id) {
+  let idx = visibleVideos.findIndex(v => v.id === id);
+  if (idx === -1) {
+    const v = allVideos.find(x => x.id === id);
+    if (!v) return false;
+    visibleVideos = [v, ...visibleVideos.filter(x => x.id !== id)];
+    renderGrid();
+    idx = 0;
+  }
+  openLightbox(idx);
+  return true;
 }
 
 function navigate(dir) {
@@ -1057,6 +1084,8 @@ function navigate(dir) {
 function renderLightbox() {
   const v = visibleVideos[currentIndex];
   if (!v) return;
+  // Keep URL hash in sync when navigating (prev/next/related click)
+  history.replaceState(null, '', '#v=' + v.id);
 
   const img = document.getElementById('lb-img');
   img.src = `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`;
