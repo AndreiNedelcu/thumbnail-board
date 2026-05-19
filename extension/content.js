@@ -232,7 +232,8 @@ async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
   const info = getVideoInfo();
   if (!info || !info.id) {
-    showToast('❌ Could not detect video ID — try refreshing the page');
+    showToast('❌ No video ID detected — try refreshing the page (F5)');
+    console.warn('[ThumbnailBoard] getVideoId failed. URL:', location.href);
     return;
   }
   videoData = info;
@@ -291,11 +292,18 @@ function isWatchPage() {
 }
 
 function init() {
-  if (!isWatchPage()) return; // only run on video pages
+  const existing = document.getElementById('tb-btn');
+  if (!isWatchPage()) {
+    // Hide button when navigating away from a video page
+    if (existing) existing.style.display = 'none';
+    if (panelOpen) closePanel();
+    return;
+  }
   const id = getVideoId();
   if (!id) return;
 
-  const existing = document.getElementById('tb-btn');
+  // Show button (it may have been hidden)
+  if (existing) existing.style.display = '';
   if (existing) {
     // Already injected — just update state
     existing.classList.remove('in-board');
