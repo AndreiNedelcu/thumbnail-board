@@ -132,6 +132,22 @@
   }
   #mini-search:focus { border-color:#e94560; }
   .stats { font-size:11px; color:var(--muted); white-space:nowrap; font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+
+  /* Mini sort controls in the sticky header (icon-only, compact) */
+  .mini-sort { display:inline-flex; align-items:center; gap:2px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:2px; }
+  .mini-sort-btn {
+    width:28px; height:28px; border:none; background:transparent; color:var(--muted);
+    border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+    transition:color .15s, background .15s;
+  }
+  .mini-sort-btn:hover { color:var(--text); background:var(--surface3); }
+  .mini-sort-btn.active { color:var(--text-bright); background:var(--surface3); }
+  .mini-sort-btn svg { width:14px; height:14px; }
+  .mini-shuffle {
+    width:30px; height:30px; padding:0; border-radius:8px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .mini-shuffle svg { width:13px; height:13px; }
   .tagger-btn {
     display:flex; align-items:center; gap:6px;
     padding:7px 14px; border-radius:10px;
@@ -456,9 +472,22 @@
         <input id="mini-search" type="text" placeholder="Search…" autocomplete="off">
       </div>
       <div class="stats" id="mini-stats"></div>
-      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})">
+      <div class="mini-sort">
+        <button class="mini-sort-btn active" data-sort="default" onclick="setSort('default')" title="Default">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        </button>
+        <button class="mini-sort-btn" data-sort="recent" onclick="setSort('recent')" title="Recent">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </button>
+        <button class="mini-sort-btn" data-sort="views" onclick="setSort('views')" title="Views">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+      <button class="tagger-btn mini-shuffle" onclick="setSort('shuffle')" title="Shuffle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
+      </button>
+      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Top">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
-        Top
       </button>
     </div>
   </div>
@@ -720,8 +749,8 @@ function setSort(name) {
     shuffleOrder = ids;
   }
   currentSort = name;
-  // Highlight the active sort in the segmented control
-  document.querySelectorAll('.sort-btn').forEach(b => {
+  // Highlight the active sort in BOTH segmented controls (main toolbar + sticky mini-header)
+  document.querySelectorAll('.sort-btn, .mini-sort-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.sort === name);
   });
   applyFilters();
@@ -761,7 +790,7 @@ async function init() {
     const mini = document.getElementById('mini-search');
     if (mini) mini.value = searchQuery;
   }
-  document.querySelectorAll('.sort-btn').forEach(b => {
+  document.querySelectorAll('.sort-btn, .mini-sort-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.sort === currentSort);
   });
   // If shuffle was the saved sort, generate an order
@@ -1015,9 +1044,18 @@ function renderGrid() {
   const miniStats = document.getElementById('mini-stats');
   if (miniStats) miniStats.textContent = statsText;
 
+  // Pin grid height during the DOM swap so the document doesn't briefly
+  // collapse (which makes the browser snap scroll to the new max-height).
+  // Also remember scrollY and restore it on the next frame as a belt-and-
+  // suspenders measure.
+  const prevH = grid.offsetHeight;
+  if (prevH > 0) grid.style.minHeight = prevH + 'px';
+  const prevScrollY = window.scrollY;
+
   if (!visibleVideos.length) {
     grid.innerHTML = '';
     empty.style.display = 'block';
+    grid.style.minHeight = '';
     return;
   }
   empty.style.display = 'none';
@@ -1033,6 +1071,11 @@ function renderGrid() {
         <div class="card-title">${esc(v.title || v.id)}</div>
       </div>
     </div>`).join('');
+
+  requestAnimationFrame(() => {
+    if (window.scrollY !== prevScrollY) window.scrollTo(0, prevScrollY);
+    grid.style.minHeight = '';
+  });
   scheduleBrokenCheck();
 }
 
