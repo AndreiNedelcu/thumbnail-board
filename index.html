@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Thumbnail Board</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
 <style>
   :root {
     --bg: #0d0d0d;
@@ -12,187 +14,133 @@
     --surface3: #2a2a2a;
     --border: rgba(255,255,255,0.08);
     --text: #f0f0f0;
-    --muted: #777;
-    --accent: #e94560;
+    --muted: #666;
     --radius: 10px;
   }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
 
   /* ── HEADER ── */
   header {
-    position: sticky; top: 0; z-index: 50;
-    background: rgba(13,13,13,0.96);
-    backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border);
-    padding: 12px 20px;
-    display: flex; flex-direction: column; gap: 10px;
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,13,13,0.97); backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--border);
+    padding:12px 20px; display:flex; flex-direction:column; gap:10px;
   }
-  .header-top { display: flex; align-items: center; gap: 14px; }
-  .logo { font-size: 17px; font-weight: 800; letter-spacing: 2px; white-space: nowrap; }
-  .logo span { color: var(--accent); }
-  .search-wrap { flex: 1; position: relative; max-width: 480px; }
-  .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+  .header-top { display:flex; align-items:center; gap:14px; }
+  .logo { font-size:17px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
+  .logo span { color:#e94560; }
+  .search-wrap { flex:1; position:relative; max-width:460px; }
+  .search-icon { position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none; }
   #search {
-    width: 100%; background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 8px; color: var(--text); font-size: 14px;
-    padding: 8px 12px 8px 34px; outline: none; transition: border-color .2s;
+    width:100%; background:var(--surface2); border:1px solid var(--border);
+    border-radius:8px; color:var(--text); font-size:14px;
+    padding:8px 32px 8px 34px; outline:none; transition:border-color .2s;
   }
-  #search:focus { border-color: var(--accent); }
-  #search::placeholder { color: var(--muted); }
-  .stats { font-size: 12px; color: var(--muted); white-space: nowrap; margin-left: auto; }
-  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
-  .filter-btn {
-    padding: 4px 13px; border-radius: 20px; font-size: 11px; font-weight: 700;
-    letter-spacing: 0.8px; border: 1px solid var(--border); cursor: pointer;
-    transition: all .15s; background: var(--surface2); color: var(--muted);
+  #search:focus { border-color:#e94560; }
+  #search::placeholder { color:var(--muted); }
+  .clear-search {
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    background:none; border:none; color:var(--muted); font-size:16px;
+    cursor:pointer; display:none; line-height:1;
   }
-  .filter-btn:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
-  .filter-btn.active { color: #fff; border-color: transparent; }
+  .clear-search:hover { color:var(--text); }
+  .stats { font-size:12px; color:var(--muted); white-space:nowrap; margin-left:auto; }
+
+  /* ── CATEGORY FILTERS ── */
+  .cat-bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .cat-btn {
+    display:flex; align-items:center; gap:5px;
+    padding:5px 13px; border-radius:20px; font-size:12px; font-weight:700;
+    letter-spacing:0.7px; border:1px solid var(--border); cursor:pointer;
+    transition:all .15s; background:var(--surface2); color:var(--muted);
+    white-space:nowrap;
+  }
+  .cat-btn:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
+  .cat-btn.active { color:#fff; border-color:transparent; }
+  .cat-btn .arrow { font-size:10px; transition:transform .2s; }
+  .cat-btn.expanded .arrow { transform:rotate(90deg); }
+
+  /* Subcategory drawer */
+  .subcat-drawer {
+    overflow:hidden; max-height:0; transition:max-height .25s ease;
+    display:flex; flex-wrap:wrap; gap:6px; padding:0 2px;
+  }
+  .subcat-drawer.open { max-height:200px; padding-top:8px; }
+  .sub-btn {
+    padding:3px 11px; border-radius:14px; font-size:11px; font-weight:600;
+    border:1px solid transparent; cursor:pointer; transition:all .15s;
+    background:var(--surface3); color:var(--muted);
+  }
+  .sub-btn:hover { color:#fff; }
+  .sub-btn.active { color:#fff; border-color:transparent; }
 
   /* ── GRID ── */
-  main { padding: 16px 20px; }
-  #grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 10px;
-  }
+  main { padding:16px 20px; }
+  #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px; }
   .card {
-    position: relative; border-radius: var(--radius); overflow: hidden;
-    background: var(--surface); cursor: pointer; aspect-ratio: 16/9;
-    transition: transform .2s, box-shadow .2s;
+    position:relative; border-radius:var(--radius); overflow:hidden;
+    background:var(--surface); cursor:pointer; aspect-ratio:16/9;
+    transition:transform .2s, box-shadow .2s;
   }
-  .card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.6); z-index: 2; }
-  .card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(0,0,0,.6); z-index:2; }
+  .card img { width:100%; height:100%; object-fit:cover; display:block; }
   .card-overlay {
-    position: absolute; inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,.85) 0%, transparent 55%);
-    opacity: 0; transition: opacity .2s;
-    display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 10px;
+    position:absolute; inset:0;
+    background:linear-gradient(to top,rgba(0,0,0,.88) 0%,transparent 55%);
+    opacity:0; transition:opacity .2s;
+    display:flex; align-items:flex-end; padding:10px;
   }
-  .card:hover .card-overlay { opacity: 1; }
-  .card-title {
-    font-size: 12px; font-weight: 600; line-height: 1.35; color: #fff;
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  }
+  .card:hover .card-overlay { opacity:1; }
+  .card-title { font-size:12px; font-weight:600; line-height:1.35; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 
   /* ── EMPTY ── */
-  #empty { display: none; text-align: center; padding: 80px 20px; color: var(--muted); }
-  #empty h2 { font-size: 20px; margin-bottom: 8px; }
+  #empty { display:none; text-align:center; padding:80px 20px; color:var(--muted); }
+  #empty h2 { font-size:20px; margin-bottom:8px; }
 
   /* ── LIGHTBOX ── */
-  #lightbox {
-    display: none; position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.9); backdrop-filter: blur(10px);
-    overflow-y: auto; padding: 20px;
-  }
-  #lightbox.open { display: block; }
+  #lightbox { display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.92); backdrop-filter:blur(10px); overflow-y:auto; padding:24px 16px; }
+  #lightbox.open { display:block; }
+  .lb-container { background:var(--surface); border-radius:18px; overflow:hidden; max-width:1000px; width:100%; margin:0 auto; box-shadow:0 40px 100px rgba(0,0,0,.9); }
 
-  .lb-container {
-    background: var(--surface); border-radius: 18px; overflow: hidden;
-    max-width: 1000px; width: 100%; margin: 0 auto;
-    box-shadow: 0 40px 100px rgba(0,0,0,.9);
-    display: flex; flex-direction: column;
-  }
+  .lb-image-wrap { position:relative; aspect-ratio:16/9; background:#000; }
+  #lb-img { width:100%; height:100%; object-fit:contain; display:block; }
+  .lb-close { position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,.75); border:none; color:#fff; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; z-index:5; }
+  .lb-close:hover { background:rgba(255,255,255,.2); }
+  .lb-nav { position:absolute; top:50%; transform:translateY(-50%); width:42px; height:42px; border-radius:50%; background:rgba(0,0,0,.7); border:none; color:#fff; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; z-index:5; }
+  .lb-nav:hover { background:rgba(255,255,255,.2); }
+  #lb-prev { left:12px; }
+  #lb-next { right:12px; }
 
-  /* Image */
-  .lb-image-wrap {
-    position: relative; aspect-ratio: 16/9; background: #000; flex-shrink: 0;
-  }
-  #lb-img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .lb-close {
-    position: absolute; top: 12px; right: 12px;
-    width: 34px; height: 34px; border-radius: 50%;
-    background: rgba(0,0,0,.75); border: none; color: #fff;
-    font-size: 17px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .2s; z-index: 5;
-  }
-  .lb-close:hover { background: rgba(255,255,255,.2); }
-  .lb-nav {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    width: 42px; height: 42px; border-radius: 50%;
-    background: rgba(0,0,0,.7); border: none; color: #fff;
-    font-size: 22px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: background .2s; z-index: 5;
-  }
-  .lb-nav:hover { background: rgba(255,255,255,.2); }
-  #lb-prev { left: 12px; }
-  #lb-next { right: 12px; }
+  .lb-body { padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
+  .lb-title { font-size:16px; font-weight:700; line-height:1.4; }
+  .lb-channel { font-size:13px; color:var(--muted); margin-top:-10px; }
 
-  /* Body */
-  .lb-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .lb-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .lb-btn { display:flex; align-items:center; gap:7px; padding:9px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; text-decoration:none; white-space:nowrap; }
+  .lb-btn-yt   { background:#ff0000; color:#fff; }
+  .lb-btn-yt:hover { background:#cc0000; }
+  .lb-btn-eagle { background:#ff6b35; color:#fff; }
+  .lb-btn-eagle:hover { background:#e55a25; }
+  .lb-btn-eagle.no-id { background:#555; cursor:not-allowed; }
+  .lb-btn-copy  { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .lb-btn-copy:hover { background:var(--surface3); }
+  .lb-btn-copy.copied { background:#1a3a1a; color:#4caf50; border-color:#4caf5055; }
 
-  .lb-meta { display: flex; flex-direction: column; gap: 4px; }
-  .lb-title { font-size: 16px; font-weight: 700; line-height: 1.4; }
-  .lb-channel { font-size: 13px; color: var(--muted); }
+  .lb-tags-section h4, .lb-related h4 { font-size:11px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:10px; }
+  .lb-tags { display:flex; flex-wrap:wrap; gap:6px; }
+  .lb-tag { padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; transition:opacity .15s; border:1px solid transparent; }
+  .lb-tag:hover { opacity:.72; }
 
-  /* Actions */
-  .lb-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-  .lb-btn {
-    display: flex; align-items: center; gap: 7px;
-    padding: 9px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
-    cursor: pointer; border: none; transition: all .15s; text-decoration: none;
-    white-space: nowrap;
-  }
-  .lb-btn-yt    { background: #ff0000; color: #fff; }
-  .lb-btn-yt:hover { background: #cc0000; }
-  .lb-btn-eagle { background: #ff6b35; color: #fff; }
-  .lb-btn-eagle:hover { background: #e85a25; }
-  .lb-btn-copy  { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
-  .lb-btn-copy:hover { background: var(--surface3); }
-  .lb-btn-copy.copied { background: #1a3a1a; color: #4caf50; border-color: #4caf5055; }
-
-  /* Tags */
-  .lb-tags-section h4 {
-    font-size: 11px; color: var(--muted); letter-spacing: 1.2px;
-    text-transform: uppercase; margin-bottom: 10px;
-  }
-  .lb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .lb-tag {
-    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: opacity .15s; border: 1px solid transparent;
-  }
-  .lb-tag:hover { opacity: 0.72; }
-
-  /* Related */
-  .lb-related h4 {
-    font-size: 11px; color: var(--muted); letter-spacing: 1.2px;
-    text-transform: uppercase; margin-bottom: 12px;
-  }
-  .related-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 8px;
-  }
-  .related-card {
-    aspect-ratio: 16/9; border-radius: 8px; overflow: hidden;
-    background: var(--surface2); cursor: pointer;
-    transition: transform .15s, box-shadow .15s; position: relative;
-  }
-  .related-card:hover { transform: scale(1.04); box-shadow: 0 6px 20px rgba(0,0,0,.5); }
-  .related-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-  /* Divider */
-  .lb-divider { border: none; border-top: 1px solid var(--border); margin: 0 -24px; }
+  .lb-divider { border:none; border-top:1px solid var(--border); margin:0 -24px; }
+  .related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; }
+  .related-card { aspect-ratio:16/9; border-radius:8px; overflow:hidden; background:var(--surface2); cursor:pointer; transition:transform .15s, box-shadow .15s; }
+  .related-card:hover { transform:scale(1.04); box-shadow:0 6px 20px rgba(0,0,0,.5); }
+  .related-card img { width:100%; height:100%; object-fit:cover; display:block; }
 
   /* ── TOAST ── */
-  #toast {
-    position: fixed; bottom: 28px; left: 50%; z-index: 999;
-    transform: translateX(-50%) translateY(16px);
-    background: var(--surface3); color: var(--text);
-    padding: 10px 20px; border-radius: 8px; font-size: 13px;
-    opacity: 0; transition: all .3s; pointer-events: none;
-    border: 1px solid var(--border);
-  }
-  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast { position:fixed; bottom:28px; left:50%; z-index:999; transform:translateX(-50%) translateY(16px); background:var(--surface3); color:var(--text); padding:10px 20px; border-radius:8px; font-size:13px; opacity:0; transition:all .3s; pointer-events:none; border:1px solid var(--border); white-space:nowrap; }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -201,13 +149,14 @@
   <div class="header-top">
     <div class="logo">THUMBNAIL<span>BOARD</span></div>
     <div class="search-wrap">
-      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <svg class="search-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
       <input id="search" type="text" placeholder="Search by tag, title or channel…" autocomplete="off">
+      <button class="clear-search" id="clear-search" onclick="clearSearch()">×</button>
     </div>
     <div class="stats" id="stats"></div>
-    <div id="eagle-status" style="display:none; font-size:12px; color:#ff6b35; white-space:nowrap;">🦅 Eagle live</div>
   </div>
-  <div class="filters" id="filters"></div>
+  <div class="cat-bar" id="cat-bar"></div>
+  <div class="subcat-drawer" id="subcat-drawer"></div>
 </header>
 
 <main>
@@ -215,7 +164,6 @@
   <div id="empty"><h2>No results</h2><p>Try a different search or clear the filters</p></div>
 </main>
 
-<!-- Lightbox -->
 <div id="lightbox">
   <div class="lb-container">
     <div class="lb-image-wrap">
@@ -225,14 +173,14 @@
       <button class="lb-nav" id="lb-next">›</button>
     </div>
     <div class="lb-body">
-      <div class="lb-meta">
+      <div>
         <div class="lb-title" id="lb-title"></div>
         <div class="lb-channel" id="lb-channel"></div>
       </div>
       <div class="lb-actions">
         <a class="lb-btn lb-btn-yt" id="lb-yt" href="#" target="_blank">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
-          Open in YouTube
+          YouTube
         </a>
         <button class="lb-btn lb-btn-eagle" id="lb-eagle">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -259,69 +207,137 @@
 <div id="toast"></div>
 
 <script>
-const CATEGORIES = {
-  STYLE:     { color: '#e94560', bg: '#533483' },
-  MOOD:      { color: '#4caf50', bg: '#2d6a2d' },
-  TEXT:      { color: '#7c4dff', bg: '#4527a0' },
-  ELEMENT:   { color: '#ff6d00', bg: '#bf360c' },
-  CAMERA:    { color: '#00bcd4', bg: '#006064' },
-  SUBJECT:   { color: '#ffab40', bg: '#e65100' },
-  FORMATION: { color: '#ab47bc', bg: '#6a1b9a' },
-  TOPIC:     { color: '#26a69a', bg: '#004d40' },
-  CALLOUT:   { color: '#d4e157', bg: '#827717' },
-  BACKDROP:  { color: '#ec407a', bg: '#880e4f' },
+// ── Category + subcategory config ────────────────────────────────
+const CATS = {
+  STYLE:     { color:'#e94560', bg:'#533483', subs:['style-colorful','style-high-contrast','style-minimal','style-split-screen','style-illustration','style-handdrawn','style-3d','style-photoshopped','style-collage','style-anatomy','style-busy','style-match-split','style-monochrome','style-pattern','style-dissolving','style-photo-composite'] },
+  MOOD:      { color:'#4caf50', bg:'#2d6a2d', subs:['mood-dramatic','mood-happy','mood-serious','mood-entertaining','mood-confused','mood-exhausted','mood-frustrated','mood-sad','mood-surprised','mood-skeptical'] },
+  TEXT:      { color:'#7c4dff', bg:'#4527a0', subs:['text-identity','text-callout','text-question','text-normative-claim','text-number','text-quote','text-forward-referencing','text-cta','text-in-center','text-in-background','text-direct-address','text-chat','text-answer'] },
+  ELEMENT:   { color:'#ff6d00', bg:'#bf360c', subs:['element-celebrity','element-graphic','element-chart','element-unusual','element-glow','element-logo','element-screen','element-money','element-in-background','element-fire','element-hand','element-in-foreground','element-in-motion','element-obfuscation','element-eye','element-map','element-vehicle','element-pile','element-damage','element-animal','element-food','element-book','element-brain','element-crowd','element-emoji','element-notification','element-checkbox','element-review','element-building'] },
+  CAMERA:    { color:'#00bcd4', bg:'#006064', subs:['camera-medium-shot','camera-close-up','camera-overhead-shot','camera-full-shot','camera-aerial-shot','camera-back-shot','camera-unusual'] },
+  SUBJECT:   { color:'#ffab40', bg:'#e65100', subs:['subject-in-motion','subject-holding-object','subject-count-two','subject-count-many','subject-in-background','subject-unusual-pose','subject-talking','subject-laying','subject-sitting','subject-clone'] },
+  FORMATION: { color:'#ab47bc', bg:'#6a1b9a', subs:['formation-flat-lay','formation-line','formation-grid','formation-v'] },
+  TOPIC:     { color:'#26a69a', bg:'#004d40', subs:['topic-comparison','topic-product-showcase','topic-space','topic-secret','topic-social-media','topic-size'] },
+  CALLOUT:   { color:'#d4e157', bg:'#827717', subs:['callout-magnifier'] },
+  BACKDROP:  { color:'#ec407a', bg:'#880e4f', subs:['backdrop-dark','backdrop-light','backdrop-blurry'] },
 };
 
-function getCategory(tag) {
-  const p = tag.split('-')[0].toUpperCase();
-  return CATEGORIES[p] ? p : null;
-}
 function tagStyle(tag) {
-  const cat = getCategory(tag);
-  return cat ? CATEGORIES[cat] : { color: '#888', bg: '#333' };
+  const p = tag.split('-')[0].toUpperCase();
+  return CATS[p] || { color:'#888', bg:'#333' };
 }
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-let allVideos = [], filteredVideos = [], visibleVideos = [];
-let activeCategory = 'ALL', searchQuery = '';
+// ── State ─────────────────────────────────────────────────────────
+let allVideos = [], visibleVideos = [];
+let activeCategory = 'ALL';
+let activeSubcat = null;
+let searchQuery = '';
 let currentIndex = 0;
+let expandedCat = null;
 
+// ── Init ──────────────────────────────────────────────────────────
 async function init() {
   const res = await fetch('data.json');
   allVideos = await res.json();
-  buildFilters();
+  buildCatBar();
   applyFilters();
 }
 
-function buildFilters() {
-  const container = document.getElementById('filters');
-  ['ALL', ...Object.keys(CATEGORIES)].forEach(cat => {
+// ── Category bar ──────────────────────────────────────────────────
+function buildCatBar() {
+  const bar = document.getElementById('cat-bar');
+
+  // ALL button
+  const allBtn = document.createElement('button');
+  allBtn.className = 'cat-btn active';
+  allBtn.textContent = 'ALL';
+  allBtn.onclick = () => selectCategory('ALL', allBtn);
+  bar.appendChild(allBtn);
+
+  // Category buttons
+  Object.entries(CATS).forEach(([cat, cfg]) => {
     const btn = document.createElement('button');
-    btn.className = 'filter-btn' + (cat === 'ALL' ? ' active' : '');
-    btn.textContent = cat;
-    btn.onclick = () => {
-      activeCategory = cat;
-      document.querySelectorAll('.filter-btn').forEach(b => {
-        b.classList.remove('active');
-        b.style.background = b.style.color = '';
-      });
-      btn.classList.add('active');
-      if (cat !== 'ALL' && CATEGORIES[cat]) {
-        btn.style.background = CATEGORIES[cat].bg;
-        btn.style.color = '#fff';
-      }
-      applyFilters();
-    };
-    container.appendChild(btn);
+    btn.className = 'cat-btn';
+    btn.dataset.cat = cat;
+    btn.innerHTML = `${cat} <span class="arrow">›</span>`;
+    btn.onclick = () => selectCategory(cat, btn);
+    bar.appendChild(btn);
   });
 }
 
+function selectCategory(cat, btn) {
+  // Update active button styles
+  document.querySelectorAll('.cat-btn').forEach(b => {
+    b.classList.remove('active', 'expanded');
+    b.style.background = b.style.color = '';
+  });
+
+  if (cat === 'ALL') {
+    btn.classList.add('active');
+    activeCategory = 'ALL';
+    activeSubcat = null;
+    expandedCat = null;
+    closeDrawer();
+  } else {
+    const cfg = CATS[cat];
+    if (expandedCat === cat) {
+      // Toggle off
+      expandedCat = null;
+      activeCategory = 'ALL';
+      activeSubcat = null;
+      document.querySelector('.cat-btn[data-cat="'+cat+'"]')?.classList.remove('active');
+      closeDrawer();
+    } else {
+      expandedCat = cat;
+      activeCategory = cat;
+      activeSubcat = null;
+      btn.classList.add('active', 'expanded');
+      btn.style.background = cfg.bg;
+      btn.style.color = '#fff';
+      openDrawer(cat, cfg);
+    }
+  }
+  applyFilters();
+}
+
+function openDrawer(cat, cfg) {
+  const drawer = document.getElementById('subcat-drawer');
+  drawer.innerHTML = cfg.subs.map(sub => {
+    const label = sub.split('-').slice(1).join('-');
+    return `<button class="sub-btn" data-sub="${sub}" style="border-color:${cfg.color}33"
+      onclick="selectSubcat('${sub}', this, '${cfg.color}', '${cfg.bg}')">${label}</button>`;
+  }).join('');
+  drawer.classList.add('open');
+}
+
+function closeDrawer() {
+  const drawer = document.getElementById('subcat-drawer');
+  drawer.classList.remove('open');
+  setTimeout(() => { drawer.innerHTML = ''; }, 260);
+}
+
+function selectSubcat(sub, btn, color, bg) {
+  document.querySelectorAll('.sub-btn').forEach(b => {
+    b.classList.remove('active'); b.style.background = ''; b.style.color = '';
+  });
+  if (activeSubcat === sub) {
+    activeSubcat = null;
+  } else {
+    activeSubcat = sub;
+    btn.classList.add('active');
+    btn.style.background = bg;
+    btn.style.color = '#fff';
+  }
+  applyFilters();
+}
+
+// ── Filtering ─────────────────────────────────────────────────────
 function applyFilters() {
   const q = searchQuery.toLowerCase().trim();
-  filteredVideos = allVideos.filter(v => {
-    if (activeCategory !== 'ALL') {
+  visibleVideos = allVideos.filter(v => {
+    if (activeSubcat) {
+      if (!v.tags.includes(activeSubcat)) return false;
+    } else if (activeCategory !== 'ALL') {
       const p = activeCategory.toLowerCase();
       if (!v.tags.some(t => t.startsWith(p + '-') || t === p)) return false;
     }
@@ -336,20 +352,27 @@ function applyFilters() {
   renderGrid();
 }
 
+function clearSearch() {
+  document.getElementById('search').value = '';
+  searchQuery = '';
+  document.getElementById('clear-search').style.display = 'none';
+  applyFilters();
+}
+
+// ── Grid ──────────────────────────────────────────────────────────
 function renderGrid() {
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
-  visibleVideos = filteredVideos;
-  document.getElementById('stats').textContent = `${filteredVideos.length} thumbnails`;
+  document.getElementById('stats').textContent = `${visibleVideos.length} thumbnails`;
 
-  if (!filteredVideos.length) {
+  if (!visibleVideos.length) {
     grid.innerHTML = '';
     empty.style.display = 'block';
     return;
   }
   empty.style.display = 'none';
 
-  grid.innerHTML = filteredVideos.map((v, i) => `
+  grid.innerHTML = visibleVideos.map((v, i) => `
     <div class="card" onclick="openLightbox(${i})">
       <img loading="lazy"
         src="https://img.youtube.com/vi/${v.id}/maxresdefault.jpg"
@@ -361,7 +384,7 @@ function renderGrid() {
     </div>`).join('');
 }
 
-// ── Lightbox ────────────────────────────────────────────────────
+// ── Lightbox ──────────────────────────────────────────────────────
 function openLightbox(index) {
   currentIndex = index;
   renderLightbox();
@@ -378,8 +401,7 @@ function closeLightbox() {
 
 function navigate(dir) {
   currentIndex = Math.max(0, Math.min(visibleVideos.length - 1, currentIndex + dir));
-  const lb = document.getElementById('lightbox');
-  lb.scrollTop = 0;
+  document.getElementById('lightbox').scrollTop = 0;
   renderLightbox();
 }
 
@@ -387,7 +409,6 @@ function renderLightbox() {
   const v = visibleVideos[currentIndex];
   if (!v) return;
 
-  // Image — try HD first, fallback to SD
   const img = document.getElementById('lb-img');
   img.src = `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`;
   img.onerror = () => { img.src = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`; img.onerror = null; };
@@ -396,135 +417,102 @@ function renderLightbox() {
   document.getElementById('lb-channel').textContent = v.channel || '';
   document.getElementById('lb-yt').href = `https://www.youtube.com/watch?v=${v.id}`;
 
-  // Nav arrows
-  document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
-  document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
+  // Eagle button — deep link via eagle:// URL scheme
+  const eagleBtn = document.getElementById('lb-eagle');
+  if (v.eid) {
+    eagleBtn.classList.remove('no-id');
+    eagleBtn.title = '';
+    eagleBtn.onclick = () => {
+      window.location.href = `eagle://item/open?id=${v.eid}`;
+      showToast('Opening in Eagle…');
+    };
+  } else {
+    eagleBtn.classList.add('no-id');
+    eagleBtn.title = 'Eagle ID not available for this item';
+    eagleBtn.onclick = () => showToast('Eagle ID not available for this thumbnail');
+  }
 
-  // Eagle
-  document.getElementById('lb-eagle').onclick = () => openInEagle(v.id);
-
-  // Copy
+  // Copy button
   const copyBtn = document.getElementById('lb-copy');
   copyBtn.className = 'lb-btn lb-btn-copy';
   copyBtn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy image`;
   copyBtn.onclick = () => copyImage(v.id, copyBtn);
 
+  // Nav
+  document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
+  document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
+
   // Tags
   document.getElementById('lb-tags').innerHTML = v.tags.map(t => {
     const c = tagStyle(t);
-    return `<span class="lb-tag" style="background:${c.bg};color:#fff;border-color:${c.color}55"
+    return `<span class="lb-tag" style="background:${c.bg};color:#fff;border-color:${c.color}44"
       onclick="filterByTag('${esc(t)}')">${esc(t)}</span>`;
   }).join('');
 
-  // Related — sorted by shared tag count descending, show 20
+  // Related — sorted by shared tags count
   const tagSet = new Set(v.tags);
   const related = allVideos
     .filter(r => r.id !== v.id)
     .map(r => ({ v: r, score: r.tags.filter(t => tagSet.has(t)).length }))
     .filter(x => x.score > 0)
-    .sort((a, b) => b.score - a.score || a.v.title.localeCompare(b.v.title))
+    .sort((a, b) => b.score - a.score)
     .slice(0, 20);
 
-  document.getElementById('lb-related').innerHTML = related.map((x, i) => `
-    <div class="related-card" onclick="jumpToRelated('${x.v.id}')">
-      <img loading="lazy"
-        src="https://img.youtube.com/vi/${x.v.id}/mqdefault.jpg"
-        alt="${esc(x.v.title)}">
+  document.getElementById('lb-related').innerHTML = related.map(x => `
+    <div class="related-card" onclick="jumpTo('${x.v.id}')">
+      <img loading="lazy" src="https://img.youtube.com/vi/${x.v.id}/mqdefault.jpg" alt="${esc(x.v.title)}">
     </div>`).join('');
 }
 
-function jumpToRelated(videoId) {
+function jumpTo(videoId) {
   const idx = visibleVideos.findIndex(v => v.id === videoId);
   if (idx !== -1) {
     currentIndex = idx;
   } else {
-    // Video not in current filter — find it in allVideos and switch to unfiltered view
-    const globalIdx = allVideos.findIndex(v => v.id === videoId);
-    if (globalIdx === -1) return;
-    activeCategory = 'ALL';
-    searchQuery = '';
-    document.getElementById('search').value = '';
-    document.querySelectorAll('.filter-btn').forEach(b => {
-      b.classList.remove('active'); b.style.background = b.style.color = '';
-    });
-    document.querySelector('.filter-btn').classList.add('active');
+    // Not in current filter — reset and find globally
+    activeCategory = 'ALL'; activeSubcat = null; expandedCat = null;
+    document.querySelectorAll('.cat-btn').forEach(b => { b.classList.remove('active','expanded'); b.style.background = b.style.color = ''; });
+    document.querySelector('.cat-btn').classList.add('active');
+    closeDrawer();
     applyFilters();
     currentIndex = visibleVideos.findIndex(v => v.id === videoId);
   }
-  const lb = document.getElementById('lightbox');
-  lb.scrollTop = 0;
+  document.getElementById('lightbox').scrollTop = 0;
   renderLightbox();
 }
 
 function filterByTag(tag) {
   closeLightbox();
   document.getElementById('search').value = tag;
+  document.getElementById('clear-search').style.display = '';
   searchQuery = tag;
   applyFilters();
 }
 
-// ── Copy image ───────────────────────────────────────────────────
+// ── Copy image ────────────────────────────────────────────────────
 async function copyImage(videoId, btn) {
   const url = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-
-  // Try canvas approach (works if YouTube allows crossOrigin)
   try {
     const image = new Image();
     image.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = reject;
-      image.src = url + '?_=' + Date.now();
-    });
+    await new Promise((res, rej) => { image.onload = res; image.onerror = rej; image.src = url + '?_=' + Date.now(); });
     const canvas = document.createElement('canvas');
     canvas.width = image.naturalWidth || 1280;
     canvas.height = image.naturalHeight || 720;
     canvas.getContext('2d').drawImage(image, 0, 0);
-
-    await new Promise((resolve, reject) => {
+    await new Promise((res, rej) => {
       canvas.toBlob(async blob => {
-        if (!blob) { reject(new Error('no blob')); return; }
-        try {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          resolve();
-        } catch(e) { reject(e); }
+        if (!blob) { rej(new Error('no blob')); return; }
+        try { await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]); res(); }
+        catch(e) { rej(e); }
       }, 'image/png');
     });
-
     btn.className = 'lb-btn lb-btn-copy copied';
     btn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Copied!`;
     showToast('Image copied to clipboard ✓');
-    return;
-  } catch(e) { /* fall through */ }
-
-  // Fallback: open image in new tab
-  window.open(url, '_blank');
-  showToast('Image opened in new tab — right-click → Copy image');
-}
-
-// ── Open in Eagle ────────────────────────────────────────────────
-const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-
-async function openInEagle(videoId) {
-  if (IS_LOCAL) {
-    // Use local server proxy — no CORS issues
-    try {
-      const res = await fetch(`/api/eagle/open?videoId=${videoId}`, {
-        signal: AbortSignal.timeout(4000)
-      });
-      const data = await res.json();
-      if (data.ok && data.eagle_id) {
-        window.location.href = `eagle://item/open?id=${data.eagle_id}`;
-        showToast('Opening in Eagle…');
-      } else {
-        showToast(data.msg || 'Not found in Eagle');
-      }
-    } catch(e) {
-      showToast('Server not responding — is server.py running?');
-    }
-  } else {
-    // On GitHub Pages: can't reach localhost
-    showToast('Eagle only works in local mode — run server.py');
+  } catch(e) {
+    window.open(url, '_blank');
+    showToast('Opened in new tab — right-click → Copy image');
   }
 }
 
@@ -533,13 +521,14 @@ function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
 // ── Events ────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', e => {
   searchQuery = e.target.value;
+  document.getElementById('clear-search').style.display = searchQuery ? '' : 'none';
   applyFilters();
 });
 document.getElementById('lb-close').onclick = closeLightbox;
@@ -555,24 +544,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') navigate(1);
 });
 
-// Show Eagle indicator + use live data if local
-async function checkEagleStatus() {
-  if (!IS_LOCAL) return;
-  try {
-    const res = await fetch('/api/eagle/status', { signal: AbortSignal.timeout(2000) });
-    const data = await res.json();
-    if (data.ok) {
-      document.getElementById('eagle-status').style.display = '';
-      // Reload live data from server
-      const r2 = await fetch('/api/data');
-      allVideos = await r2.json();
-      applyFilters();
-    }
-  } catch(e) {}
-}
-
 init();
-checkEagleStatus();
 </script>
 </body>
 </html>
