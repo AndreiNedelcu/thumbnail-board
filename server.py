@@ -380,7 +380,23 @@ class Handler(BaseHTTPRequestHandler):
                 if updated:
                     DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
                     print(f"[update] Synced tags for eid={eagle_id} vid={vid} → data.json", flush=True)
-                    auto_publish()  # push to GitHub Pages in background
+                    auto_publish()
+                elif vid:
+                    # Entry not in data.json yet — create it from the data sent by tagger
+                    name  = body.get("name","")
+                    ann   = body.get("annotation","")
+                    ch_m  = re.search(r'Channel:\s*(.+)', ann)
+                    vi_m  = re.search(r'Views:\s*(.+)', ann)
+                    channel = ch_m.group(1).strip() if ch_m else ""
+                    views   = vi_m.group(1).strip() if vi_m else ""
+                    new_entry = {"id": vid, "title": name, "channel": channel,
+                                 "views": views, "tags": new_tags, "eid": eagle_id}
+                    _dataset.append(new_entry)
+                    DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
+                    print(f"[update] Created new entry vid={vid} eid={eagle_id}", flush=True)
+                    auto_publish()
+                else:
+                    print(f"[update] WARNING: could not find entry for eid={eagle_id} vid={vid}", flush=True)
             self.send_json(result)
             return
 
