@@ -25,9 +25,8 @@
 
   /* ── HERO ── */
   .hero {
-    padding:80px 0 48px;
+    padding:80px 0 40px;
     text-align:center;
-    border-bottom:1px solid var(--border);
   }
   .hero-title {
     font-size:clamp(42px, 7vw, 84px);
@@ -163,6 +162,9 @@
   #lb-img { width:100%; height:100%; object-fit:contain; display:block; }
   .lb-close { position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:50%; background:rgba(0,0,0,.75); border:none; color:#fff; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; z-index:5; }
   .lb-close:hover { background:rgba(255,255,255,.2); }
+  .lb-back { position:absolute; top:12px; left:12px; height:34px; padding:0 14px; border-radius:18px; background:rgba(0,0,0,.75); border:none; color:#fff; font-size:13px; font-weight:600; cursor:pointer; display:none; align-items:center; gap:5px; transition:background .2s; z-index:5; }
+  .lb-back.visible { display:flex; }
+  .lb-back:hover { background:rgba(255,255,255,.2); }
   .lb-nav { position:absolute; top:50%; transform:translateY(-50%); width:42px; height:42px; border-radius:50%; background:rgba(0,0,0,.7); border:none; color:#fff; font-size:22px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .2s; z-index:5; }
   .lb-nav:hover { background:rgba(255,255,255,.2); }
   #lb-prev { left:12px; }
@@ -272,6 +274,7 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <input id="size-slider" type="range" min="160" max="480" value="280" oninput="setCardSize(this.value)">
     </div>
+    <button class="tagger-btn" id="shuffle-btn" onclick="shuffleVideos()" title="Randomise order">🔀 Shuffle</button>
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
     <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">☐ Select</button>
     <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">🗑 Delete <span id="sel-count">0</span></button>
@@ -288,6 +291,7 @@
   <div class="lb-container">
     <div class="lb-image-wrap">
       <img id="lb-img" src="" alt="">
+      <button class="lb-back" id="lb-back" onclick="lightboxBack()">← Back</button>
       <button class="lb-close" id="lb-close">✕</button>
       <button class="lb-nav" id="lb-prev">‹</button>
       <button class="lb-nav" id="lb-next">›</button>
@@ -367,6 +371,7 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 
 // ── State ─────────────────────────────────────────────────────────
 let allVideos = [], visibleVideos = [];
+let shuffleOrder = null; // when set, an array of video IDs in shuffled order
 let activeCategory = 'ALL';
 let activeSubcat = null;
 let searchQuery = '';
@@ -523,7 +528,29 @@ function applyFilters() {
     }
     return true;
   });
+  // Apply shuffle order if active
+  if (shuffleOrder) {
+    const rank = new Map(shuffleOrder.map((id, i) => [id, i]));
+    visibleVideos.sort((a, b) => {
+      const ra = rank.has(a.id) ? rank.get(a.id) : 1e9;
+      const rb = rank.has(b.id) ? rank.get(b.id) : 1e9;
+      return ra - rb;
+    });
+  }
   renderGrid();
+}
+
+function shuffleVideos() {
+  // Fisher-Yates shuffle of all video IDs — persists across filters
+  const ids = allVideos.map(v => v.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  shuffleOrder = ids;
+  const btn = document.getElementById('shuffle-btn');
+  if (btn) { btn.textContent = '🔀 Shuffled'; setTimeout(() => btn.textContent = '🔀 Shuffle', 1200); }
+  applyFilters();
 }
 
 function clearSearch() {
@@ -617,6 +644,7 @@ function renderGrid() {
 // ── Lightbox ──────────────────────────────────────────────────────
 function openLightbox(index) {
   currentIndex = index;
+  lbHistory = []; // reset history when opening from grid (fresh session)
   renderLightbox();
   const lb = document.getElementById('lightbox');
   lb.classList.add('open');
@@ -627,6 +655,7 @@ function openLightbox(index) {
 function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
   document.body.style.overflow = '';
+  lbHistory = []; // clear history on close
 }
 
 function navigate(dir) {
@@ -679,6 +708,8 @@ function renderLightbox() {
   document.getElementById('lb-delete').onclick = () => showDeleteConfirm(v.id, v.title || v.id);
 
   // Nav
+  // Toggle back button based on history
+  document.getElementById('lb-back').classList.toggle('visible', lbHistory.length > 0);
   document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
   document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
 
@@ -702,7 +733,14 @@ function renderLightbox() {
     </div>`).join('');
 }
 
+// History stack of videoIds visited via "related" clicks within the lightbox
+let lbHistory = [];
+
 function jumpTo(videoId) {
+  // Push current video onto history before navigating
+  const currentVid = visibleVideos[currentIndex]?.id;
+  if (currentVid && currentVid !== videoId) lbHistory.push(currentVid);
+
   const idx = visibleVideos.findIndex(v => v.id === videoId);
   if (idx !== -1) {
     currentIndex = idx;
@@ -710,13 +748,24 @@ function jumpTo(videoId) {
     // Not in current filter — reset and find globally
     activeCategory = 'ALL'; activeSubcat = null; expandedCat = null;
     document.querySelectorAll('.cat-btn').forEach(b => { b.classList.remove('active','expanded'); b.style.background = b.style.color = ''; });
-    document.querySelector('.cat-btn').classList.add('active');
-    closeDrawer();
+    document.querySelector('.cat-btn')?.classList.add('active');
+    if (typeof closeDrawer === 'function') closeDrawer();
     applyFilters();
     currentIndex = visibleVideos.findIndex(v => v.id === videoId);
   }
   document.getElementById('lightbox').scrollTop = 0;
   renderLightbox();
+}
+
+function lightboxBack() {
+  if (!lbHistory.length) return;
+  const prevId = lbHistory.pop();
+  const idx = visibleVideos.findIndex(v => v.id === prevId);
+  if (idx !== -1) {
+    currentIndex = idx;
+    document.getElementById('lightbox').scrollTop = 0;
+    renderLightbox();
+  }
 }
 
 function filterByTag(tag) {
