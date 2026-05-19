@@ -144,8 +144,8 @@ async function refreshSavedIds() {
     const data = await r.json();
     savedVideoIds.clear();
     for (const v of data) savedVideoIds.add(v.id);
-    // After refresh, re-style any existing card buttons
-    document.querySelectorAll('.tb-card-btn').forEach(b => updateCardBtnState(b, savedVideoIds.has(b.dataset.vid)));
+    // After refresh, re-style any existing card buttons (both variants)
+    document.querySelectorAll('.tb-card-btn, .tb-yt-btn').forEach(b => updateCardBtnState(b, savedVideoIds.has(b.dataset.vid)));
   } catch (e) {
     console.warn('[ThumbnailBoard] could not load saved IDs', e);
   }
@@ -479,18 +479,18 @@ function openMenu(btn, info) {
 async function runSave(btn, info) {
   if (btn.dataset.state === 'loading') return;
   try {
-    updateCardBtnState(btn, false, 'loading');
+    updateAllForVid(info.id, false, 'loading');
     const tags = await saveVideo(info);
-    updateCardBtnState(btn, true, 'saved');
+    updateAllForVid(info.id, true, 'saved');
     showToast(`Saved · ${tags.length} tags`, 'success');
   } catch (err) {
     if (/already in board/i.test(err.message)) {
-      updateCardBtnState(btn, true, 'saved');
+      updateAllForVid(info.id, true, 'saved');
       showToast('Already in board', 'success');
     } else {
-      updateCardBtnState(btn, false, 'error');
+      updateAllForVid(info.id, false, 'error');
       showToast(err.message, 'error');
-      setTimeout(() => updateCardBtnState(btn, savedVideoIds.has(info.id)), 2500);
+      setTimeout(() => updateAllForVid(info.id, savedVideoIds.has(info.id)), 2500);
     }
   }
 }
@@ -506,7 +506,7 @@ async function removeFromBoard(btn, info) {
     const d = await r.json();
     if (d.ok || /not found/i.test(d.msg || '')) {
       savedVideoIds.delete(info.id);
-      updateCardBtnState(btn, false);
+      updateAllForVid(info.id, false);
       showToast('Removed from board', 'success');
     } else {
       showToast(d.msg || 'Delete failed', 'error');
@@ -650,7 +650,6 @@ chrome.runtime.onMessage.addListener((msg) => {
 
 // Continuously discover new cards as the user scrolls
 const cardObserver = new MutationObserver(() => {
-  // Debounce to avoid hammering on every micro-mutation
   if (cardObserver._t) return;
   cardObserver._t = setTimeout(() => {
     cardObserver._t = null;
@@ -658,6 +657,68 @@ const cardObserver = new MutationObserver(() => {
   }, 250);
 });
 cardObserver.observe(document.body, { childList: true, subtree: true });
+
+// ── Inject button into YouTube's inline-preview controls stack ────
+// When the user hovers a card, YT eventually creates a vertical
+// flex container at the top-right of the inline preview holding mute
+// and captions buttons:  div.ytInlinePlayerControlsTopRightControls
+// We append a third button to that stack so our save button looks
+// like one of YT's own controls.
+function injectIntoYTControls(ytContainer) {
+  if (!ytContainer || ytContainer.querySelector('.tb-yt-btn')) return;
+
+  // Find the video ID from the card surrounding this preview
+  const card = ytContainer.closest(
+    'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
+    'ytd-compact-video-renderer, ytd-rich-grid-media, ytd-reel-item-renderer, ' +
+    'yt-lockup-view-model, ytm-rich-item-renderer, ytd-thumbnail'
+  );
+  if (!card) return;
+  const link = card.querySelector('a[href*="/watch?v="]');
+  if (!link) return;
+  const m = link.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  if (!m) return;
+  const vid = m[1];
+
+  const btn = document.createElement('button');
+  btn.className = 'tb-yt-btn';
+  btn.dataset.vid = vid;
+  btn.title = 'Save to board';
+  updateCardBtnState(btn, savedVideoIds.has(vid));
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (btn.dataset.state === 'loading') return;
+    const info = getCardInfo(card) || { id: vid, title: '', channel: '', views: '' };
+    info.id = vid;
+    openMenu(btn, info);
+  });
+  ytContainer.appendChild(btn);
+}
+
+// Watch the whole DOM for the YT controls container being created
+const ytObserver = new MutationObserver((muts) => {
+  for (const mut of muts) {
+    for (const node of mut.addedNodes) {
+      if (node.nodeType !== 1) continue;
+      if (node.classList?.contains('ytInlinePlayerControlsTopRightControls')) {
+        injectIntoYTControls(node);
+      } else if (node.querySelectorAll) {
+        node.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
+      }
+    }
+  }
+  // Catch any already-present containers we might have missed
+  document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
+});
+ytObserver.observe(document.body, { childList: true, subtree: true });
+
+// Helper: update ALL buttons (absolute card btn + YT-controls btn) for
+// a given video id. Used after a save/delete so both icons reflect state.
+function updateAllForVid(vid, isInBoard, state = null) {
+  document.querySelectorAll(`.tb-card-btn[data-vid="${vid}"], .tb-yt-btn[data-vid="${vid}"]`)
+    .forEach(b => updateCardBtnState(b, isInBoard, state));
+}
 
 // Kick off
 (async () => {
