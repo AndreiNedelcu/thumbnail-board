@@ -443,13 +443,16 @@ function openMenu(btn, info) {
   // We use fixed positioning so it floats above YouTube's overlays
   const mw = menu.offsetWidth;
   const mh = menu.offsetHeight;
-  // Anchor: open to the right of the button (button is in card's top-left).
-  let top  = r.bottom + 6;
-  let left = r.left;
-  if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+  // Button is now at the bottom-right of the card — open the menu
+  // UPWARDS and align its right edge with the button's right edge.
+  let top  = r.top - mh - 6;
+  let left = r.right - mw;
+  // Flip downwards if there's no room above
+  if (top < 8) top = r.bottom + 6;
+  // Keep within viewport horizontally
   if (left < 8) left = 8;
-  if (top + mh > window.innerHeight - 8) top = r.top - mh - 6;
-  if (top < 8) top = 8;
+  if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+  if (top + mh > window.innerHeight - 8) top = window.innerHeight - mh - 8;
   menu.style.top  = `${top}px`;
   menu.style.left = `${left}px`;
   menu.style.visibility = 'visible';

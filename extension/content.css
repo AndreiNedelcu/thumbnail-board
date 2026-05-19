@@ -57,11 +57,12 @@
 
 /* ── Per-card button — native YouTube look ── */
 /* Round, dark, semi-transparent — matches YouTube's hover overlay
-   controls. Top-left to avoid overlap with YT's top-right menu. */
+   controls (mute / captions). Anchored bottom-right above the duration
+   badge so it stacks visually with YT's own hover buttons. */
 .tb-card-btn {
   position: absolute;
-  top: 8px;
-  left: 8px;
+  right: 8px;
+  bottom: 40px;             /* clears the duration badge (4-8px from bottom) */
   z-index: 50;
   width: 32px;
   height: 32px;
