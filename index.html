@@ -725,7 +725,6 @@ function setSort(name) {
     b.classList.toggle('active', b.dataset.sort === name);
   });
   applyFilters();
-  window.scrollTo({ top: 0, behavior: 'instant' });
   saveState();
 }
 let activeCategory = 'ALL';
