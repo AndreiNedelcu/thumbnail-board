@@ -359,7 +359,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/add":
             # Add a new video from extension: save to Eagle + data.json
-            vid_id  = body.get("videoId","")
+            vid_id  = body.get("id","") or body.get("videoId","")
             title   = body.get("title","")
             channel = body.get("channel","")
             views   = body.get("views","")
