@@ -60,7 +60,18 @@
       <div class="tb-login-box">
         <h2>Enter your access token</h2>
         <p>You're viewing the public board, but you need a token to make changes (add, edit, delete). Your token is stored locally in this browser.</p>
-        <input id="tb-token-input" type="password" placeholder="paste your token here…" autocomplete="off">
+        <input id="tb-token-input"
+               type="text"
+               placeholder="paste your token here…"
+               autocomplete="off"
+               autocapitalize="off"
+               autocorrect="off"
+               spellcheck="false"
+               data-1p-ignore
+               data-lpignore="true"
+               data-bwignore
+               name="thumbnail-board-token"
+               style="font-family:monospace;letter-spacing:0.5px">
         <button id="tb-token-submit">Continue</button>
       </div>
     `;
