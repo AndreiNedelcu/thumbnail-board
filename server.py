@@ -11,7 +11,7 @@ Uso:
     python3 server.py
 """
 
-import json, re, time, threading, os, sys
+import json, re, time, threading, os, sys, subprocess
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
@@ -315,6 +315,26 @@ class Handler(BaseHTTPRequestHandler):
             # Proxy Eagle item update
             result = eagle_post("/api/item/update", body)
             self.send_json(result)
+            return
+
+        if path == "/api/publish":
+            # Commit + push data.json to GitHub
+            try:
+                repo = Path(__file__).parent
+                count = len(_dataset)
+                subprocess.run(["git", "add", "data.json"], cwd=repo, check=True)
+                # Check if there's anything to commit
+                diff = subprocess.run(["git", "diff", "--cached", "--stat"], cwd=repo, capture_output=True, text=True)
+                if not diff.stdout.strip():
+                    self.send_json({"ok": True, "msg": "Already up to date — nothing new to publish"})
+                    return
+                msg = f"data: sync {count} thumbnails from Eagle"
+                subprocess.run(["git", "commit", "-m", msg], cwd=repo, check=True)
+                subprocess.run(["git", "push"], cwd=repo, check=True)
+                print(f"[publish] Pushed data.json ({count} items)", flush=True)
+                self.send_json({"ok": True, "msg": f"{count} thumbnails published to GitHub"})
+            except subprocess.CalledProcessError as e:
+                self.send_json({"ok": False, "msg": str(e)})
             return
 
         self.send_response(404)

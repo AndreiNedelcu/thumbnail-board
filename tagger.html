@@ -30,6 +30,11 @@
   .btn-save { background:#e94560; color:#fff; padding:6px 16px; }
   .btn-save:hover:not(:disabled) { background:#c73050; }
   .btn-save:disabled { background:#2a2a2a; color:#555; cursor:not-allowed; }
+  .btn-eagle { background:var(--surface2); color:#7c4dff; border:1px solid #7c4dff44; }
+  .btn-eagle:hover:not(:disabled) { background:#7c4dff22; }
+  .btn-eagle:disabled { opacity:.3; cursor:not-allowed; }
+  .btn-publish { background:var(--surface2); color:#26a69a; border:1px solid #26a69a44; }
+  .btn-publish:hover { background:#26a69a22; }
 
   /* LAYOUT */
   main { flex:1; min-height:0; display:grid; grid-template-columns:1fr 360px; overflow:hidden; }
@@ -90,6 +95,8 @@
   <div class="header-actions">
     <button class="btn btn-ghost" id="btn-back" onclick="goBack()" disabled>← Back</button>
     <button class="btn btn-ghost" onclick="skip()">Skip →</button>
+    <button class="btn btn-eagle" id="btn-eagle" onclick="openInEagle()" disabled title="Open in Eagle">🦅 Eagle</button>
+    <button class="btn btn-publish" id="btn-publish" onclick="publishToGithub()" title="Save & publish to GitHub">⬆ Publish</button>
     <button class="btn btn-save" id="btn-save" onclick="saveTags()" disabled>Save tags</button>
   </div>
 </header>
@@ -144,6 +151,7 @@ const isOfficial = t => VALID.has(t.split('-')[0]);
 let queue = [], history = [], idx = 0, current = null;
 let selected = new Set();
 let totalAll = 0, preTagged = 0;
+const savedSelections = {};  // eagle item id → Set of selected tags
 
 // ── Load all items via server proxy (MCP → all 2006 items) ───────
 async function loadItems() {
@@ -223,7 +231,8 @@ function render() {
   }
 
   current = queue[idx];
-  selected = new Set();
+  // Restore previously selected tags for this item (if navigating back)
+  selected = savedSelections[current.id] ? new Set(savedSelections[current.id]) : new Set();
   document.getElementById('main').style.display = 'grid';
 
   // Image
@@ -239,8 +248,18 @@ function render() {
   const vm = (current.annotation||'').match(/Views:\s*([\d.KMB]+)/);
   document.getElementById('tviews').textContent = vm ? `👁 ${vm[1]}` : '';
 
-  // Reset buttons
-  document.querySelectorAll('.tag-btn').forEach(b => { b.classList.remove('selected'); b.style.cssText=''; });
+  // Reset + re-apply selected state on buttons
+  document.querySelectorAll('.tag-btn').forEach(b => {
+    const tag = b.dataset.tag;
+    if (selected.has(tag)) {
+      const cat = tag.split('-')[0].toUpperCase();
+      const cfg = CATS[cat] || {};
+      b.classList.add('selected');
+      b.style.background = cfg.bg||''; b.style.color='#fff'; b.style.borderColor='transparent';
+    } else {
+      b.classList.remove('selected'); b.style.cssText='';
+    }
+  });
   refreshSelTags();
   refreshProgress();
   refreshBtns();
@@ -265,6 +284,7 @@ function refreshProgress() {
 function refreshBtns() {
   document.getElementById('btn-save').disabled = selected.size === 0;
   document.getElementById('btn-back').disabled = history.length === 0;
+  document.getElementById('btn-eagle').disabled = !current;
 }
 
 // ── Tag toggle ────────────────────────────────────────────────────
@@ -277,6 +297,7 @@ function toggle(tag, btn, bg, color) {
     btn.classList.add('selected');
     btn.style.background=bg; btn.style.color='#fff'; btn.style.borderColor='transparent';
   }
+  if (current) savedSelections[current.id] = new Set(selected);
   refreshSelTags(); refreshBtns();
 }
 
@@ -284,12 +305,35 @@ function untag(tag) {
   selected.delete(tag);
   const btn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
   if (btn) { btn.classList.remove('selected'); btn.style.cssText=''; }
+  if (current) savedSelections[current.id] = new Set(selected);
   refreshSelTags(); refreshBtns();
 }
 
 // ── Navigation ────────────────────────────────────────────────────
-function skip()   { history.push(idx); idx++; render(); }
-function goBack() { if (history.length) { idx = history.pop(); render(); } }
+function skip()   { if (current) savedSelections[current.id] = new Set(selected); history.push(idx); idx++; render(); }
+function goBack() { if (current) savedSelections[current.id] = new Set(selected); if (history.length) { idx = history.pop(); render(); } }
+
+// ── Open in Eagle ─────────────────────────────────────────────────
+function openInEagle() {
+  if (!current) return;
+  window.location.href = `eagle://item/${current.id}`;
+}
+
+// ── Publish to GitHub ─────────────────────────────────────────────
+async function publishToGithub() {
+  const btn = document.getElementById('btn-publish');
+  btn.disabled = true; btn.textContent = '⬆ Publishing…';
+  try {
+    const r = await fetch(`${SERVER}/api/publish`, { method:'POST' });
+    const d = await r.json();
+    if (d.ok) toast(`✅ Published! ${d.msg||''}`);
+    else toast(`❌ ${d.msg||'Publish failed'}`);
+  } catch(e) {
+    toast(`❌ ${e.message}`);
+  } finally {
+    btn.disabled = false; btn.textContent = '⬆ Publish';
+  }
+}
 
 // ── Save ──────────────────────────────────────────────────────────
 async function saveTags() {
