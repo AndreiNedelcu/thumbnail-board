@@ -116,10 +116,22 @@ def looks_confident(tags: list, min_tags: int, max_tags: int) -> tuple[bool, str
     return True, ""
 
 def publish_to_worker(entry: dict, auth_token: str) -> tuple[bool, str]:
-    """POST to /api/add. Returns (success, message)."""
-    payload = json.dumps(entry).encode()
+    """POST a single entry to /api/add."""
+    return _post_worker("/api/add", entry, auth_token)
+
+def publish_batch_to_worker(entries: list, auth_token: str) -> tuple[bool, str, int]:
+    """POST many entries in ONE git commit via /api/add-batch.
+    Returns (success, message, added_count)."""
+    if not entries: return True, "nothing to publish", 0
+    ok, msg = _post_worker("/api/add-batch", {"items": entries}, auth_token, timeout=60)
+    if not ok: return False, msg, 0
+    # _post_worker returns msg as the message string from response
+    return True, msg, len(entries)
+
+def _post_worker(path: str, body: dict, auth_token: str, timeout: int = 30) -> tuple[bool, str]:
+    payload = json.dumps(body).encode()
     req = Request(
-        f"{WORKER_URL}/api/add",
+        f"{WORKER_URL}{path}",
         data=payload,
         headers={
             "Content-Type": "application/json",
@@ -128,10 +140,10 @@ def publish_to_worker(entry: dict, auth_token: str) -> tuple[bool, str]:
         },
     )
     try:
-        with urlopen(req, timeout=30) as r:
+        with urlopen(req, timeout=timeout) as r:
             resp = json.loads(r.read())
         if resp.get("ok"):
-            return True, "published"
+            return True, resp.get("msg") or "ok"
         msg = resp.get("msg", "")
         if "Already" in msg:
             return True, "already in board"
@@ -253,6 +265,9 @@ def main():
                     help="Minimum tags for auto-approve (default 3)")
     ap.add_argument("--max-tags", type=int, default=10,
                     help="Maximum tags for auto-approve (default 10)")
+    ap.add_argument("--batch-size", type=int, default=20,
+                    help="In --auto-approve mode, send N items per /api/add-batch call. "
+                         "Default 20. Reduces GitHub Pages build pressure.")
     args = ap.parse_args()
     if args.limit and not args.batch:
         args.batch = args.limit
@@ -295,6 +310,24 @@ def main():
 
     t0 = time.time()
     fails = 0
+    pending_batch = []  # accumulated entries waiting for batch commit
+
+    def flush_batch(batch, token):
+        if not batch: return
+        ok, msg, n = publish_batch_to_worker(batch, token)
+        if ok:
+            pub_log = json.loads(AUTO_PUBLISHED_FILE.read_text()) if AUTO_PUBLISHED_FILE.exists() else []
+            pub_log.extend([{**e, "result": "batch"} for e in batch])
+            AUTO_PUBLISHED_FILE.write_text(json.dumps(pub_log, ensure_ascii=False, indent=2))
+            print(f"           🚀 flushed batch of {len(batch)} → {msg}")
+        else:
+            print(f"           ❌ batch flush failed ({msg}) — queuing for review")
+            current = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
+            for e in batch:
+                if not any(r.get("id") == e["id"] for r in current):
+                    current.append(e)
+            REVIEW_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2))
+
     for i, item in enumerate(todo, 1):
         vid = item["id"]
         title = item.get("title","")
@@ -340,14 +373,14 @@ def main():
         if args.auto_approve:
             ok, reason = looks_confident(tags, args.min_tags, args.max_tags)
             if ok:
-                published, msg = publish_to_worker(entry, auth_token)
-                if published:
-                    pub_log = json.loads(AUTO_PUBLISHED_FILE.read_text()) if AUTO_PUBLISHED_FILE.exists() else []
-                    pub_log.append({**entry, "result": msg})
-                    AUTO_PUBLISHED_FILE.write_text(json.dumps(pub_log, ensure_ascii=False, indent=2))
-                    print(f"           🚀 auto-published: {tags}")
-                    continue
-                print(f"           ⚠ publish failed ({msg}) — queuing for review")
+                # Accumulate in batch buffer — flushed below when full or at end
+                pending_batch.append(entry)
+                print(f"           📦 queued ({len(pending_batch)}/{args.batch_size}): {tags}")
+                # Flush if full
+                if len(pending_batch) >= args.batch_size:
+                    flush_batch(pending_batch, auth_token)
+                    pending_batch.clear()
+                continue
             else:
                 print(f"           👀 needs human ({reason}) — queuing for review")
         # Append to pending_review.json — re-read from disk to avoid clobbering
@@ -363,9 +396,15 @@ def main():
         if not args.auto_approve:
             print(f"           ✓ {tags}")
 
+    # Flush any partial batch at the end
+    if args.auto_approve and pending_batch:
+        flush_batch(pending_batch, auth_token)
+        pending_batch.clear()
+
     if args.auto_approve:
         pub_count = len(json.loads(AUTO_PUBLISHED_FILE.read_text())) if AUTO_PUBLISHED_FILE.exists() else 0
-        print(f"\n✅ Batch done. {pub_count} total auto-published. {len(review)} need human review.")
+        review_count = len(json.loads(REVIEW_FILE.read_text())) if REVIEW_FILE.exists() else 0
+        print(f"\n✅ Batch done. {pub_count} total auto-published. {review_count} need human review.")
         print(f"   Errors: {fails}")
         print(f"   Next: python3 review.py    # check the queued ones")
     else:

@@ -163,6 +163,36 @@ async function handleDelete(body, env) {
   return json({ ok: true, msg: `Deleted ${vid}` });
 }
 
+async function handleAddBatch(body, env) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return json({ ok: false, msg: 'No items' }, 400);
+  const entries = items.map(it => ({
+    id: it.id || it.videoId || '',
+    title: it.title || '',
+    channel: it.channel || '',
+    views: it.views || '',
+    tags: canonicaliseTags(it.tags),
+    eid: it.eid || '',
+  })).filter(e => e.id);
+  if (!entries.length) return json({ ok: false, msg: 'No valid items' }, 400);
+
+  let addedCount = 0;
+  let skippedCount = 0;
+  const result = await mutate(env, (dataset) => {
+    const existing = new Set(dataset.map(v => v.id));
+    const additions = entries.filter(e => {
+      if (existing.has(e.id)) { skippedCount++; return false; }
+      existing.add(e.id);
+      return true;
+    });
+    addedCount = additions.length;
+    if (!additions.length) return null;
+    return [...dataset, ...additions];
+  }, `data: batch add ${entries.length} thumbnails (+${entries.length - skippedCount} new)`);
+
+  return json({ ok: true, added: addedCount, skipped: skippedCount, total: result.count || null });
+}
+
 async function handleBulkDelete(body, env) {
   const ids = Array.isArray(body.ids) ? body.ids : [];
   if (!ids.length) return json({ ok: false, msg: 'No ids' }, 400);
@@ -223,6 +253,7 @@ export default {
       catch { return json({ ok: false, msg: 'Bad JSON' }, 400); }
       try {
         if (path === '/api/add')         return await handleAdd(body, env);
+        if (path === '/api/add-batch')   return await handleAddBatch(body, env);
         if (path === '/api/delete')      return await handleDelete(body, env);
         if (path === '/api/bulk-delete') return await handleBulkDelete(body, env);
         if (path === '/api/update' || path === '/api/eagle/update')
