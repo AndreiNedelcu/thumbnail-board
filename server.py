@@ -338,8 +338,22 @@ class Handler(BaseHTTPRequestHandler):
         body   = json.loads(self.rfile.read(length)) if length else {}
 
         if path == "/api/eagle/update":
-            # Proxy Eagle item update
+            # Proxy Eagle item update AND immediately update data.json
             result = eagle_post("/api/item/update", body)
+            # If successful, sync tags into data.json right away
+            if result.get("status") == "success":
+                eagle_id = body.get("id","")
+                new_tags = canonicalize_tags(body.get("tags",[]))
+                # Find by eid and update tags
+                updated = False
+                for entry in _dataset:
+                    if entry.get("eid") == eagle_id:
+                        entry["tags"] = new_tags
+                        updated = True
+                        break
+                if updated:
+                    DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
+                    print(f"[update] Synced tags for {eagle_id} → data.json", flush=True)
             self.send_json(result)
             return
 

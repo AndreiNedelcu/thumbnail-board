@@ -159,18 +159,41 @@ let totalAll = 0, preTagged = 0;
 const savedSelections = {};  // eagle item id → Set of selected tags
 
 // ── Load all items via server proxy (MCP → all 2006 items) ───────
+function extractVid(item) {
+  const s = (item.url||'') + ' ' + (item.annotation||'');
+  const m = s.match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  return m ? m[1] : null;
+}
+
 async function loadItems() {
   msg('Loading items from Eagle…');
   try {
-    const r = await fetch(`${SERVER}/api/eagle/all-items`);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    const items = d.data || [];
-    msg(`Loaded ${items.length} items…`);
+    // Load Eagle items AND data.json in parallel
+    const [eagleResp, boardResp] = await Promise.all([
+      fetch(`${SERVER}/api/eagle/all-items`),
+      fetch(`${SERVER}/api/data`)
+    ]);
+    if (!eagleResp.ok) throw new Error(`HTTP ${eagleResp.status}`);
+    const eagleData = await eagleResp.json();
+    const boardData = boardResp.ok ? await boardResp.json() : [];
+    const items = eagleData.data || [];
+    msg(`Loaded ${items.length} Eagle items…`);
+
+    // Build set of video IDs already tagged in data.json (source of truth)
+    const taggedInBoard = new Set(
+      boardData.filter(v => (v.tags||[]).some(isOfficial)).map(v => v.id)
+    );
+
+    // An item is "tagged" if its video ID is in data.json OR it has official tags in Eagle
+    const isDone = i => {
+      const vid = extractVid(i);
+      if (vid && taggedInBoard.has(vid)) return true;
+      return (i.tags||[]).some(isOfficial);
+    };
 
     totalAll = items.length;
-    preTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
-    queue = items.filter(i => !(i.tags||[]).some(isOfficial));
+    preTagged = items.filter(isDone).length;
+    queue = items.filter(i => !isDone(i));
     idx = 0;
     render();
   } catch(e) {
