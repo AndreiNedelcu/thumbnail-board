@@ -34,13 +34,16 @@
   .btn-save:disabled { background:#333; color:#555; cursor:not-allowed; }
 
   /* ── MAIN LAYOUT ── */
-  main { flex:1; display:grid; grid-template-columns:1fr 380px; height:calc(100vh - 69px); }
+  main {
+    flex:1; display:grid; grid-template-columns:1fr 380px;
+    height:calc(100vh - 69px); overflow:hidden;
+  }
 
-  /* ── LEFT: Thumbnail ── */
+  /* ── LEFT: Thumbnail — fixed, no scroll ── */
   .thumb-panel {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
     padding:32px; gap:16px; border-right:1px solid var(--border);
-    background:var(--surface);
+    background:var(--surface); overflow:hidden; height:100%;
   }
   .thumb-img { max-width:100%; max-height:50vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.6); object-fit:contain; }
   .thumb-title { font-size:15px; font-weight:600; line-height:1.4; text-align:center; max-width:500px; }
@@ -54,8 +57,8 @@
   .current-tag .remove { cursor:pointer; color:#e94560; font-size:13px; line-height:1; }
   .current-tag .remove:hover { opacity:.7; }
 
-  /* ── RIGHT: Tag selector ── */
-  .tag-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:20px; }
+  /* ── RIGHT: Tag selector — scrolls independently ── */
+  .tag-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:20px; height:100%; }
 
   .cat-section { }
   .cat-title {
@@ -136,8 +139,11 @@
 <div id="toast"></div>
 
 <script>
+// Use server proxy (avoids CORS when opened via file://)
+const SERVER     = 'http://localhost:3000';
 const EAGLE_API  = 'http://localhost:41595';
 const FOLDER_ID  = 'MPBRJ4DRT0IR0';
+const USE_PROXY  = location.hostname === 'localhost';
 
 const CATS = {
   STYLE:     { color:'#e94560', bg:'#533483', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
@@ -168,6 +174,15 @@ let done = 0;
 let total = 0;
 
 // ── Load ──────────────────────────────────────────────────────────
+async function eagleFetch(url) {
+  // Try server proxy first, fall back to direct Eagle API
+  if (USE_PROXY) {
+    const r = await fetch(SERVER + url);
+    return r.json();
+  }
+  return fetch(EAGLE_API + url.replace('/api/eagle/items', '/api/item/list')).then(r => r.json());
+}
+
 async function loadItems() {
   const seen = new Set();
   const items = [];
@@ -175,15 +190,13 @@ async function loadItems() {
   for (const order of ['CREATEDATE','NAME','FILESIZE','MODIFYDATE']) {
     let offset = 0;
     while (true) {
-      const r = await fetch(`${EAGLE_API}/api/item/list?folders[]=${FOLDER_ID}&limit=200&offset=${offset}&orderBy=${order}`);
-      const data = await r.json();
+      const data = await eagleFetch(
+        `/api/eagle/items?folder=${FOLDER_ID}&limit=200&offset=${offset}&order=${order}`
+      );
       const batch = data.data || [];
       if (!batch.length) break;
       for (const b of batch) {
-        if (!seen.has(b.id)) {
-          seen.add(b.id);
-          items.push(b);
-        }
+        if (!seen.has(b.id)) { seen.add(b.id); items.push(b); }
       }
       if (batch.length < 200) break;
       offset += 200;
@@ -191,12 +204,7 @@ async function loadItems() {
   }
 
   total = items.length;
-  // Filter: items that have NO official tags
-  queue = items.filter(item => {
-    const tags = item.tags || [];
-    return !tags.some(isOfficialTag);
-  });
-
+  queue = items.filter(item => !(item.tags || []).some(isOfficialTag));
   console.log(`Total: ${total}, without official tags: ${queue.length}`);
   showNext();
 }
@@ -329,16 +337,22 @@ async function save() {
   const newTags = [...new Set([...existingTags, ...selectedTags])];
 
   try {
-    const r = await fetch(`${EAGLE_API}/api/item/update`, {
+    const endpoint = USE_PROXY
+      ? `${SERVER}/api/eagle/update`
+      : `${EAGLE_API}/api/item/update`;
+
+    const r = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: current.id, tags: newTags })
     });
     const data = await r.json();
     if (data.status === 'success') {
-      showToast(`✅ Saved ${selectedTags.size} tags to Eagle`);
       done++;
       currentIdx++;
+      // Trigger sync in background
+      triggerSync();
+      showToast(`✅ Saved! Syncing website…`);
       setTimeout(showNext, 400);
     } else {
       showToast('❌ Eagle error: ' + JSON.stringify(data));
@@ -346,7 +360,7 @@ async function save() {
       btn.textContent = 'Save tags';
     }
   } catch(e) {
-    showToast('❌ Cannot reach Eagle — is it running?');
+    showToast('❌ Cannot reach Eagle — open tagger.command instead of the file directly');
     btn.disabled = false;
     btn.textContent = 'Save tags';
   }
@@ -355,6 +369,13 @@ async function save() {
 function skip() {
   currentIdx++;
   showNext();
+}
+
+async function triggerSync() {
+  if (!USE_PROXY) return;
+  try {
+    await fetch(`${SERVER}/api/sync`);
+  } catch(e) { /* silent */ }
 }
 
 function showToast(msg) {

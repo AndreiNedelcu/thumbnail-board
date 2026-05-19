@@ -123,6 +123,18 @@ def load_dataset():
     if DATA_FILE.exists():
         _dataset = json.loads(DATA_FILE.read_text())
 
+def force_sync():
+    global _dataset, _last_count
+    try:
+        items = get_all_eagle_items()
+        dataset = build_dataset(items)
+        _dataset = dataset
+        _last_count = len(dataset)
+        DATA_FILE.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",",":")))
+        print(f"[sync] Force sync done: {len(dataset)} thumbnails", flush=True)
+    except Exception as e:
+        print(f"[sync] Force sync error: {e}", flush=True)
+
 def sync_loop():
     global _dataset, _last_count
     while True:
@@ -182,6 +194,22 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"ok": "error" not in data, "count": len(_dataset)})
             return
 
+        if path == "/api/eagle/items":
+            # Proxy Eagle item list for tagger
+            folder = params.get("folder", [FOLDER_ID])[0]
+            order  = params.get("order", ["CREATEDATE"])[0]
+            offset = params.get("offset", ["0"])[0]
+            data = eagle_get("/api/item/list",
+                f"folders[]={folder}&limit=200&offset={offset}&orderBy={order}")
+            self.send_json(data)
+            return
+
+        if path == "/api/sync":
+            # Trigger immediate sync
+            threading.Thread(target=force_sync, daemon=True).start()
+            self.send_json({"ok": True, "msg": "Sync started"})
+            return
+
         # ── Static files ──
         if path == "/" or path == "":
             path = "/index.html"
@@ -200,10 +228,26 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path   = parsed.path
+        length = int(self.headers.get("Content-Length", 0))
+        body   = json.loads(self.rfile.read(length)) if length else {}
+
+        if path == "/api/eagle/update":
+            # Proxy Eagle item update
+            result = eagle_post("/api/item/update", body)
+            self.send_json(result)
+            return
+
+        self.send_response(404)
+        self.end_headers()
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
 # ── Main ─────────────────────────────────────────────────────────
