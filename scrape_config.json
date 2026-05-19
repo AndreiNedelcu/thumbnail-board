@@ -1,0 +1,39 @@
+{
+  "search_queries": [
+    "software engineering best practices",
+    "senior developer career",
+    "AI agent tutorial",
+    "system design interview",
+    "tech founder story",
+    "developer productivity",
+    "programming explained",
+    "MKBHD review",
+    "Linus Tech Tips",
+    "Fireship coding",
+    "ThePrimeagen",
+    "computer science education",
+    "indie hacker product",
+    "startup story",
+    "engineering documentary"
+  ],
+  "channels": [
+    "@Fireship",
+    "@ThePrimeagen",
+    "@mkbhd",
+    "@LinusTechTips",
+    "@veritasium",
+    "@3blue1brown",
+    "@mreflow",
+    "@LexFridman",
+    "@theseniordev",
+    "@therealseniordev"
+  ],
+  "filters": {
+    "min_views": 50000,
+    "min_duration_seconds": 90,
+    "exclude_shorts": true,
+    "max_age_days": 730,
+    "items_per_query": 8,
+    "videos_per_channel": 6
+  }
+}

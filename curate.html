@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YouTube Curation · theSeniorDev</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
+    --border:rgba(204,218,231,0.08); --border-h:rgba(204,218,231,0.18);
+    --text:#ccdae7; --bright:#fff; --muted:#6e7d8c;
+    --mint:#3aecba; --purple:#524add; --red:#e94560;
+    --grad:linear-gradient(135deg,#3aecba 0%,#524add 100%);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Inter',sans-serif; background:var(--bg); color:var(--text);
+    min-height:100vh; -webkit-font-smoothing:antialiased; position:relative;
+  }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% -5%, rgba(58,236,186,0.12), transparent 55%),
+      radial-gradient(ellipse 900px 600px at 85% 8%, rgba(82,74,221,0.14), transparent 55%);
+  }
+  body > * { position:relative; z-index:1; }
+
+  header {
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,17,23,0.92); backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+    padding:18px 28px; display:flex; align-items:center; gap:18px;
+  }
+  .logo { font-weight:800; font-size:14px; letter-spacing:1.8px; color:var(--bright); }
+  .logo span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .stats { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+  .spacer { flex:1; }
+  .bulk-btn {
+    padding:7px 13px; border-radius:9px;
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    transition:all .15s; display:inline-flex; align-items:center; gap:6px;
+  }
+  .bulk-btn:hover { color:var(--bright); border-color:var(--border-h); background:var(--surface3); }
+  .commit-btn {
+    padding:8px 16px; border-radius:9px;
+    background:var(--grad); color:#0d1117; border:none;
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    transition:all .15s;
+  }
+  .commit-btn:hover { box-shadow:0 6px 20px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .commit-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  main { max-width:1600px; margin:0 auto; padding:28px clamp(20px, 4vw, 48px) 80px; }
+
+  #grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:16px;
+  }
+  .card {
+    position:relative; aspect-ratio:16/9;
+    background:var(--surface); border-radius:12px; overflow:hidden;
+    cursor:pointer; transition:transform .15s, box-shadow .15s, outline-color .15s;
+    outline:2px solid transparent; outline-offset:-2px;
+  }
+  .card:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card.kept { outline-color:var(--mint); }
+  .card.rejected { outline-color:rgba(233,69,96,.6); }
+  .card.rejected img { filter:grayscale(.8) brightness(.5); }
+
+  .badge {
+    position:absolute; top:8px; right:8px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
+    display:flex; align-items:center; justify-content:center;
+    transition:all .15s;
+  }
+  .card.kept .badge { background:var(--mint); border-color:var(--mint); }
+  .card.kept .badge::after {
+    content:''; width:13px; height:13px;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d1117' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/contain no-repeat;
+  }
+  .card.rejected .badge { background:var(--red); border-color:var(--red); }
+  .card.rejected .badge::after {
+    content:''; width:11px; height:11px;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><path d='M18 6 6 18'/><path d='m6 6 12 12'/></svg>") center/contain no-repeat;
+  }
+
+  .card .meta {
+    position:absolute; inset:auto 0 0 0;
+    background:linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 100%);
+    padding:24px 12px 10px;
+    opacity:0; transition:opacity .15s;
+  }
+  .card:hover .meta { opacity:1; }
+  .card .title { font-size:12px; font-weight:600; color:#fff; line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card .sub { font-size:10px; color:rgba(255,255,255,.7); margin-top:3px; }
+
+  .reject-btn {
+    position:absolute; top:8px; left:8px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; transition:all .15s;
+  }
+  .card:hover .reject-btn { opacity:1; }
+  .reject-btn:hover { background:var(--red); border-color:var(--red); }
+  .reject-btn svg { color:#fff; width:14px; height:14px; }
+
+  #empty { text-align:center; padding:120px 24px; color:var(--muted); }
+  #empty h2 { font-size:24px; color:var(--bright); margin-bottom:8px; font-weight:800; letter-spacing:-0.5px; }
+
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
+    font-size:13px; font-weight:600; border:1px solid var(--border);
+    opacity:0; transition:all .25s; pointer-events:none;
+    box-shadow:0 12px 32px rgba(0,0,0,.4); z-index:100;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">YT<span>CURATE</span></div>
+  <div class="stats" id="stats">Loading…</div>
+  <div class="spacer"></div>
+  <button class="bulk-btn" onclick="keepAll()">Keep all</button>
+  <button class="bulk-btn" onclick="rejectAll()">Reject all</button>
+  <button class="bulk-btn" onclick="clearAll()">Clear</button>
+  <button class="commit-btn" id="commitBtn" onclick="commit()">Process selection</button>
+</header>
+
+<main>
+  <div id="grid"></div>
+  <div id="empty" style="display:none">
+    <h2>Empty queue</h2>
+    <p>Run <code>python3 scrape_youtube.py</code> to fetch new candidates.</p>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+let candidates = [];
+const decisions = new Map();  // id → "keep" | "reject"
+
+async function load() {
+  const r = await fetch('/api/candidates');
+  candidates = await r.json();
+  if (!candidates.length) {
+    document.getElementById('grid').style.display = 'none';
+    document.getElementById('empty').style.display = 'block';
+    document.getElementById('stats').textContent = 'No candidates';
+    document.getElementById('commitBtn').disabled = true;
+    return;
+  }
+  render();
+}
+
+function esc(s) { return String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]); }
+
+function render() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = candidates.map(c => {
+    const state = decisions.get(c.id) || '';
+    const cls = state === 'keep' ? 'kept' : state === 'reject' ? 'rejected' : '';
+    return `
+      <div class="card ${cls}" data-id="${esc(c.id)}" onclick="toggle('${esc(c.id)}')">
+        <img loading="lazy" src="https://img.youtube.com/vi/${esc(c.id)}/maxresdefault.jpg"
+          onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${esc(c.id)}/mqdefault.jpg'">
+        <div class="badge"></div>
+        <div class="reject-btn" onclick="event.stopPropagation();rejectCard('${esc(c.id)}')" title="Reject">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </div>
+        <div class="meta">
+          <div class="title">${esc(c.title)}</div>
+          <div class="sub">${esc(c.channel)} · ${esc(c.views)} views</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateStats();
+}
+
+function toggle(id) {
+  const cur = decisions.get(id);
+  if (!cur) decisions.set(id, 'keep');
+  else if (cur === 'keep') decisions.delete(id);
+  else if (cur === 'reject') decisions.set(id, 'keep');
+  refreshCard(id);
+  updateStats();
+}
+
+function rejectCard(id) {
+  decisions.set(id, 'reject');
+  refreshCard(id);
+  updateStats();
+}
+
+function refreshCard(id) {
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (!card) return;
+  card.classList.remove('kept','rejected');
+  const s = decisions.get(id);
+  if (s === 'keep') card.classList.add('kept');
+  if (s === 'reject') card.classList.add('rejected');
+}
+
+function keepAll() {
+  for (const c of candidates) decisions.set(c.id, 'keep');
+  render();
+}
+function rejectAll() {
+  for (const c of candidates) decisions.set(c.id, 'reject');
+  render();
+}
+function clearAll() {
+  decisions.clear();
+  render();
+}
+
+function updateStats() {
+  let kept = 0, rejected = 0;
+  for (const v of decisions.values()) { if (v==='keep') kept++; else if (v==='reject') rejected++; }
+  const undecided = candidates.length - kept - rejected;
+  document.getElementById('stats').textContent =
+    `${candidates.length} candidates · ${kept} keep · ${rejected} reject · ${undecided} undecided`;
+}
+
+async function commit() {
+  const kept = [...decisions.entries()].filter(([_,v]) => v==='keep').map(([k,_]) => k);
+  const rejected = [...decisions.entries()].filter(([_,v]) => v==='reject').map(([k,_]) => k);
+  if (!kept.length && !rejected.length) { toast('Nothing selected', 'error'); return; }
+  const btn = document.getElementById('commitBtn');
+  btn.disabled = true; btn.textContent = 'Processing…';
+  try {
+    const r = await fetch('/api/commit', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ kept, rejected })});
+    const d = await r.json();
+    if (d.ok) {
+      toast(`Kept ${d.added_to_pending} → auto-tag queue · Rejected ${d.rejected}`, 'success');
+      decisions.clear();
+      await load();
+    } else {
+      toast(d.msg || 'Failed', 'error');
+    }
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Process selection';
+  }
+}
+
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.color = type==='error' ? '#e94560' : type==='success' ? '#3aecba' : '#fff';
+  t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+load();
+</script>
+</body>
+</html>
