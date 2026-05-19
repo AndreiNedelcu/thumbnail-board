@@ -442,6 +442,24 @@
   .lep-save:hover { box-shadow:0 6px 20px rgba(58,236,186,.25); transform:translateY(-1px); }
   .lep-save:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
 
+  /* Floating back-to-top button */
+  #back-to-top {
+    position:fixed; bottom:24px; right:24px; z-index:80;
+    width:44px; height:44px; border:none; border-radius:50%;
+    background:var(--surface); color:var(--text);
+    border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; transform:translateY(8px);
+    pointer-events:none;
+    transition:opacity .2s, transform .2s, background .15s, color .15s;
+    box-shadow:0 8px 24px rgba(0,0,0,.4);
+    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(10px);
+  }
+  #back-to-top.visible { opacity:1; transform:translateY(0); pointer-events:auto; }
+  #back-to-top:hover { background:var(--surface2); color:var(--text-bright); border-color:var(--mint); }
+  #back-to-top svg { width:18px; height:18px; }
+
   #toast {
     position:fixed; bottom:32px; left:50%; z-index:999;
     transform:translateX(-50%) translateY(16px);
@@ -485,9 +503,6 @@
       </div>
       <button class="tagger-btn mini-shuffle" onclick="setSort('shuffle')" title="Shuffle">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
-      </button>
-      <button class="tagger-btn" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Top">
-        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
       </button>
     </div>
   </div>
@@ -655,6 +670,11 @@
   </div>
 </div>
 
+<!-- Floating back-to-top button (appears once you scroll past the hero) -->
+<button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top" aria-label="Back to top">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>
+</button>
+
 <div id="toast"></div>
 
 <script>
@@ -817,13 +837,15 @@ async function init() {
   }
 }
 
-// Show sticky mini-header when scrolled past hero + persist scrollY
+// Show sticky mini-header + back-to-top when scrolled past hero, persist scrollY
 let _scrollSaveTimer = null;
 window.addEventListener('scroll', () => {
   const hero = document.querySelector('.hero');
+  const scrolledPast = hero ? hero.getBoundingClientRect().bottom < 0 : window.scrollY > 100;
   const mini = document.getElementById('mini-header');
-  if (hero && mini) mini.classList.toggle('visible', hero.getBoundingClientRect().bottom < 0);
-  // Debounced save (~200ms after scroll stops)
+  const top = document.getElementById('back-to-top');
+  if (mini) mini.classList.toggle('visible', scrolledPast);
+  if (top)  top.classList.toggle('visible', scrolledPast);
   if (_scrollSaveTimer) clearTimeout(_scrollSaveTimer);
   _scrollSaveTimer = setTimeout(saveState, 200);
 });
