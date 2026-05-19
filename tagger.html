@@ -148,6 +148,7 @@ const CATS = {
   TOPIC:     { color:'#26a69a', bg:'#004d40', subs:['comparison','product-showcase','space','secret','social-media','size'] },
   CALLOUT:   { color:'#d4e157', bg:'#827717', subs:['magnifier'] },
   BACKDROP:  { color:'#ec407a', bg:'#880e4f', subs:['dark','light','blurry'] },
+  CHANNEL:   { color:'#00bcd4', bg:'#006064', subs:['theseniordev-main','theseniordev-podcast'] },
 };
 const VALID = new Set(Object.keys(CATS).map(k => k.toLowerCase()));
 const isOfficial = t => VALID.has(t.split('-')[0]);

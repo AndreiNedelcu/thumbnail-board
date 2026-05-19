@@ -24,7 +24,7 @@ PORT       = 3000
 DATA_FILE  = Path(__file__).parent / "data.json"
 SYNC_EVERY = 30  # seconds
 
-VALID_PREFIXES = {"style","mood","text","element","camera","subject","formation","topic","callout","backdrop"}
+VALID_PREFIXES = {"style","mood","text","element","camera","subject","formation","topic","callout","backdrop","channel"}
 TYPO_MAP = {
     "mood-suprised":"mood-surprised","mood-surpised":"mood-surprised",
     "background-blurry":"backdrop-blurry","backround-blurry":"backdrop-blurry",
@@ -106,7 +106,14 @@ def get_all_eagle_items():
                 fp = b.get("filePath","")
                 if fp:
                     mp = Path(fp).parent / "metadata.json"
-                    try: items.append(json.loads(mp.read_text())); continue
+                    try:
+                        meta = json.loads(mp.read_text())
+                        # Always use live tags from MCP (metadata.json can be stale)
+                        live_tags = b.get("tags")
+                        if live_tags is not None:
+                            meta["tags"] = live_tags
+                        items.append(meta)
+                        continue
                     except: pass
                 items.append(b)
         if len(batch) < limit: break
@@ -139,6 +146,17 @@ def canonicalize_tags(raw):
         if p not in VALID_PREFIXES: continue
         if c not in seen: result.append(c); seen.add(c)
     return result
+
+def fetch_yt_metadata(vid_id):
+    """Fetch title + channel via YouTube oEmbed (free, no API key)."""
+    try:
+        url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={vid_id}&format=json"
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urlopen(req, timeout=6) as r:
+            d = json.loads(r.read())
+        return d.get("title",""), d.get("author_name","")
+    except:
+        return "", ""
 
 def extract_vid_id(item):
     for f in ["url","annotation"]:
@@ -177,9 +195,16 @@ def sync_with_eagle(eagle_items, dataset):
         if not vid_id or not eagle_tags: continue
         if vid_id in seen_vids: continue
         seen_vids.add(vid_id)
-        dataset.append({"id": vid_id, "title": item.get("name",""), "channel":"", "views":"",
+        title = item.get("name","")
+        channel = ""
+        # Try to get real title + channel from YouTube
+        yt_title, yt_channel = fetch_yt_metadata(vid_id)
+        if yt_title: title = yt_title
+        if yt_channel: channel = yt_channel
+        dataset.append({"id": vid_id, "title": title, "channel": channel, "views":"",
                          "tags": eagle_tags, "eid": eagle_id})
         n_added += 1
+        print(f"  [sync] New item: {vid_id} — {channel}", flush=True)
 
     return dataset, n_updated, n_added
 
@@ -306,6 +331,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
+        global _dataset
         parsed = urlparse(self.path)
         path   = parsed.path
         length = int(self.headers.get("Content-Length", 0))
@@ -317,16 +343,50 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(result)
             return
 
+        if path == "/api/add":
+            # Add a new video from extension: save to Eagle + data.json
+            vid_id  = body.get("videoId","")
+            title   = body.get("title","")
+            channel = body.get("channel","")
+            views   = body.get("views","")
+            tags    = canonicalize_tags(body.get("tags",[]))
+            if not vid_id:
+                self.send_json({"ok": False, "msg": "No videoId"}); return
+            # Check if already exists
+            if any(v["id"] == vid_id for v in _dataset):
+                self.send_json({"ok": False, "msg": "Already in board"}); return
+            # Add to Eagle
+            thumb_url = f"https://img.youtube.com/vi/{vid_id}/maxresdefault.jpg"
+            annotation = f"Channel: {channel}\nViews: {views}\nhttps://www.youtube.com/watch?v={vid_id}"
+            eagle_result = eagle_post("/api/item/addFromURL", {
+                "url": thumb_url, "name": title, "tags": tags,
+                "annotation": annotation,
+                "website": f"https://www.youtube.com/watch?v={vid_id}",
+                "folderId": FOLDER_ID
+            })
+            eid = eagle_result.get("data","")
+            if not eid: eid = ""
+            # Add to dataset
+            entry = {"id": vid_id, "title": title, "channel": channel, "views": views, "tags": tags, "eid": eid}
+            _dataset.append(entry)
+            DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
+            print(f"[add] {vid_id} — {title[:40]}", flush=True)
+            self.send_json({"ok": True, "entry": entry})
+            return
+
         if path == "/api/delete":
-            global _dataset
             vid_id = body.get("id", "")
+            print(f"[delete] Request to delete: '{vid_id}' (body={body})", flush=True)
             if not vid_id:
                 self.send_json({"ok": False, "msg": "No id provided"})
                 return
             before = len(_dataset)
             new_dataset = [v for v in _dataset if v.get("id") != vid_id]
             if len(new_dataset) == before:
-                self.send_json({"ok": False, "msg": "Video not found"})
+                # Debug: check if it's there under a different key
+                matching = [v for v in _dataset if vid_id in str(v)]
+                print(f"[delete] Not found. Partial matches: {matching[:2]}", flush=True)
+                self.send_json({"ok": False, "msg": f"Video '{vid_id}' not found in {len(_dataset)} items"})
                 return
             _dataset = new_dataset
             DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
