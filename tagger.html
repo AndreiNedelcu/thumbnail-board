@@ -7,91 +7,97 @@
 <link rel="icon" type="image/png" href="favicon.png">
 <style>
   :root {
-    --bg: #0d0d0d; --surface: #161616; --surface2: #1f1f1f; --surface3: #2a2a2a;
-    --border: rgba(255,255,255,0.08); --text: #f0f0f0; --muted: #666;
+    --bg:#0d0d0d; --surface:#161616; --surface2:#1f1f1f; --surface3:#2a2a2a;
+    --border:rgba(255,255,255,0.08); --text:#f0f0f0; --muted:#666;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+
+  /* Lock full height, no page scroll */
+  html, body { height:100%; overflow:hidden; }
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
 
   /* ── HEADER ── */
   header {
-    padding:16px 24px; border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:16px;
-    background:rgba(13,13,13,0.97); position:sticky; top:0; z-index:10;
+    flex-shrink:0; padding:12px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:14px;
+    background:rgba(13,13,13,0.97);
   }
-  .logo { font-size:16px; font-weight:800; letter-spacing:2px; }
+  .logo { font-size:15px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
   .logo span { color:#e94560; }
-  .progress-wrap { flex:1; max-width:300px; }
-  .progress-bar { height:6px; background:var(--surface3); border-radius:3px; overflow:hidden; margin-bottom:4px; }
-  .progress-fill { height:100%; background:#e94560; border-radius:3px; transition:width .3s; }
-  .progress-label { font-size:12px; color:var(--muted); }
-  .header-actions { display:flex; gap:8px; margin-left:auto; }
-  .btn { padding:8px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; }
+  .progress-wrap { flex:1; max-width:280px; }
+  .progress-bar { height:5px; background:var(--surface3); border-radius:3px; overflow:hidden; margin-bottom:4px; }
+  .progress-fill { height:100%; background:#e94560; border-radius:3px; transition:width .4s; }
+  .progress-label { font-size:11px; color:var(--muted); }
+  .header-actions { display:flex; gap:6px; margin-left:auto; align-items:center; }
+  .btn { padding:7px 14px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
+  .btn-back { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+  .btn-back:hover:not(:disabled) { color:var(--text); }
+  .btn-back:disabled { opacity:.3; cursor:not-allowed; }
   .btn-skip { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
   .btn-skip:hover { color:var(--text); }
-  .btn-save { background:#e94560; color:#fff; }
-  .btn-save:hover { background:#c73050; }
+  .btn-save { background:#e94560; color:#fff; padding:7px 18px; }
+  .btn-save:hover:not(:disabled) { background:#c73050; }
   .btn-save:disabled { background:#333; color:#555; cursor:not-allowed; }
 
-  /* ── MAIN LAYOUT ── */
+  /* ── MAIN: fixed height, no overflow ── */
   main {
-    flex:1; display:grid; grid-template-columns:1fr 380px;
-    height:calc(100vh - 69px); overflow:hidden;
+    flex:1; min-height:0;
+    display:grid; grid-template-columns:1fr 360px;
+    overflow:hidden;
   }
 
-  /* ── LEFT: Thumbnail — fixed, no scroll ── */
+  /* LEFT — image panel, never scrolls */
   .thumb-panel {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:32px; gap:16px; border-right:1px solid var(--border);
-    background:var(--surface); overflow:hidden; height:100%;
+    padding:28px; gap:14px; border-right:1px solid var(--border);
+    background:var(--surface); overflow:hidden; min-height:0;
   }
-  .thumb-img { max-width:100%; max-height:50vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.6); object-fit:contain; }
-  .thumb-title { font-size:15px; font-weight:600; line-height:1.4; text-align:center; max-width:500px; }
-  .thumb-meta { font-size:13px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap; justify-content:center; }
+  .thumb-img {
+    max-width:100%; max-height:55vh; border-radius:10px;
+    box-shadow:0 16px 48px rgba(0,0,0,.6); object-fit:contain; flex-shrink:0;
+  }
+  .thumb-title { font-size:14px; font-weight:600; line-height:1.4; text-align:center; max-width:520px; }
+  .thumb-meta { font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
   .thumb-url { font-size:12px; color:#7c4dff; text-decoration:none; }
   .thumb-url:hover { text-decoration:underline; }
+  .selected-tags { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; max-width:560px; }
+  .sel-tag { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; }
+  .sel-tag .x { cursor:pointer; font-size:12px; opacity:.7; }
+  .sel-tag .x:hover { opacity:1; }
 
-  /* Current tags on item */
-  .current-tags { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
-  .current-tag { padding:3px 10px; border-radius:12px; font-size:11px; background:var(--surface3); color:var(--muted); border:1px solid var(--border); display:flex; align-items:center; gap:5px; }
-  .current-tag .remove { cursor:pointer; color:#e94560; font-size:13px; line-height:1; }
-  .current-tag .remove:hover { opacity:.7; }
+  /* RIGHT — tags panel, scrolls */
+  .tag-panel {
+    overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:16px;
+    min-height:0;
+  }
+  .tag-panel::-webkit-scrollbar { width:4px; }
+  .tag-panel::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:2px; }
 
-  /* ── RIGHT: Tag selector — scrolls independently ── */
-  .tag-panel { overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:20px; height:100%; }
-
-  .cat-section { }
+  .cat-section {}
   .cat-title {
-    font-size:11px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
-    margin-bottom:10px; display:flex; align-items:center; gap:8px;
+    font-size:10px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
+    margin-bottom:8px; display:flex; align-items:center; gap:7px; color:var(--muted);
   }
-  .cat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .tag-grid { display:flex; flex-wrap:wrap; gap:6px; }
+  .cat-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .tag-grid { display:flex; flex-wrap:wrap; gap:5px; }
   .tag-btn {
-    padding:5px 12px; border-radius:16px; font-size:12px; font-weight:600;
+    padding:4px 11px; border-radius:14px; font-size:11px; font-weight:600;
     cursor:pointer; border:1px solid var(--border); background:var(--surface2);
-    color:var(--muted); transition:all .15s;
+    color:var(--muted); transition:all .12s;
   }
-  .tag-btn:hover { color:var(--text); border-color:rgba(255,255,255,.25); }
+  .tag-btn:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
   .tag-btn.selected { color:#fff; border-color:transparent; }
 
-  /* ── EMPTY / DONE ── */
-  .done-screen {
-    display:none; flex:1; align-items:center; justify-content:center;
-    flex-direction:column; gap:16px; padding:40px;
-  }
-  .done-screen.visible { display:flex; }
-  .done-icon { font-size:64px; }
-  .done-screen h2 { font-size:24px; font-weight:700; }
-  .done-screen p { color:var(--muted); font-size:15px; text-align:center; }
-
-  /* ── LOADING ── */
-  #loading { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
-  .spinner { width:32px; height:32px; border:3px solid var(--border); border-top-color:#e94560; border-radius:50%; animation:spin .8s linear infinite; }
+  /* ── LOADING / DONE ── */
+  #loading { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:12px; min-height:0; }
+  .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:#e94560; border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
+  #done-screen { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
+  #done-screen.visible { display:flex; }
+  .done-icon { font-size:56px; }
 
   /* ── TOAST ── */
-  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(16px); background:var(--surface3); color:var(--text); padding:10px 20px; border-radius:8px; font-size:13px; opacity:0; transition:all .3s; pointer-events:none; border:1px solid var(--border); z-index:99; }
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface3); color:var(--text); padding:9px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; border:1px solid var(--border); z-index:99; white-space:nowrap; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
@@ -104,18 +110,18 @@
     <div class="progress-label" id="progress-label">Loading…</div>
   </div>
   <div class="header-actions">
+    <button class="btn btn-back" id="btn-back" onclick="goBack()" disabled>← Back</button>
     <button class="btn btn-skip" id="btn-skip" onclick="skip()">Skip →</button>
-    <button class="btn btn-save" id="btn-save" onclick="save()" disabled>Save tags</button>
+    <button class="btn btn-save" id="btn-save" onclick="saveTags()" disabled>Save tags</button>
   </div>
 </header>
 
 <div id="loading">
   <div class="spinner"></div>
-  <p style="color:var(--muted)">Loading items from Eagle…</p>
+  <p style="color:var(--muted);font-size:14px" id="load-msg">Connecting to Eagle…</p>
 </div>
 
 <main id="main" style="display:none">
-  <!-- Left: thumbnail -->
   <div class="thumb-panel">
     <img class="thumb-img" id="thumb-img" src="" alt="">
     <div class="thumb-title" id="thumb-title"></div>
@@ -123,27 +129,25 @@
       <span id="thumb-views"></span>
       <a class="thumb-url" id="thumb-url" href="#" target="_blank">Open in YouTube ↗</a>
     </div>
-    <div class="current-tags" id="current-tags"></div>
+    <div class="selected-tags" id="selected-tags"></div>
   </div>
-
-  <!-- Right: tag selector -->
   <div class="tag-panel" id="tag-panel"></div>
 </main>
 
-<div class="done-screen" id="done-screen">
+<div id="done-screen">
   <div class="done-icon">🎉</div>
-  <h2>All tagged!</h2>
-  <p>All thumbnails in the folder now have official tags.<br>Run sync.command to update the website.</p>
+  <h2 style="font-size:22px;font-weight:700">All tagged!</h2>
+  <p style="color:var(--muted);font-size:14px;text-align:center">All thumbnails have official tags.<br>The website syncs automatically.</p>
+  <a href="/" style="color:#7c4dff;font-size:13px;text-decoration:none">← Back to Thumbnail Board</a>
 </div>
 
 <div id="toast"></div>
 
 <script>
-// Use server proxy (avoids CORS when opened via file://)
-const SERVER     = 'http://localhost:3000';
-const EAGLE_API  = 'http://localhost:41595';
-const FOLDER_ID  = 'MPBRJ4DRT0IR0';
-const USE_PROXY  = location.hostname === 'localhost';
+const SERVER    = 'http://localhost:3000';
+const EAGLE_API = 'http://localhost:41595';
+const FOLDER_ID = 'MPBRJ4DRT0IR0';
+const IS_LOCAL  = location.hostname === 'localhost';
 
 const CATS = {
   STYLE:     { color:'#e94560', bg:'#533483', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
@@ -157,59 +161,41 @@ const CATS = {
   CALLOUT:   { color:'#d4e157', bg:'#827717', subs:['magnifier'] },
   BACKDROP:  { color:'#ec407a', bg:'#880e4f', subs:['dark','light','blurry'] },
 };
-
 const VALID_PREFIXES = new Set(Object.keys(CATS).map(k => k.toLowerCase()));
-
-function isOfficialTag(t) {
-  const p = t.split('-')[0];
-  return VALID_PREFIXES.has(p);
-}
+function isOfficial(t) { return VALID_PREFIXES.has(t.split('-')[0]); }
 
 // ── State ─────────────────────────────────────────────────────────
-let queue = [];          // items without official tags
-let current = null;
+let queue = [];       // items without official tags
+let history = [];     // stack of visited indices for back navigation
 let currentIdx = 0;
+let current = null;
 let selectedTags = new Set();
-let done = 0;
-let total = 0;
+let totalItems = 0;
+let alreadyTagged = 0;
 
-// ── Load ──────────────────────────────────────────────────────────
-async function eagleFetch(url) {
-  // Try server proxy first, fall back to direct Eagle API
-  if (USE_PROXY) {
-    const r = await fetch(SERVER + url);
-    return r.json();
-  }
-  return fetch(EAGLE_API + url.replace('/api/eagle/items', '/api/item/list')).then(r => r.json());
-}
-
+// ── Load all items via server (MCP) ───────────────────────────────
 async function loadItems() {
-  const seen = new Set();
-  const items = [];
-
-  for (const order of ['CREATEDATE','NAME','FILESIZE','MODIFYDATE']) {
-    let offset = 0;
-    while (true) {
-      const data = await eagleFetch(
-        `/api/eagle/items?folder=${FOLDER_ID}&limit=200&offset=${offset}&order=${order}`
-      );
-      const batch = data.data || [];
-      if (!batch.length) break;
-      for (const b of batch) {
-        if (!seen.has(b.id)) { seen.add(b.id); items.push(b); }
-      }
-      if (batch.length < 200) break;
-      offset += 200;
-    }
+  setMsg('Loading all items from Eagle (this takes ~10s)…');
+  try {
+    const url = IS_LOCAL ? `${SERVER}/api/eagle/all-items` : `${EAGLE_API}/api/item/list?folders[]=${FOLDER_ID}&limit=200`;
+    const r = await fetch(url);
+    const data = await r.json();
+    const items = data.data || [];
+    totalItems = items.length;
+    alreadyTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
+    queue = items.filter(i => !(i.tags||[]).some(isOfficial));
+    currentIdx = 0;
+    showCurrent();
+  } catch(e) {
+    setMsg(`❌ Cannot reach Eagle. Open via tagger.command.\n${e}`);
   }
-
-  total = items.length;
-  queue = items.filter(item => !(item.tags || []).some(isOfficialTag));
-  console.log(`Total: ${total}, without official tags: ${queue.length}`);
-  showNext();
 }
 
-// ── UI ────────────────────────────────────────────────────────────
+function setMsg(msg) {
+  document.getElementById('load-msg').textContent = msg;
+}
+
+// ── Build tag panel (once) ────────────────────────────────────────
 function buildTagPanel() {
   const panel = document.getElementById('tag-panel');
   panel.innerHTML = '';
@@ -218,21 +204,21 @@ function buildTagPanel() {
     sec.className = 'cat-section';
     sec.innerHTML = `
       <div class="cat-title">
-        <span class="cat-dot" style="background:${cfg.color}"></span>
-        ${cat}
+        <span class="cat-dot" style="background:${cfg.color}"></span>${cat}
       </div>
       <div class="tag-grid">
         ${cfg.subs.map(sub => {
           const full = `${cat.toLowerCase()}-${sub}`;
           return `<button class="tag-btn" data-tag="${full}"
-            onclick="toggleTag('${full}', this, '${cfg.bg}', '${cfg.color}')">${sub}</button>`;
+            onclick="toggleTag('${full}',this,'${cfg.bg}','${cfg.color}')">${sub}</button>`;
         }).join('')}
       </div>`;
     panel.appendChild(sec);
   });
 }
 
-function showNext() {
+// ── Show current item ─────────────────────────────────────────────
+function showCurrent() {
   document.getElementById('loading').style.display = 'none';
 
   if (!queue.length || currentIdx >= queue.length) {
@@ -245,62 +231,62 @@ function showNext() {
   selectedTags = new Set();
   document.getElementById('main').style.display = 'grid';
 
-  // Thumbnail
-  const vidMatch = (current.url || current.annotation || '').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  // Image
+  const vidMatch = (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   const vidId = vidMatch ? vidMatch[1] : null;
   const img = document.getElementById('thumb-img');
   if (vidId) {
     img.src = `https://img.youtube.com/vi/${vidId}/maxresdefault.jpg`;
-    img.onerror = () => { img.src = `https://img.youtube.com/vi/${vidId}/mqdefault.jpg`; };
+    img.onerror = () => { img.src = `https://img.youtube.com/vi/${vidId}/mqdefault.jpg`; img.onerror=null; };
+    document.getElementById('thumb-url').href = `https://www.youtube.com/watch?v=${vidId}`;
   } else {
-    img.src = current.filePath || '';
+    img.src = ''; document.getElementById('thumb-url').href = '#';
   }
 
   document.getElementById('thumb-title').textContent = current.name || '';
-  document.getElementById('thumb-url').href = current.url || '#';
-
-  // Annotation views
-  const viewsMatch = (current.annotation || '').match(/Views:\s*([\d.KMB]+)/);
-  document.getElementById('thumb-views').textContent = viewsMatch ? `👁 ${viewsMatch[1]} views` : '';
-
-  // Existing non-official tags
-  renderCurrentTags();
+  const vm = (current.annotation||'').match(/Views:\s*([\d.KMB]+)/);
+  document.getElementById('thumb-views').textContent = vm ? `👁 ${vm[1]}` : '';
 
   // Reset tag buttons
   document.querySelectorAll('.tag-btn').forEach(b => {
     b.classList.remove('selected');
-    b.style.background = b.style.color = b.style.borderColor = '';
+    b.style.cssText = '';
   });
-
-  // Progress
-  const tagged = total - queue.length + done;
-  const pct = Math.round(tagged / total * 100);
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-label').textContent =
-    `${queue.length - currentIdx} to tag · ${tagged}/${total} done (${pct}%)`;
-
-  updateSaveBtn();
+  renderSelectedTags();
+  updateProgress();
+  updateButtons();
 }
 
-function renderCurrentTags() {
-  const el = document.getElementById('current-tags');
-  // Merge: existing non-official tags + selected official tags
-  const existingNonOfficial = (current.tags || []).filter(t => !isOfficialTag(t));
-  const all = [...existingNonOfficial, ...selectedTags];
-  el.innerHTML = all.map(t => {
-    const official = isOfficialTag(t);
-    return `<span class="current-tag" style="${official ? 'background:#2a1a2a;border-color:#7c4dff44' : ''}">
-      ${t}
-      ${official ? `<span class="remove" onclick="removeTag('${t}')">×</span>` : ''}
+function renderSelectedTags() {
+  document.getElementById('selected-tags').innerHTML = [...selectedTags].map(t => {
+    const cat = t.split('-')[0].toUpperCase();
+    const cfg = CATS[cat] || {bg:'#333',color:'#888'};
+    return `<span class="sel-tag" style="background:${cfg.bg};color:#fff">
+      ${t} <span class="x" onclick="removeTag('${t}')">×</span>
     </span>`;
   }).join('');
 }
 
+function updateProgress() {
+  const remaining = queue.length - currentIdx;
+  const done = alreadyTagged + currentIdx;
+  const pct = totalItems ? Math.round(done / totalItems * 100) : 0;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent =
+    `${remaining} to tag · ${done} of ${totalItems} done (${pct}%)`;
+}
+
+function updateButtons() {
+  document.getElementById('btn-save').disabled = selectedTags.size === 0;
+  document.getElementById('btn-back').disabled = history.length === 0;
+}
+
+// ── Tag toggling ──────────────────────────────────────────────────
 function toggleTag(tag, btn, bg, color) {
   if (selectedTags.has(tag)) {
     selectedTags.delete(tag);
     btn.classList.remove('selected');
-    btn.style.background = btn.style.color = btn.style.borderColor = '';
+    btn.style.cssText = '';
   } else {
     selectedTags.add(tag);
     btn.classList.add('selected');
@@ -308,88 +294,90 @@ function toggleTag(tag, btn, bg, color) {
     btn.style.color = '#fff';
     btn.style.borderColor = 'transparent';
   }
-  renderCurrentTags();
-  updateSaveBtn();
+  renderSelectedTags();
+  updateButtons();
 }
 
 function removeTag(tag) {
   selectedTags.delete(tag);
   const btn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
-  if (btn) { btn.classList.remove('selected'); btn.style.background = btn.style.color = btn.style.borderColor = ''; }
-  renderCurrentTags();
-  updateSaveBtn();
+  if (btn) { btn.classList.remove('selected'); btn.style.cssText = ''; }
+  renderSelectedTags();
+  updateButtons();
 }
 
-function updateSaveBtn() {
-  document.getElementById('btn-save').disabled = selectedTags.size === 0;
+// ── Navigation ────────────────────────────────────────────────────
+function skip() {
+  history.push(currentIdx);
+  currentIdx++;
+  showCurrent();
 }
 
-// ── Actions ───────────────────────────────────────────────────────
-async function save() {
-  if (!current || selectedTags.size === 0) return;
+function goBack() {
+  if (!history.length) return;
+  currentIdx = history.pop();
+  showCurrent();
+}
 
+// ── Save ──────────────────────────────────────────────────────────
+async function saveTags() {
+  if (!current || !selectedTags.size) return;
   const btn = document.getElementById('btn-save');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
+  btn.disabled = true; btn.textContent = 'Saving…';
 
-  // Merge: keep existing tags + add new official ones
   const existingTags = (current.tags || []);
   const newTags = [...new Set([...existingTags, ...selectedTags])];
 
   try {
-    const endpoint = USE_PROXY
-      ? `${SERVER}/api/eagle/update`
-      : `${EAGLE_API}/api/item/update`;
-
-    const r = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: current.id, tags: newTags })
-    });
+    let r;
+    if (IS_LOCAL) {
+      r = await fetch(`${SERVER}/api/eagle/update`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id: current.id, tags: newTags})
+      });
+    } else {
+      r = await fetch(`${EAGLE_API}/api/item/update`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id: current.id, tags: newTags})
+      });
+    }
     const data = await r.json();
     if (data.status === 'success') {
-      done++;
+      // Update local copy so Back works correctly
+      current.tags = newTags;
+      history.push(currentIdx);
       currentIdx++;
-      // Trigger sync in background
       triggerSync();
-      showToast(`✅ Saved! Syncing website…`);
-      setTimeout(showNext, 400);
+      showToast(`✅ ${selectedTags.size} tags saved · syncing…`);
+      showCurrent();
     } else {
-      showToast('❌ Eagle error: ' + JSON.stringify(data));
-      btn.disabled = false;
-      btn.textContent = 'Save tags';
+      throw new Error(JSON.stringify(data));
     }
   } catch(e) {
-    showToast('❌ Cannot reach Eagle — open tagger.command instead of the file directly');
-    btn.disabled = false;
+    showToast('❌ Error: ' + e.message);
+  } finally {
     btn.textContent = 'Save tags';
+    updateButtons();
   }
 }
 
-function skip() {
-  currentIdx++;
-  showNext();
-}
-
 async function triggerSync() {
-  if (!USE_PROXY) return;
-  try {
-    await fetch(`${SERVER}/api/sync`);
-  } catch(e) { /* silent */ }
+  if (!IS_LOCAL) return;
+  try { await fetch(`${SERVER}/api/sync`); } catch {}
 }
 
+// ── Toast ─────────────────────────────────────────────────────────
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._t);
-  t._t = setTimeout(() => t.classList.remove('show'), 3000);
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// ── Keyboard shortcuts ────────────────────────────────────────────
+// ── Keyboard ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.repeat) save();
+  if (e.key === 'Enter' && !e.repeat) saveTags();
   if (e.key === 'ArrowRight' && !e.repeat) skip();
+  if (e.key === 'ArrowLeft' && !e.repeat) goBack();
 });
 
 // ── Init ──────────────────────────────────────────────────────────

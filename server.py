@@ -63,8 +63,56 @@ def eagle_post(path, body):
     except Exception as e:
         return {"error": str(e)}
 
+def mcp_call(method, params):
+    try:
+        req = Request(
+            f"{EAGLE_MCP}/mcp",
+            data=json.dumps({"jsonrpc":"2.0","id":1,"method":method,"params":params}).encode(),
+            headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream","User-Agent":"Mozilla/5.0"}
+        )
+        with urlopen(req, timeout=30) as r:
+            text = r.read().decode()
+        parts, collecting = [], False
+        for line in text.splitlines():
+            if line.startswith("data:"):
+                parts = [line[5:]]; collecting = True
+            elif collecting and line == "": break
+            elif collecting: parts.append(line)
+        d = json.loads("".join(parts))
+        if "result" in d: return d["result"]
+        raise Exception(d.get("error",{}).get("message","MCP error"))
+    except Exception as e:
+        raise Exception(f"MCP: {e}")
+
 def get_all_eagle_items():
     seen, items = set(), []
+
+    # MCP — gets all 2000+ items with filePaths
+    offset, limit = 0, 200
+    while True:
+        try:
+            result = mcp_call("tools/call", {
+                "name": "item_get",
+                "arguments": {"folders": [FOLDER_ID], "limit": limit, "offset": offset, "fullDetails": False}
+            })
+            text = result.get("content",[{}])[0].get("text","")
+            batch = json.loads(text).get("data", [])
+        except Exception as e:
+            print(f"  MCP stopped at offset {offset}: {e}", flush=True)
+            break
+        for b in batch:
+            if b["id"] not in seen:
+                seen.add(b["id"])
+                fp = b.get("filePath","")
+                if fp:
+                    mp = Path(fp).parent / "metadata.json"
+                    try: items.append(json.loads(mp.read_text())); continue
+                    except: pass
+                items.append(b)
+        if len(batch) < limit: break
+        offset += limit
+
+    # REST fallback for any missed items
     for order in ["CREATEDATE","NAME","FILESIZE","MODIFYDATE"]:
         offset = 0
         while True:
@@ -75,14 +123,11 @@ def get_all_eagle_items():
             for b in batch:
                 if b["id"] not in seen:
                     seen.add(b["id"])
-                    fp = b.get("filePath","")
-                    if fp:
-                        mp = Path(fp).parent / "metadata.json"
-                        try: items.append(json.loads(mp.read_text())); continue
-                        except: pass
                     items.append(b)
             if len(batch) < 200: break
             offset += 200
+
+    print(f"  Eagle items: {len(items)}", flush=True)
     return items
 
 def canonicalize_tags(raw):
@@ -195,13 +240,18 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/eagle/items":
-            # Proxy Eagle item list for tagger
             folder = params.get("folder", [FOLDER_ID])[0]
             order  = params.get("order", ["CREATEDATE"])[0]
             offset = params.get("offset", ["0"])[0]
             data = eagle_get("/api/item/list",
                 f"folders[]={folder}&limit=200&offset={offset}&orderBy={order}")
             self.send_json(data)
+            return
+
+        if path == "/api/eagle/all-items":
+            # Return ALL items from folder using MCP+REST (for tagger)
+            all_items = get_all_eagle_items()
+            self.send_json({"status":"success","data":all_items})
             return
 
         if path == "/api/sync":

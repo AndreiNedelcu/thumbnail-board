@@ -46,6 +46,8 @@
   }
   .clear-search:hover { color:var(--text); }
   .stats { font-size:12px; color:var(--muted); white-space:nowrap; margin-left:auto; }
+  .tagger-btn { display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:color .15s; }
+  .tagger-btn:hover { color:var(--text); }
 
   /* ── CATEGORY FILTERS ── */
   .cat-bar { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
@@ -157,6 +159,7 @@
       <button class="clear-search" id="clear-search" onclick="clearSearch()">×</button>
     </div>
     <div class="stats" id="stats"></div>
+    <a href="tagger.html" class="tagger-btn">🏷 Tagger</a>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
   <div class="subcat-drawer" id="subcat-drawer"></div>
