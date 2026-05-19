@@ -318,6 +318,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/delete":
+            global _dataset
             vid_id = body.get("id", "")
             if not vid_id:
                 self.send_json({"ok": False, "msg": "No id provided"})
@@ -327,7 +328,6 @@ class Handler(BaseHTTPRequestHandler):
             if len(new_dataset) == before:
                 self.send_json({"ok": False, "msg": "Video not found"})
                 return
-            global _dataset
             _dataset = new_dataset
             DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
             print(f"[delete] Removed {vid_id} → {len(_dataset)} total", flush=True)
