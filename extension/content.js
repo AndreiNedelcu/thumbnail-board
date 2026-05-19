@@ -1,4 +1,8 @@
 // ── Thumbnail Board Extension ─────────────────────────────────────
+// Guard against double-injection (manifest content_scripts + background.js)
+if (window.__tbLoaded) { setTimeout(init, 800); return; }
+window.__tbLoaded = true;
+
 const SERVER = 'http://localhost:3000';
 
 const CATS = {
