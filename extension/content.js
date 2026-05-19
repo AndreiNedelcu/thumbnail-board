@@ -420,6 +420,7 @@ function openMenu(btn, info) {
   closeMenu();
   const menu = document.createElement('div');
   menu.className = 'tb-card-menu';
+  menu.dataset.forVid = info.id;       // so hover-leave doesn't hide the button while menu is open
   const isSaved = savedVideoIds.has(info.id);
   menu.innerHTML = `
     ${isSaved
@@ -556,7 +557,6 @@ function injectCardButton(thumbContainer, watchLink) {
     e.preventDefault();
     e.stopPropagation();
     if (btn.dataset.state === 'loading') return;
-    // Find the surrounding card to extract metadata
     const card = btn.closest(
       'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
       'ytd-compact-video-renderer, ytd-rich-grid-media, ytd-reel-item-renderer, ' +
@@ -567,6 +567,24 @@ function injectCardButton(thumbContainer, watchLink) {
     openMenu(btn, info);
   });
   thumbContainer.appendChild(btn);
+
+  // JS-driven hover visibility — more reliable than CSS :hover because
+  // YouTube swaps the static thumbnail for an inline preview <video> that
+  // breaks the CSS hover chain on the parent. We use the CARD as anchor
+  // (the outermost card element) so the button stays visible while the
+  // preview plays.
+  const hoverAnchor = btn.closest(
+    'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
+    'ytd-compact-video-renderer, ytd-rich-grid-media, ytd-reel-item-renderer, ' +
+    'yt-lockup-view-model, ytm-rich-item-renderer'
+  ) || thumbContainer;
+  hoverAnchor.addEventListener('mouseenter', () => btn.classList.add('tb-show'));
+  hoverAnchor.addEventListener('mouseleave', () => {
+    // Don't hide while the menu is open or while a save is running
+    if (_openMenu && _openMenu.dataset.forVid === vid) return;
+    if (btn.dataset.state === 'loading') return;
+    btn.classList.remove('tb-show');
+  });
 }
 
 function scanCards() {

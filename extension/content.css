@@ -58,12 +58,17 @@
 /* ── Per-card button — native YouTube look ── */
 /* Round, dark, semi-transparent — matches YouTube's hover overlay
    controls (mute / captions). Anchored bottom-right above the duration
-   badge so it stacks visually with YT's own hover buttons. */
+   badge so it stacks visually with YT's own hover buttons.
+   z-index has to BEAT YouTube's inline-preview overlay which renders
+   on top of the thumbnail with z-index around 1-10. */
 .tb-card-btn {
   position: absolute;
-  right: 8px;
-  bottom: 40px;             /* clears the duration badge (4-8px from bottom) */
-  z-index: 50;
+  /* Bottom-right area, immediately to the LEFT of where YouTube places
+     its mute + captions buttons during the hover-preview. This puts ours
+     visually in the same horizontal row as YT's own controls. */
+  right: 78px;
+  bottom: 8px;
+  z-index: 2147483640;          /* above YT's preview layers */
   width: 32px;
   height: 32px;
   border: none;
@@ -82,16 +87,10 @@
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
-/* Show on hover of any common YouTube card renderer */
-ytd-thumbnail:hover > .tb-card-btn,
-.tb-card-btn:hover,
-ytd-rich-item-renderer:hover .tb-card-btn,
-ytd-video-renderer:hover .tb-card-btn,
-ytd-grid-video-renderer:hover .tb-card-btn,
-ytd-compact-video-renderer:hover .tb-card-btn,
-ytd-rich-grid-media:hover .tb-card-btn,
-yt-lockup-view-model:hover .tb-card-btn,
-ytm-rich-item-renderer:hover .tb-card-btn {
+/* Visibility is now controlled by the JS hover listener via .tb-show
+   class — CSS :hover is unreliable because YouTube swaps the thumbnail
+   for an inline preview iframe that breaks the hover chain. */
+.tb-card-btn.tb-show {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
