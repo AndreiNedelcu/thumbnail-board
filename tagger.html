@@ -179,6 +179,16 @@ async function loadItems() {
     const items = eagleData.data || [];
     msg(`Loaded ${items.length} Eagle items…`);
 
+    // Build lookup: videoId → data.json entry (source of truth for tags)
+    const boardByVid = new Map(boardData.map(v => [v.id, v]));
+    const boardByEid = new Map(boardData.filter(v => v.eid).map(v => [v.eid, v]));
+
+    // Override Eagle tags with data.json tags (always up-to-date, not cached)
+    items.forEach(item => {
+      const entry = boardByEid.get(item.id) || boardByVid.get(extractVid(item));
+      if (entry) item.tags = entry.tags || item.tags;
+    });
+
     // Build set of video IDs already tagged in data.json (source of truth)
     const taggedInBoard = new Set(
       boardData.filter(v => (v.tags||[]).some(isOfficial)).map(v => v.id)
@@ -419,7 +429,7 @@ async function publishToGithub() {
 
 // ── Save ──────────────────────────────────────────────────────────
 async function saveTags() {
-  if (!current || !selected.size) return;
+  if (!current) return;
   const btn = document.getElementById('btn-save');
   btn.disabled=true; btn.textContent='Saving…';
 
