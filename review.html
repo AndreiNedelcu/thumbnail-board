@@ -40,14 +40,27 @@
   .progress-label { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
 
   main {
-    max-width:1100px; margin:0 auto; padding:40px 24px 80px;
-    display:grid; grid-template-columns:1fr 380px; gap:32px;
+    max-width:1180px; margin:0 auto; padding:32px 24px 60px;
+    display:grid; grid-template-columns:1fr 400px; gap:28px;
+    align-items:start;
   }
   @media (max-width:900px) { main { grid-template-columns:1fr; } }
+
+  .left-col { display:flex; flex-direction:column; gap:16px; }
 
   .thumb-card {
     background:var(--surface); border:1px solid var(--border); border-radius:14px;
     overflow:hidden; box-shadow:0 16px 48px rgba(0,0,0,.4);
+  }
+
+  .current-tags-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px 18px;
+  }
+  .current-tags-card .tags-head { margin-bottom:10px; }
+  .current-tags-card .tags-list {
+    background:transparent; border:none; padding:0;
+    min-height:auto;
   }
   .thumb-card img { width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:#000; }
   .thumb-meta { padding:18px 20px; }
@@ -101,7 +114,7 @@
   .new-tag-add:hover { box-shadow:0 4px 12px rgba(58,236,186,.2); }
 
   /* Suggestion sections */
-  .tag-sections { max-height:340px; overflow-y:auto; padding:4px 6px 4px 0; }
+  .tag-sections { max-height:calc(100vh - 280px); overflow-y:auto; padding:4px 6px 4px 0; }
   .tag-sections::-webkit-scrollbar { width:5px; }
   .tag-sections::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:3px; }
   .tag-section { margin-bottom:14px; }
@@ -159,35 +172,37 @@
 </header>
 
 <main id="main">
-  <div class="thumb-card">
-    <img id="thumb" src="">
-    <div class="thumb-meta">
-      <div class="thumb-title" id="title"></div>
-      <div class="thumb-sub" id="channel"></div>
-      <a class="thumb-link" id="yt" target="_blank">View on YouTube ↗</a>
+  <div class="left-col">
+    <div class="thumb-card">
+      <img id="thumb" src="">
+      <div class="thumb-meta">
+        <div class="thumb-title" id="title"></div>
+        <div class="thumb-sub" id="channel"></div>
+        <a class="thumb-link" id="yt" target="_blank">View on YouTube ↗</a>
+      </div>
     </div>
-  </div>
 
-  <div class="tags-panel">
-    <div>
-      <div class="tags-head" style="margin-bottom:8px">AI-suggested tags · click × to remove</div>
+    <div class="current-tags-card">
+      <div class="tags-head">Current tags · click × to remove</div>
       <div class="tags-list" id="tags"></div>
     </div>
-    <div>
-      <div class="tags-head" style="margin-bottom:8px">Add tag</div>
-      <input class="tag-add" id="tagInput" placeholder="search… e.g. happy, colorful, celebrity" autocomplete="off" data-1p-ignore data-lpignore="true">
-      <div class="new-tag-row">
-        <select class="new-tag-cat" id="newTagCat"></select>
-        <input class="new-tag-sub" id="newTagSub" placeholder="custom subtag, e.g. watercolor" autocomplete="off" data-1p-ignore>
-        <button class="new-tag-add" onclick="createCustomTag()">+ Create</button>
-      </div>
-      <div class="tag-sections" id="sugs" style="margin-top:14px"></div>
-    </div>
+
     <div class="actions">
       <button class="btn btn-reject" onclick="reject()">Reject</button>
       <button class="btn btn-skip" onclick="next()" title="Decide later">Skip</button>
       <button class="btn btn-approve" onclick="approve()">Approve & Publish</button>
     </div>
+  </div>
+
+  <div class="tags-panel">
+    <div class="tags-head" style="margin-bottom:8px">Add tag</div>
+    <input class="tag-add" id="tagInput" placeholder="search… e.g. happy, colorful, celebrity" autocomplete="off" data-1p-ignore data-lpignore="true">
+    <div class="new-tag-row">
+      <select class="new-tag-cat" id="newTagCat"></select>
+      <input class="new-tag-sub" id="newTagSub" placeholder="custom subtag, e.g. watercolor" autocomplete="off" data-1p-ignore>
+      <button class="new-tag-add" onclick="createCustomTag()">+ Create</button>
+    </div>
+    <div class="tag-sections" id="sugs" style="margin-top:14px"></div>
   </div>
 
   <div id="empty" style="display:none">
