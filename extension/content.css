@@ -63,11 +63,11 @@
    on top of the thumbnail with z-index around 1-10. */
 .tb-card-btn {
   position: absolute;
-  /* Bottom-right area, immediately to the LEFT of where YouTube places
-     its mute + captions buttons during the hover-preview. This puts ours
-     visually in the same horizontal row as YT's own controls. */
-  right: 78px;
-  bottom: 8px;
+  /* TOP-RIGHT, directly below where YouTube stacks its mute (top) and
+     captions (middle) buttons in .ytInlinePlayerControlsTopRightControls.
+     mute ~8-10px from top, cc ~48px, captions ~88px → ours at ~88px. */
+  top: 88px;
+  right: 8px;
   z-index: 2147483640;          /* above YT's preview layers */
   width: 32px;
   height: 32px;
@@ -134,6 +134,11 @@ ytm-rich-item-renderer:hover .tb-card-btn,
   opacity: 1 !important;
   pointer-events: auto !important;
   transform: scale(1) !important;
+}
+/* Hide the absolute fallback when our button is already injected into
+   YT's inline-preview controls stack (avoids showing two icons). */
+.tb-card-btn.tb-hidden-by-yt {
+  display: none !important;
 }
 
 /* ── Button injected INSIDE YT's inline-preview controls stack ── */

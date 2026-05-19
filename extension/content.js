@@ -590,14 +590,16 @@ function injectCardButton(thumbContainer, watchLink) {
 function scanCards() {
   // Strategy: find every /watch?v= anchor that actually wraps a thumbnail
   // (has an image-like element inside). Skip shorts.
+  // We anchor positioning to the <a> itself (the actual thumbnail image)
+  // because ytd-thumbnail can wrap a larger area, throwing off `bottom`.
   const links = document.querySelectorAll('a[href*="/watch?v="]');
   for (const a of links) {
     if (/\/shorts\//.test(a.href)) continue;
-    // Only treat as a thumbnail link if it contains an image-bearing element
     if (!a.querySelector('img, yt-image, yt-thumbnail-view-model, .yt-core-image, .shortsLockupViewModelHostThumbnailContainer')) continue;
-    const container = a.closest('ytd-thumbnail') || a;
-    injectCardButton(container, a);
+    injectCardButton(a, a);
   }
+  // Also try to inject into YT's inline-preview controls stack if present
+  document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
 }
 
 // ── Init + SPA navigation ─────────────────────────────────────────
@@ -667,18 +669,24 @@ cardObserver.observe(document.body, { childList: true, subtree: true });
 function injectIntoYTControls(ytContainer) {
   if (!ytContainer || ytContainer.querySelector('.tb-yt-btn')) return;
 
-  // Find the video ID from the card surrounding this preview
-  const card = ytContainer.closest(
-    'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
-    'ytd-compact-video-renderer, ytd-rich-grid-media, ytd-reel-item-renderer, ' +
-    'yt-lockup-view-model, ytm-rich-item-renderer, ytd-thumbnail'
-  );
-  if (!card) return;
-  const link = card.querySelector('a[href*="/watch?v="]');
+  // Find the video ID from the card surrounding this preview.
+  // Walk up the DOM tree until we hit something containing a /watch link.
+  let cur = ytContainer.parentElement;
+  let link = null;
+  while (cur && cur !== document.body) {
+    link = cur.querySelector('a[href*="/watch?v="]');
+    if (link) break;
+    cur = cur.parentElement;
+  }
   if (!link) return;
   const m = link.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (!m) return;
   const vid = m[1];
+
+  // Hide the absolute fallback button so we don't show two icons at once
+  const card = cur;
+  const absoluteBtn = card.querySelector(`.tb-card-btn[data-vid="${vid}"]`);
+  if (absoluteBtn) absoluteBtn.classList.add('tb-hidden-by-yt');
 
   const btn = document.createElement('button');
   btn.className = 'tb-yt-btn';
@@ -696,7 +704,7 @@ function injectIntoYTControls(ytContainer) {
   ytContainer.appendChild(btn);
 }
 
-// Watch the whole DOM for the YT controls container being created
+// Watch the whole DOM for the YT controls container being added or removed
 const ytObserver = new MutationObserver((muts) => {
   for (const mut of muts) {
     for (const node of mut.addedNodes) {
@@ -707,8 +715,17 @@ const ytObserver = new MutationObserver((muts) => {
         node.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
       }
     }
+    // When the YT controls disappear, un-hide the absolute fallback button
+    for (const node of mut.removedNodes) {
+      if (node.nodeType !== 1) continue;
+      const isHost = node.classList?.contains('ytInlinePlayerControlsTopRightControls');
+      const had = isHost || node.querySelector?.('.ytInlinePlayerControlsTopRightControls');
+      if (!had) continue;
+      // Reveal any tb-card-btn that was hidden
+      document.querySelectorAll('.tb-card-btn.tb-hidden-by-yt').forEach(b => b.classList.remove('tb-hidden-by-yt'));
+    }
   }
-  // Catch any already-present containers we might have missed
+  // Defensive: always re-scan for any controls we missed
   document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
 });
 ytObserver.observe(document.body, { childList: true, subtree: true });
