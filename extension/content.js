@@ -20,8 +20,24 @@ let videoData = { id:'', title:'', channel:'', views:'' };
 let panelOpen = false;
 
 function getVideoId() {
-  const m = location.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
-  return m ? m[1] : null;
+  // Try location.href first
+  let m = location.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  if (m) return m[1];
+  // Fallback: canonical link tag (more reliable on SPA navigation)
+  const canonical = document.querySelector('link[rel="canonical"]');
+  if (canonical) {
+    m = canonical.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (m) return m[1];
+  }
+  // Fallback: ytInitialData
+  try {
+    const scripts = document.querySelectorAll('script');
+    for (const s of scripts) {
+      const match = s.textContent.match(/"videoId":"([A-Za-z0-9_-]{11})"/);
+      if (match) return match[1];
+    }
+  } catch {}
+  return null;
 }
 
 function getVideoInfo() {

@@ -48,6 +48,9 @@
   .stats { font-size:12px; color:var(--muted); white-space:nowrap; margin-left:auto; }
   .tagger-btn { display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; text-decoration:none; white-space:nowrap; transition:color .15s; }
   .tagger-btn:hover { color:var(--text); }
+  .broken-btn { display:none; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:transparent; border:1px solid #e9456044; color:#e94560; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s; }
+  .broken-btn:hover { background:#e9456022; }
+  .broken-btn.visible { display:flex; }
   .size-wrap { display:flex; align-items:center; gap:7px; }
   .size-wrap svg { color:var(--muted); flex-shrink:0; }
   #size-slider { -webkit-appearance:none; appearance:none; width:80px; height:3px; background:var(--surface3); border-radius:2px; outline:none; cursor:pointer; }
@@ -91,6 +94,8 @@
     transition:transform .2s, box-shadow .2s;
   }
   .card:hover { transform:translateY(-3px); box-shadow:0 12px 32px rgba(0,0,0,.6); z-index:2; }
+  .card.broken { outline:2px solid #e9456055; }
+  .card.broken::after { content:'unavailable'; position:absolute; top:6px; left:6px; background:#e94560; color:#fff; font-size:9px; font-weight:800; letter-spacing:1px; padding:2px 6px; border-radius:4px; text-transform:uppercase; }
   .card img { width:100%; height:100%; object-fit:cover; display:block; }
   .card-overlay {
     position:absolute; inset:0;
@@ -197,6 +202,7 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <input id="size-slider" type="range" min="160" max="480" value="260" oninput="setCardSize(this.value)">
     </div>
+    <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
     <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
@@ -417,6 +423,47 @@ function clearSearch() {
   applyFilters();
 }
 
+// Track broken cards after images load
+function updateBrokenBtn() {
+  const count = document.querySelectorAll('.card.broken').length;
+  const btn = document.getElementById('broken-btn');
+  if (count > 0) {
+    btn.textContent = `🗑 Delete ${count} unavailable`;
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
+  }
+}
+// Poll briefly after render to catch broken images
+function scheduleBrokenCheck() {
+  clearTimeout(window._brokenTimer);
+  window._brokenTimer = setTimeout(updateBrokenBtn, 2500);
+}
+
+async function deleteAllBroken() {
+  const broken = [...document.querySelectorAll('.card.broken')];
+  if (!broken.length) return;
+  const ids = broken.map(card => {
+    const idx = [...document.querySelectorAll('.card')].indexOf(card);
+    return visibleVideos[idx]?.id;
+  }).filter(Boolean);
+  if (!confirm(`Delete ${ids.length} unavailable thumbnails?`)) return;
+  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      const r = await fetch(`${apiBase}/api/delete`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id})
+      });
+      const d = await r.json();
+      if (d.ok) { const i = videos.findIndex(v => v.id === id); if (i !== -1) videos.splice(i, 1); deleted++; }
+    } catch {}
+  }
+  applyFilters();
+  showToast(`🗑 Deleted ${deleted} unavailable thumbnails`);
+}
+
 function setCardSize(val) {
   document.documentElement.style.setProperty('--card-size', val + 'px');
   localStorage.setItem('cardSize', val);
@@ -444,12 +491,13 @@ function renderGrid() {
     <div class="card" onclick="openLightbox(${i})">
       <img loading="lazy"
         src="https://img.youtube.com/vi/${v.id}/maxresdefault.jpg"
-        onerror="this.src='https://img.youtube.com/vi/${v.id}/mqdefault.jpg'"
+        onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${v.id}/mqdefault.jpg';this.parentElement.classList.add('broken')"
         alt="${esc(v.title)}">
       <div class="card-overlay">
         <div class="card-title">${esc(v.title || v.id)}</div>
       </div>
     </div>`).join('');
+  scheduleBrokenCheck();
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────
@@ -693,7 +741,8 @@ async function saveLbTags(v, newTags) {
   try {
     // Update Eagle if we have an eid
     if (v.eid) {
-      await fetch('http://localhost:3000/api/eagle/update', {
+      const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
+      await fetch(`${apiBase}/api/eagle/update`, {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({id: v.eid, tags: newTags})
       });
@@ -723,15 +772,16 @@ async function confirmDelete() {
   if (!_deleteId) return;
   const btn = document.getElementById('confirm-delete-btn');
   btn.disabled = true; btn.textContent = 'Deleting…';
+  // Use relative URL when on localhost, absolute when on GitHub Pages
+  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
   try {
-    const r = await fetch('http://localhost:3000/api/delete', {
+    const r = await fetch(`${apiBase}/api/delete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: _deleteId })
     });
     const d = await r.json();
     if (d.ok) {
-      // Remove from local array and re-render
       const idx = videos.findIndex(v => v.id === _deleteId);
       if (idx !== -1) videos.splice(idx, 1);
       hideDeleteConfirm();
@@ -742,7 +792,7 @@ async function confirmDelete() {
       showToast('❌ ' + (d.msg || 'Delete failed'));
     }
   } catch(e) {
-    showToast('❌ Server not running — open via tagger.command to delete');
+    showToast('❌ Open http://localhost:3000 in your browser to use delete');
   } finally {
     btn.disabled = false; btn.textContent = 'Delete';
   }
