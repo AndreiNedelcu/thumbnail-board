@@ -288,9 +288,14 @@ const ICONS = {
   check: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
   error: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6"/><path d="M9 9l6 6"/></svg>',
   // smaller versions for card buttons
-  aiSm: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>',
-  spinnerSm: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="tb-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
-  checkSm: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  aiSm: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/></svg>',
+  spinnerSm: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" class="tb-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+  checkSm: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+  // Dropdown menu icons
+  download:  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  external:  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+  trash:     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  edit:      '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
 };
 
 function setBtnState(state, label) {
@@ -378,60 +383,175 @@ function updateCardBtnState(btn, isInBoard, state = null) {
   btn.title = 'Save with AI';
 }
 
+// ── Dropdown menu ─────────────────────────────────────────────────
+let _openMenu = null;
+
+function closeMenu() {
+  if (_openMenu) { _openMenu.remove(); _openMenu = null; }
+  document.removeEventListener('click', _onDocClickClose, true);
+  document.removeEventListener('scroll', closeMenu, true);
+  window.removeEventListener('resize', closeMenu, true);
+}
+function _onDocClickClose(e) {
+  if (_openMenu && !_openMenu.contains(e.target) && !e.target.closest('.tb-card-btn')) closeMenu();
+}
+
+function openMenu(btn, info) {
+  closeMenu();
+  const menu = document.createElement('div');
+  menu.className = 'tb-card-menu';
+  const isSaved = savedVideoIds.has(info.id);
+  menu.innerHTML = `
+    ${isSaved
+      ? `<button class="tb-mi tb-mi-disabled"><span class="tb-mi-ic">${ICONS.checkSm}</span><span>Already in your board</span></button>`
+      : `<button class="tb-mi tb-mi-primary" data-act="save"><span class="tb-mi-ic">${ICONS.aiSm}</span><span>Save with AI</span></button>`
+    }
+    <button class="tb-mi" data-act="download"><span class="tb-mi-ic">${ICONS.download}</span><span>Download thumbnail</span></button>
+    <button class="tb-mi" data-act="open"><span class="tb-mi-ic">${ICONS.external}</span><span>Open thumbnail (max res)</span></button>
+    ${isSaved
+      ? `<button class="tb-mi tb-mi-danger" data-act="delete"><span class="tb-mi-ic">${ICONS.trash}</span><span>Remove from board</span></button>`
+      : ''
+    }
+  `;
+  document.body.appendChild(menu);
+  _openMenu = menu;
+
+  // Position next to the button — try right side first, flip to left if no room
+  const r = btn.getBoundingClientRect();
+  menu.style.visibility = 'hidden';
+  menu.style.top = '0'; menu.style.left = '0';
+  // We use fixed positioning so it floats above YouTube's overlays
+  const mw = menu.offsetWidth;
+  const mh = menu.offsetHeight;
+  let top  = r.bottom + 6;
+  let left = r.right  - mw;
+  if (left < 8) left = r.left;
+  if (top + mh > window.innerHeight - 8) top = r.top - mh - 6;
+  menu.style.top  = `${top}px`;
+  menu.style.left = `${left}px`;
+  menu.style.visibility = 'visible';
+  requestAnimationFrame(() => menu.classList.add('open'));
+
+  menu.addEventListener('click', async (e) => {
+    const item = e.target.closest('[data-act]');
+    if (!item) return;
+    const act = item.dataset.act;
+    closeMenu();
+    if (act === 'save')      await runSave(btn, info);
+    if (act === 'download')  downloadThumbnail(info.id, info.title);
+    if (act === 'open')      window.open(`https://img.youtube.com/vi/${info.id}/maxresdefault.jpg`, '_blank');
+    if (act === 'delete')    await removeFromBoard(btn, info);
+  });
+  setTimeout(() => {
+    document.addEventListener('click', _onDocClickClose, true);
+    document.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('resize', closeMenu, true);
+  }, 0);
+}
+
+async function runSave(btn, info) {
+  if (btn.dataset.state === 'loading') return;
+  try {
+    updateCardBtnState(btn, false, 'loading');
+    const tags = await saveVideo(info);
+    updateCardBtnState(btn, true, 'saved');
+    showToast(`Saved · ${tags.length} tags`, 'success');
+  } catch (err) {
+    if (/already in board/i.test(err.message)) {
+      updateCardBtnState(btn, true, 'saved');
+      showToast('Already in board', 'success');
+    } else {
+      updateCardBtnState(btn, false, 'error');
+      showToast(err.message, 'error');
+      setTimeout(() => updateCardBtnState(btn, savedVideoIds.has(info.id)), 2500);
+    }
+  }
+}
+
+async function removeFromBoard(btn, info) {
+  if (!confirm(`Remove "${info.title || info.id}" from the board?`)) return;
+  try {
+    const r = await tbFetch('/api/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: info.id }),
+    });
+    const d = await r.json();
+    if (d.ok || /not found/i.test(d.msg || '')) {
+      savedVideoIds.delete(info.id);
+      updateCardBtnState(btn, false);
+      showToast('Removed from board', 'success');
+    } else {
+      showToast(d.msg || 'Delete failed', 'error');
+    }
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function downloadThumbnail(videoId, title) {
+  try {
+    const r = await fetch(`https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`);
+    if (!r.ok) throw new Error('not available');
+    const blob = await r.blob();
+    if (blob.size < 2000) throw new Error('not available');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safe = (title || videoId).replace(/[^a-z0-9\-_]+/gi, '_').slice(0, 80);
+    a.download = `${safe}_${videoId}.jpg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 3000);
+    showToast('Thumbnail downloaded', 'success');
+  } catch (e) {
+    showToast('Could not download — try mqdefault', 'error');
+  }
+}
+
+// ── Per-card button injection ─────────────────────────────────────
 function injectCardButton(thumbContainer, watchLink) {
   if (!thumbContainer || !watchLink) return;
-  if (thumbContainer.querySelector('.tb-card-btn')) return;  // already injected
+  if (thumbContainer.querySelector('.tb-card-btn')) return;
   const m = watchLink.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (!m) return;
   const vid = m[1];
 
-  // Ensure container can position absolutely
   const cs = getComputedStyle(thumbContainer);
   if (cs.position === 'static') thumbContainer.style.position = 'relative';
 
   const btn = document.createElement('button');
   btn.className = 'tb-card-btn';
   btn.dataset.vid = vid;
+  btn.title = 'Thumbnail Board';
   updateCardBtnState(btn, savedVideoIds.has(vid));
-  btn.addEventListener('click', async (e) => {
+  btn.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
     if (btn.dataset.state === 'loading') return;
-    if (btn.dataset.state === 'saved') {
-      showToast('Already in board', 'success');
-      return;
-    }
-    // Find the parent card to extract metadata
-    const card = btn.closest('ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ytd-compact-video-renderer, ytd-rich-grid-media, ytm-shelf-renderer, ytd-reel-item-renderer')
-                 || thumbContainer.parentElement;
+    // Find the surrounding card to extract metadata
+    const card = btn.closest(
+      'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
+      'ytd-compact-video-renderer, ytd-rich-grid-media, ytd-reel-item-renderer, ' +
+      'yt-lockup-view-model, ytm-rich-item-renderer'
+    ) || thumbContainer.parentElement;
     const info = getCardInfo(card) || { id: vid, title: '', channel: '', views: '' };
     info.id = vid;
-    try {
-      updateCardBtnState(btn, false, 'loading');
-      const tags = await saveVideo(info);
-      updateCardBtnState(btn, true, 'saved');
-      showToast(`Saved · ${tags.length} tags`, 'success');
-    } catch (err) {
-      if (/already in board/i.test(err.message)) {
-        updateCardBtnState(btn, true, 'saved');
-        showToast('Already in board', 'success');
-      } else {
-        updateCardBtnState(btn, false, 'error');
-        showToast(err.message, 'error');
-        setTimeout(() => updateCardBtnState(btn, savedVideoIds.has(vid)), 2500);
-      }
-    }
+    openMenu(btn, info);
   });
   thumbContainer.appendChild(btn);
 }
 
 function scanCards() {
-  // Find every thumbnail container that holds a /watch link
-  const links = document.querySelectorAll('a#thumbnail[href*="/watch?v="], ytd-thumbnail a[href*="/watch?v="]');
+  // Strategy: find every /watch?v= anchor that actually wraps a thumbnail
+  // (has an image-like element inside). Skip shorts.
+  const links = document.querySelectorAll('a[href*="/watch?v="]');
   for (const a of links) {
-    const container = a.closest('ytd-thumbnail') || a.parentElement;
-    if (!container) continue;
     if (/\/shorts\//.test(a.href)) continue;
+    // Only treat as a thumbnail link if it contains an image-bearing element
+    if (!a.querySelector('img, yt-image, yt-thumbnail-view-model, .yt-core-image, .shortsLockupViewModelHostThumbnailContainer')) continue;
+    const container = a.closest('ytd-thumbnail') || a;
     injectCardButton(container, a);
   }
 }

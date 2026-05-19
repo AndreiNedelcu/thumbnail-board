@@ -59,60 +59,136 @@
   box-shadow: 0 4px 16px rgba(233, 69, 96, .35);
 }
 
-/* ── Per-card hover save button (home / search / feed) ── */
+/* ── Per-card button on every YouTube thumbnail (vidIQ-style) ── */
 .tb-card-btn {
   position: absolute;
   top: 8px;
   right: 8px;
   z-index: 50;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 50%;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   color: #0d1117;
   background: linear-gradient(135deg, #3aecba 0%, #524add 100%);
-  opacity: 0;
-  transform: translateY(-4px);
+  opacity: 0.55;          /* subtle when idle, clearly visible always */
   transition: opacity .15s, transform .15s, background .15s, box-shadow .15s;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .35);
   font-family: inherit;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
 }
-/* Show on hover of any reasonable parent — covers all YT card variants */
-ytd-thumbnail:hover .tb-card-btn,
+/* Slight reveal on card hover (any common renderer) */
+ytd-thumbnail:hover > .tb-card-btn,
+.tb-card-btn:hover,
 ytd-rich-item-renderer:hover .tb-card-btn,
 ytd-video-renderer:hover .tb-card-btn,
 ytd-grid-video-renderer:hover .tb-card-btn,
-ytd-compact-video-renderer:hover .tb-card-btn {
+ytd-compact-video-renderer:hover .tb-card-btn,
+ytd-rich-grid-media:hover .tb-card-btn,
+yt-lockup-view-model:hover .tb-card-btn,
+ytm-rich-item-renderer:hover .tb-card-btn {
   opacity: 1;
-  transform: translateY(0);
 }
 .tb-card-btn:hover {
-  box-shadow: 0 6px 20px rgba(58, 236, 186, .35);
-  transform: translateY(0) scale(1.05);
+  transform: scale(1.06);
+  box-shadow: 0 6px 22px rgba(58, 236, 186, .4);
 }
 .tb-card-btn[data-state="loading"] {
   opacity: 1 !important;
-  transform: translateY(0) !important;
   cursor: progress;
 }
 .tb-card-btn[data-state="saved"] {
-  opacity: 1 !important;            /* always visible when already saved */
-  transform: translateY(0) !important;
-  background: rgba(58, 236, 186, .95);
-  color: #0d1117;
-  box-shadow: 0 4px 12px rgba(58, 236, 186, .35);
+  opacity: 1 !important;                /* always visible — "in board" badge */
+  background: rgba(13, 17, 23, .85);
+  color: #3aecba;
+  border: 1.5px solid #3aecba;
+  box-shadow: 0 4px 12px rgba(58, 236, 186, .25);
 }
 .tb-card-btn[data-state="saved"]:hover {
-  background: #3aecba;
+  background: rgba(58, 236, 186, .15);
 }
 .tb-card-btn[data-state="error"] {
   background: #e94560;
   color: #fff;
+  opacity: 1 !important;
 }
+
+/* ── Dropdown menu (opens from card button) ── */
+.tb-card-menu {
+  position: fixed;
+  z-index: 2147483645;
+  min-width: 220px;
+  background: #171e25;
+  border: 1px solid rgba(204, 218, 231, .12);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55), 0 4px 14px rgba(0, 0, 0, .3);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  opacity: 0;
+  transform: translateY(-6px) scale(.96);
+  transition: opacity .15s, transform .15s;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+.tb-card-menu.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.tb-mi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: transparent;
+  color: #ccdae7;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background .12s, color .12s;
+}
+.tb-mi:hover:not(.tb-mi-disabled) {
+  background: rgba(204, 218, 231, .07);
+  color: #ffffff;
+}
+.tb-mi-ic {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: inherit;
+}
+.tb-mi-primary {
+  color: #3aecba;
+  font-weight: 700;
+}
+.tb-mi-primary:hover {
+  background: rgba(58, 236, 186, .1);
+}
+.tb-mi-danger {
+  color: #e94560;
+}
+.tb-mi-danger:hover {
+  background: rgba(233, 69, 96, .1);
+}
+.tb-mi-disabled {
+  color: #3aecba;
+  opacity: .8;
+  cursor: default;
+  font-weight: 600;
+}
+.tb-mi-disabled:hover { background: transparent; }
 
 /* ── Toast ── */
 #tb-toast {
