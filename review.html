@@ -232,9 +232,31 @@ const CATS = {
   BACKDROP:  { color:'#ec407a', subs:['dark','light','blurry'] },
   CHANNEL:   { color:'#3aecba', subs:['theseniordev-main','theseniordev-podcast'] },
 };
-// Tracks custom tags discovered from data.json or created in this session
+// Tracks custom tags discovered from data.json or created by the user
 const CUSTOM = {};  // { CATEGORY: Set<subtag> }
 Object.keys(CATS).forEach(c => CUSTOM[c] = new Set());
+
+const CUSTOM_LS_KEY = 'tb-review-custom-tags';
+
+function loadCustomTagsFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_LS_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    for (const [cat, subs] of Object.entries(obj)) {
+      if (!CATS[cat] || !Array.isArray(subs)) continue;
+      for (const s of subs) CUSTOM[cat].add(s);
+    }
+  } catch {}
+}
+
+function saveCustomTagsToLocalStorage() {
+  const obj = {};
+  for (const [cat, set] of Object.entries(CUSTOM)) {
+    if (set.size) obj[cat] = [...set];
+  }
+  try { localStorage.setItem(CUSTOM_LS_KEY, JSON.stringify(obj)); } catch {}
+}
 
 function tagsByCat() {
   // Merge official + custom per category
@@ -283,6 +305,7 @@ function fillCategoryDropdown() {
 }
 
 async function load() {
+  loadCustomTagsFromLocalStorage();
   await loadBoardCustomTags();
   fillCategoryDropdown();
   const r = await fetch('/api/review-items');
@@ -388,6 +411,7 @@ function createCustomTag() {
     .replace(/^-|-$/g, '');
   if (!sub) { toast('Invalid tag name', 'error'); return; }
   CUSTOM[cat].add(sub);
+  saveCustomTagsToLocalStorage();
   const full = `${cat.toLowerCase()}-${sub}`;
   addTag(full);
   document.getElementById('newTagSub').value = '';

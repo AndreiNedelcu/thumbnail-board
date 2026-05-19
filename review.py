@@ -72,13 +72,28 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         req = urllib.request.Request(
             f"{WORKER_URL}/api/add",
             data=payload,
-            headers={"Content-Type": "application/json", "X-Auth-Token": AUTH_TOKEN},
+            headers={
+                "Content-Type": "application/json",
+                "X-Auth-Token": AUTH_TOKEN,
+                "User-Agent": "ThumbnailBoardReview/1.0 (review.py)",
+            },
         )
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 resp = json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            # Worker returned 4xx/5xx — read body for the actual message
+            body = e.read().decode("utf-8", "replace")
+            print(f"[approve] Worker HTTP {e.code} for {entry.get('id')}: {body}", file=sys.stderr)
+            try:
+                worker_resp = json.loads(body)
+                return self._json(worker_resp, e.code)
+            except Exception:
+                return self._json({"ok": False, "msg": f"HTTP {e.code}: {body[:200]}"}, e.code)
         except Exception as e:
+            print(f"[approve] network error for {entry.get('id')}: {e}", file=sys.stderr)
             return self._json({"ok": False, "msg": str(e)}, 500)
+        print(f"[approve] worker response for {entry.get('id')}: {resp}", file=sys.stderr)
         if not resp.get("ok"):
             return self._json(resp, 400)
         # Record what AI said vs what user kept — feedback for next batch
@@ -100,14 +115,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         REVIEW_FILE.write_text(json.dumps(review, ensure_ascii=False, indent=2))
         return self._json({"ok": True})
 
-    def log_message(self, *a, **k): pass
+    def log_message(self, format, *args):
+        # Keep noise low but show errors and POST requests
+        msg = format % args if args else format
+        if " 4" in msg or " 5" in msg or "POST" in msg:
+            print(f"[review.py] {msg}", file=sys.stderr)
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args()
 
-    with socketserver.TCPServer(("", args.port), Handler) as httpd:
+    class ReusableServer(socketserver.TCPServer):
+        allow_reuse_address = True
+    with ReusableServer(("", args.port), Handler) as httpd:
         url = f"http://localhost:{args.port}/review.html"
         print(f"📋 Review server: {url}")
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
