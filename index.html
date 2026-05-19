@@ -114,7 +114,10 @@
 
   .lb-body { padding:20px 24px; display:flex; flex-direction:column; gap:16px; }
   .lb-title { font-size:16px; font-weight:700; line-height:1.4; }
-  .lb-channel { font-size:13px; color:var(--muted); margin-top:4px; }
+  .lb-meta-row { display:flex; align-items:center; gap:12px; margin-top:4px; flex-wrap:wrap; }
+  .lb-channel { font-size:13px; color:var(--muted); }
+  .lb-views { font-size:13px; color:var(--muted); display:flex; align-items:center; gap:4px; }
+  .lb-views::before { content:'·'; }
 
   .lb-actions { display:flex; gap:8px; flex-wrap:wrap; }
   .lb-btn { display:flex; align-items:center; gap:7px; padding:9px 16px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; text-decoration:none; white-space:nowrap; }
@@ -175,7 +178,10 @@
     <div class="lb-body">
       <div>
         <div class="lb-title" id="lb-title"></div>
-        <div class="lb-channel" id="lb-channel"></div>
+        <div class="lb-meta-row">
+          <span class="lb-channel" id="lb-channel"></span>
+          <span class="lb-views" id="lb-views"></span>
+        </div>
       </div>
       <div class="lb-actions">
         <a class="lb-btn lb-btn-yt" id="lb-yt" href="#" target="_blank">
@@ -415,6 +421,7 @@ function renderLightbox() {
 
   document.getElementById('lb-title').textContent = v.title || v.id;
   document.getElementById('lb-channel').textContent = v.channel || '';
+  document.getElementById('lb-views').textContent = v.views ? `${v.views} views` : '';
   document.getElementById('lb-yt').href = `https://www.youtube.com/watch?v=${v.id}`;
 
   // Eagle button — deep link via eagle:// URL scheme
