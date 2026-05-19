@@ -11,93 +11,71 @@
     --border:rgba(255,255,255,0.08); --text:#f0f0f0; --muted:#666;
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-
-  /* Lock full height, no page scroll */
   html, body { height:100%; overflow:hidden; }
   body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); display:flex; flex-direction:column; }
 
-  /* ── HEADER ── */
-  header {
-    flex-shrink:0; padding:12px 20px; border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:14px;
-    background:rgba(13,13,13,0.97);
-  }
-  .logo { font-size:15px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
+  /* HEADER */
+  header { flex-shrink:0; padding:11px 18px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:rgba(13,13,13,.97); }
+  .logo { font-size:14px; font-weight:800; letter-spacing:2px; white-space:nowrap; }
   .logo span { color:#e94560; }
-  .progress-wrap { flex:1; max-width:280px; }
-  .progress-bar { height:5px; background:var(--surface3); border-radius:3px; overflow:hidden; margin-bottom:4px; }
-  .progress-fill { height:100%; background:#e94560; border-radius:3px; transition:width .4s; }
+  .progress-wrap { flex:1; max-width:260px; }
+  .progress-bar { height:4px; background:var(--surface3); border-radius:2px; overflow:hidden; margin-bottom:4px; }
+  .progress-fill { height:100%; background:#e94560; border-radius:2px; transition:width .4s; }
   .progress-label { font-size:11px; color:var(--muted); }
   .header-actions { display:flex; gap:6px; margin-left:auto; align-items:center; }
-  .btn { padding:7px 14px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
-  .btn-back { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
-  .btn-back:hover:not(:disabled) { color:var(--text); }
-  .btn-back:disabled { opacity:.3; cursor:not-allowed; }
-  .btn-skip { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
-  .btn-skip:hover { color:var(--text); }
-  .btn-save { background:#e94560; color:#fff; padding:7px 18px; }
+  .btn { padding:6px 13px; border-radius:7px; font-size:12px; font-weight:600; cursor:pointer; border:none; transition:all .15s; white-space:nowrap; }
+  .btn-ghost { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { color:var(--text); }
+  .btn-ghost:disabled { opacity:.3; cursor:not-allowed; }
+  .btn-save { background:#e94560; color:#fff; padding:6px 16px; }
   .btn-save:hover:not(:disabled) { background:#c73050; }
-  .btn-save:disabled { background:#333; color:#555; cursor:not-allowed; }
+  .btn-save:disabled { background:#2a2a2a; color:#555; cursor:not-allowed; }
 
-  /* ── MAIN: fixed height, no overflow ── */
-  main {
-    flex:1; min-height:0;
-    display:grid; grid-template-columns:1fr 360px;
-    overflow:hidden;
-  }
+  /* LAYOUT */
+  main { flex:1; min-height:0; display:grid; grid-template-columns:1fr 360px; overflow:hidden; }
 
-  /* LEFT — image panel, never scrolls */
-  .thumb-panel {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:28px; gap:14px; border-right:1px solid var(--border);
-    background:var(--surface); overflow:hidden; min-height:0;
-  }
-  .thumb-img {
-    max-width:100%; max-height:55vh; border-radius:10px;
-    box-shadow:0 16px 48px rgba(0,0,0,.6); object-fit:contain; flex-shrink:0;
-  }
-  .thumb-title { font-size:14px; font-weight:600; line-height:1.4; text-align:center; max-width:520px; }
+  /* LEFT — never scrolls */
+  .thumb-panel { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:24px; gap:12px; border-right:1px solid var(--border); background:var(--surface); overflow:hidden; }
+  .thumb-img { max-width:100%; max-height:52vh; border-radius:10px; box-shadow:0 16px 48px rgba(0,0,0,.6); object-fit:contain; flex-shrink:0; }
+  .thumb-title { font-size:14px; font-weight:600; line-height:1.4; text-align:center; max-width:500px; }
   .thumb-meta { font-size:12px; color:var(--muted); display:flex; gap:10px; flex-wrap:wrap; justify-content:center; }
-  .thumb-url { font-size:12px; color:#7c4dff; text-decoration:none; }
-  .thumb-url:hover { text-decoration:underline; }
-  .selected-tags { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; max-width:560px; }
-  .sel-tag { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; }
-  .sel-tag .x { cursor:pointer; font-size:12px; opacity:.7; }
+  .thumb-link { font-size:12px; color:#7c4dff; text-decoration:none; }
+  .thumb-link:hover { text-decoration:underline; }
+  .sel-wrap { display:flex; flex-wrap:wrap; gap:5px; justify-content:center; max-width:520px; }
+  .sel-tag { padding:3px 9px; border-radius:12px; font-size:11px; font-weight:600; display:flex; align-items:center; gap:4px; }
+  .sel-tag .x { cursor:pointer; opacity:.7; font-size:12px; }
   .sel-tag .x:hover { opacity:1; }
 
-  /* RIGHT — tags panel, scrolls */
-  .tag-panel {
-    overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:16px;
-    min-height:0;
-  }
+  /* RIGHT — scrolls */
+  .tag-panel { overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:14px; }
   .tag-panel::-webkit-scrollbar { width:4px; }
   .tag-panel::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:2px; }
 
   .cat-section {}
-  .cat-title {
-    font-size:10px; font-weight:800; letter-spacing:2px; text-transform:uppercase;
-    margin-bottom:8px; display:flex; align-items:center; gap:7px; color:var(--muted);
-  }
+  .cat-title { font-size:10px; font-weight:800; letter-spacing:2px; text-transform:uppercase; margin-bottom:7px; display:flex; align-items:center; gap:6px; color:var(--muted); }
   .cat-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
   .tag-grid { display:flex; flex-wrap:wrap; gap:5px; }
-  .tag-btn {
-    padding:4px 11px; border-radius:14px; font-size:11px; font-weight:600;
-    cursor:pointer; border:1px solid var(--border); background:var(--surface2);
-    color:var(--muted); transition:all .12s;
-  }
+  .tag-btn { padding:3px 10px; border-radius:13px; font-size:11px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--surface2); color:var(--muted); transition:all .12s; }
   .tag-btn:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
   .tag-btn.selected { color:#fff; border-color:transparent; }
 
-  /* ── LOADING / DONE ── */
-  #loading { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:12px; min-height:0; }
-  .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:#e94560; border-radius:50%; animation:spin .8s linear infinite; }
+  /* Custom tag input per category */
+  .custom-tag-row { display:flex; gap:5px; margin-top:7px; }
+  .custom-tag-input { flex:1; background:var(--surface3); border:1px solid var(--border); border-radius:7px; color:var(--text); font-size:11px; padding:4px 9px; outline:none; }
+  .custom-tag-input:focus { border-color:#7c4dff55; }
+  .custom-tag-input::placeholder { color:var(--muted); }
+  .custom-tag-add { padding:4px 10px; background:var(--surface3); border:1px solid var(--border); border-radius:7px; color:var(--muted); font-size:12px; cursor:pointer; transition:all .12s; }
+  .custom-tag-add:hover { color:var(--text); }
+
+  /* LOADING / DONE */
+  #loading { display:flex; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:10px; }
+  .spinner { width:26px; height:26px; border:3px solid var(--border); border-top-color:#e94560; border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
   #done-screen { display:none; flex:1; align-items:center; justify-content:center; flex-direction:column; gap:14px; }
-  #done-screen.visible { display:flex; }
-  .done-icon { font-size:56px; }
+  #done-screen.show { display:flex; }
 
-  /* ── TOAST ── */
-  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface3); color:var(--text); padding:9px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; border:1px solid var(--border); z-index:99; white-space:nowrap; }
+  /* TOAST */
+  #toast { position:fixed; bottom:18px; left:50%; transform:translateX(-50%) translateY(12px); background:var(--surface3); color:var(--text); padding:8px 18px; border-radius:8px; font-size:13px; opacity:0; transition:all .25s; pointer-events:none; border:1px solid var(--border); z-index:99; white-space:nowrap; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 </style>
 </head>
@@ -106,48 +84,46 @@
 <header>
   <div class="logo">THUMBNAIL<span>TAGGER</span></div>
   <div class="progress-wrap">
-    <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
-    <div class="progress-label" id="progress-label">Loading…</div>
+    <div class="progress-bar"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+    <div class="progress-label" id="plabel">Loading…</div>
   </div>
   <div class="header-actions">
-    <button class="btn btn-back" id="btn-back" onclick="goBack()" disabled>← Back</button>
-    <button class="btn btn-skip" id="btn-skip" onclick="skip()">Skip →</button>
+    <button class="btn btn-ghost" id="btn-back" onclick="goBack()" disabled>← Back</button>
+    <button class="btn btn-ghost" onclick="skip()">Skip →</button>
     <button class="btn btn-save" id="btn-save" onclick="saveTags()" disabled>Save tags</button>
   </div>
 </header>
 
 <div id="loading">
   <div class="spinner"></div>
-  <p style="color:var(--muted);font-size:14px" id="load-msg">Connecting to Eagle…</p>
+  <p id="load-msg" style="color:var(--muted);font-size:13px">Connecting to Eagle…</p>
 </div>
 
 <main id="main" style="display:none">
   <div class="thumb-panel">
-    <img class="thumb-img" id="thumb-img" src="" alt="">
-    <div class="thumb-title" id="thumb-title"></div>
+    <img class="thumb-img" id="timg" src="" alt="">
+    <div class="thumb-title" id="ttitle"></div>
     <div class="thumb-meta">
-      <span id="thumb-views"></span>
-      <a class="thumb-url" id="thumb-url" href="#" target="_blank">Open in YouTube ↗</a>
+      <span id="tviews"></span>
+      <a class="thumb-link" id="turl" href="#" target="_blank">Open in YouTube ↗</a>
     </div>
-    <div class="selected-tags" id="selected-tags"></div>
+    <div class="sel-wrap" id="sel-tags"></div>
   </div>
   <div class="tag-panel" id="tag-panel"></div>
 </main>
 
 <div id="done-screen">
-  <div class="done-icon">🎉</div>
-  <h2 style="font-size:22px;font-weight:700">All tagged!</h2>
-  <p style="color:var(--muted);font-size:14px;text-align:center">All thumbnails have official tags.<br>The website syncs automatically.</p>
-  <a href="/" style="color:#7c4dff;font-size:13px;text-decoration:none">← Back to Thumbnail Board</a>
+  <div style="font-size:52px">🎉</div>
+  <h2 style="font-size:21px;font-weight:700">All tagged!</h2>
+  <p style="color:var(--muted);font-size:14px;text-align:center">Every thumbnail has official tags now.<br>Website syncs automatically.</p>
+  <a href="/" style="margin-top:8px;color:#7c4dff;font-size:13px;text-decoration:none;border:1px solid #7c4dff44;padding:6px 16px;border-radius:8px">← Back to Thumbnail Board</a>
 </div>
 
 <div id="toast"></div>
 
 <script>
-const SERVER    = 'http://localhost:3000';
-const EAGLE_API = 'http://localhost:41595';
-const FOLDER_ID = 'MPBRJ4DRT0IR0';
-const IS_LOCAL  = location.hostname === 'localhost';
+const EAGLE = 'http://localhost:41595';
+const FOLDER = 'MPBRJ4DRT0IR0';
 
 const CATS = {
   STYLE:     { color:'#e94560', bg:'#533483', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
@@ -161,227 +137,210 @@ const CATS = {
   CALLOUT:   { color:'#d4e157', bg:'#827717', subs:['magnifier'] },
   BACKDROP:  { color:'#ec407a', bg:'#880e4f', subs:['dark','light','blurry'] },
 };
-const VALID_PREFIXES = new Set(Object.keys(CATS).map(k => k.toLowerCase()));
-function isOfficial(t) { return VALID_PREFIXES.has(t.split('-')[0]); }
+const VALID = new Set(Object.keys(CATS).map(k => k.toLowerCase()));
+const isOfficial = t => VALID.has(t.split('-')[0]);
 
-// ── State ─────────────────────────────────────────────────────────
-let queue = [];       // items without official tags
-let history = [];     // stack of visited indices for back navigation
-let currentIdx = 0;
-let current = null;
-let selectedTags = new Set();
-let totalItems = 0;
-let alreadyTagged = 0;
+let queue = [], history = [], idx = 0, current = null;
+let selected = new Set();
+let totalAll = 0, preTagged = 0;
 
-// ── Load all items via server (MCP) ───────────────────────────────
+// ── Load all items (paginated through all orderings) ──────────────
 async function loadItems() {
-  setMsg('Loading all items from Eagle (this takes ~10s)…');
+  msg('Loading items from Eagle…');
+  const seen = new Set(), items = [];
   try {
-    const url = IS_LOCAL ? `${SERVER}/api/eagle/all-items` : `${EAGLE_API}/api/item/list?folders[]=${FOLDER_ID}&limit=200`;
-    const r = await fetch(url);
-    const data = await r.json();
-    const items = data.data || [];
-    totalItems = items.length;
-    alreadyTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
-    queue = items.filter(i => !(i.tags||[]).some(isOfficial));
-    currentIdx = 0;
-    showCurrent();
+    for (const order of ['CREATEDATE','NAME','FILESIZE','MODIFYDATE','WIDTH','HEIGHT']) {
+      let offset = 0;
+      while (true) {
+        const r = await fetch(`${EAGLE}/api/item/list?folders[]=${FOLDER}&limit=200&offset=${offset}&orderBy=${order}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        const batch = d.data || [];
+        if (!batch.length) break;
+        for (const b of batch) { if (!seen.has(b.id)) { seen.add(b.id); items.push(b); } }
+        if (batch.length < 200) break;
+        offset += 200;
+      }
+      msg(`Loaded ${items.length} items so far…`);
+    }
   } catch(e) {
-    setMsg(`❌ Cannot reach Eagle. Open via tagger.command.\n${e}`);
+    msg(`❌ Cannot reach Eagle (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
+    return;
   }
+
+  totalAll = items.length;
+  preTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
+  queue = items.filter(i => !(i.tags||[]).some(isOfficial));
+  idx = 0;
+  render();
 }
 
-function setMsg(msg) {
-  document.getElementById('load-msg').textContent = msg;
-}
+function msg(t) { document.getElementById('load-msg').textContent = t; }
 
-// ── Build tag panel (once) ────────────────────────────────────────
-function buildTagPanel() {
+// ── Build tag panel ───────────────────────────────────────────────
+function buildPanel() {
   const panel = document.getElementById('tag-panel');
   panel.innerHTML = '';
   Object.entries(CATS).forEach(([cat, cfg]) => {
     const sec = document.createElement('div');
     sec.className = 'cat-section';
+    sec.dataset.cat = cat;
+
+    const tagsHtml = cfg.subs.map(sub => tagBtnHtml(`${cat.toLowerCase()}-${sub}`, sub, cfg)).join('');
+
     sec.innerHTML = `
-      <div class="cat-title">
-        <span class="cat-dot" style="background:${cfg.color}"></span>${cat}
-      </div>
-      <div class="tag-grid">
-        ${cfg.subs.map(sub => {
-          const full = `${cat.toLowerCase()}-${sub}`;
-          return `<button class="tag-btn" data-tag="${full}"
-            onclick="toggleTag('${full}',this,'${cfg.bg}','${cfg.color}')">${sub}</button>`;
-        }).join('')}
+      <div class="cat-title"><span class="cat-dot" style="background:${cfg.color}"></span>${cat}</div>
+      <div class="tag-grid" id="grid-${cat}">${tagsHtml}</div>
+      <div class="custom-tag-row">
+        <input class="custom-tag-input" id="inp-${cat}" placeholder="Add tag… (e.g. neon)"
+          onkeydown="if(event.key==='Enter'){addCustomTag('${cat}');event.preventDefault();}">
+        <button class="custom-tag-add" onclick="addCustomTag('${cat}')">+ Add</button>
       </div>`;
     panel.appendChild(sec);
   });
 }
 
-// ── Show current item ─────────────────────────────────────────────
-function showCurrent() {
+function tagBtnHtml(full, label, cfg) {
+  return `<button class="tag-btn" data-tag="${full}"
+    onclick="toggle('${full}',this,'${cfg.bg}','${cfg.color}')">${label}</button>`;
+}
+
+function addCustomTag(cat) {
+  const inp = document.getElementById(`inp-${cat}`);
+  const raw = inp.value.trim().toLowerCase().replace(/\s+/g,'-');
+  if (!raw) return;
+  const full = `${cat.toLowerCase()}-${raw}`;
+  // Add button to grid if not already there
+  const grid = document.getElementById(`grid-${cat}`);
+  if (!grid.querySelector(`[data-tag="${full}"]`)) {
+    const cfg = CATS[cat];
+    grid.insertAdjacentHTML('beforeend', tagBtnHtml(full, raw, cfg));
+  }
+  // Auto-select it
+  const btn = document.querySelector(`[data-tag="${full}"]`);
+  if (btn && !selected.has(full)) toggle(full, btn, CATS[cat].bg, CATS[cat].color);
+  inp.value = '';
+}
+
+// ── Render current item ───────────────────────────────────────────
+function render() {
   document.getElementById('loading').style.display = 'none';
 
-  if (!queue.length || currentIdx >= queue.length) {
+  if (!queue.length || idx >= queue.length) {
     document.getElementById('main').style.display = 'none';
-    document.getElementById('done-screen').classList.add('visible');
+    document.getElementById('done-screen').classList.add('show');
     return;
   }
 
-  current = queue[currentIdx];
-  selectedTags = new Set();
+  current = queue[idx];
+  selected = new Set();
   document.getElementById('main').style.display = 'grid';
 
   // Image
-  const vidMatch = (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  const vidId = vidMatch ? vidMatch[1] : null;
-  const img = document.getElementById('thumb-img');
-  if (vidId) {
-    img.src = `https://img.youtube.com/vi/${vidId}/maxresdefault.jpg`;
-    img.onerror = () => { img.src = `https://img.youtube.com/vi/${vidId}/mqdefault.jpg`; img.onerror=null; };
-    document.getElementById('thumb-url').href = `https://www.youtube.com/watch?v=${vidId}`;
-  } else {
-    img.src = ''; document.getElementById('thumb-url').href = '#';
+  const m = (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  const vid = m ? m[1] : null;
+  const img = document.getElementById('timg');
+  if (vid) {
+    img.src = `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`;
+    img.onerror = () => { img.src = `https://img.youtube.com/vi/${vid}/mqdefault.jpg`; img.onerror=null; };
+    document.getElementById('turl').href = `https://www.youtube.com/watch?v=${vid}`;
   }
-
-  document.getElementById('thumb-title').textContent = current.name || '';
+  document.getElementById('ttitle').textContent = current.name || '';
   const vm = (current.annotation||'').match(/Views:\s*([\d.KMB]+)/);
-  document.getElementById('thumb-views').textContent = vm ? `👁 ${vm[1]}` : '';
+  document.getElementById('tviews').textContent = vm ? `👁 ${vm[1]}` : '';
 
-  // Reset tag buttons
-  document.querySelectorAll('.tag-btn').forEach(b => {
-    b.classList.remove('selected');
-    b.style.cssText = '';
-  });
-  renderSelectedTags();
-  updateProgress();
-  updateButtons();
+  // Reset buttons
+  document.querySelectorAll('.tag-btn').forEach(b => { b.classList.remove('selected'); b.style.cssText=''; });
+  refreshSelTags();
+  refreshProgress();
+  refreshBtns();
 }
 
-function renderSelectedTags() {
-  document.getElementById('selected-tags').innerHTML = [...selectedTags].map(t => {
+function refreshSelTags() {
+  document.getElementById('sel-tags').innerHTML = [...selected].map(t => {
     const cat = t.split('-')[0].toUpperCase();
     const cfg = CATS[cat] || {bg:'#333',color:'#888'};
-    return `<span class="sel-tag" style="background:${cfg.bg};color:#fff">
-      ${t} <span class="x" onclick="removeTag('${t}')">×</span>
-    </span>`;
+    return `<span class="sel-tag" style="background:${cfg.bg};color:#fff">${t} <span class="x" onclick="untag('${t}')">×</span></span>`;
   }).join('');
 }
 
-function updateProgress() {
-  const remaining = queue.length - currentIdx;
-  const done = alreadyTagged + currentIdx;
-  const pct = totalItems ? Math.round(done / totalItems * 100) : 0;
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-label').textContent =
-    `${remaining} to tag · ${done} of ${totalItems} done (${pct}%)`;
+function refreshProgress() {
+  const done = preTagged + idx;
+  const pct = totalAll ? Math.round(done/totalAll*100) : 0;
+  document.getElementById('pfill').style.width = pct+'%';
+  document.getElementById('plabel').textContent =
+    `${queue.length - idx} to tag · ${done}/${totalAll} done (${pct}%)`;
 }
 
-function updateButtons() {
-  document.getElementById('btn-save').disabled = selectedTags.size === 0;
+function refreshBtns() {
+  document.getElementById('btn-save').disabled = selected.size === 0;
   document.getElementById('btn-back').disabled = history.length === 0;
 }
 
-// ── Tag toggling ──────────────────────────────────────────────────
-function toggleTag(tag, btn, bg, color) {
-  if (selectedTags.has(tag)) {
-    selectedTags.delete(tag);
-    btn.classList.remove('selected');
-    btn.style.cssText = '';
+// ── Tag toggle ────────────────────────────────────────────────────
+function toggle(tag, btn, bg, color) {
+  if (selected.has(tag)) {
+    selected.delete(tag);
+    btn.classList.remove('selected'); btn.style.cssText='';
   } else {
-    selectedTags.add(tag);
+    selected.add(tag);
     btn.classList.add('selected');
-    btn.style.background = bg;
-    btn.style.color = '#fff';
-    btn.style.borderColor = 'transparent';
+    btn.style.background=bg; btn.style.color='#fff'; btn.style.borderColor='transparent';
   }
-  renderSelectedTags();
-  updateButtons();
+  refreshSelTags(); refreshBtns();
 }
 
-function removeTag(tag) {
-  selectedTags.delete(tag);
+function untag(tag) {
+  selected.delete(tag);
   const btn = document.querySelector(`.tag-btn[data-tag="${tag}"]`);
-  if (btn) { btn.classList.remove('selected'); btn.style.cssText = ''; }
-  renderSelectedTags();
-  updateButtons();
+  if (btn) { btn.classList.remove('selected'); btn.style.cssText=''; }
+  refreshSelTags(); refreshBtns();
 }
 
 // ── Navigation ────────────────────────────────────────────────────
-function skip() {
-  history.push(currentIdx);
-  currentIdx++;
-  showCurrent();
-}
-
-function goBack() {
-  if (!history.length) return;
-  currentIdx = history.pop();
-  showCurrent();
-}
+function skip()   { history.push(idx); idx++; render(); }
+function goBack() { if (history.length) { idx = history.pop(); render(); } }
 
 // ── Save ──────────────────────────────────────────────────────────
 async function saveTags() {
-  if (!current || !selectedTags.size) return;
+  if (!current || !selected.size) return;
   const btn = document.getElementById('btn-save');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  btn.disabled=true; btn.textContent='Saving…';
 
-  const existingTags = (current.tags || []);
-  const newTags = [...new Set([...existingTags, ...selectedTags])];
-
+  const newTags = [...new Set([...(current.tags||[]), ...selected])];
   try {
-    let r;
-    if (IS_LOCAL) {
-      r = await fetch(`${SERVER}/api/eagle/update`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id: current.id, tags: newTags})
-      });
-    } else {
-      r = await fetch(`${EAGLE_API}/api/item/update`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id: current.id, tags: newTags})
-      });
-    }
-    const data = await r.json();
-    if (data.status === 'success') {
-      // Update local copy so Back works correctly
+    const r = await fetch(`${EAGLE}/api/item/update`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id:current.id, tags:newTags})
+    });
+    const d = await r.json();
+    if (d.status === 'success') {
       current.tags = newTags;
-      history.push(currentIdx);
-      currentIdx++;
-      triggerSync();
-      showToast(`✅ ${selectedTags.size} tags saved · syncing…`);
-      showCurrent();
-    } else {
-      throw new Error(JSON.stringify(data));
-    }
+      history.push(idx); idx++;
+      toast(`✅ ${selected.size} tag${selected.size>1?'s':''} saved`);
+      // Also push to website in background via server if available
+      fetch('http://localhost:3000/api/sync').catch(()=>{});
+      render();
+    } else { throw new Error(JSON.stringify(d)); }
   } catch(e) {
-    showToast('❌ Error: ' + e.message);
-  } finally {
-    btn.textContent = 'Save tags';
-    updateButtons();
-  }
+    toast(`❌ ${e.message.includes('fetch') ? 'Open via tagger.command, not the .html file' : e.message}`);
+  } finally { btn.textContent='Save tags'; refreshBtns(); }
 }
 
-async function triggerSync() {
-  if (!IS_LOCAL) return;
-  try { await fetch(`${SERVER}/api/sync`); } catch {}
-}
-
-// ── Toast ─────────────────────────────────────────────────────────
-function showToast(msg) {
+function toast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3000);
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 3000);
 }
 
-// ── Keyboard ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.repeat) saveTags();
-  if (e.key === 'ArrowRight' && !e.repeat) skip();
-  if (e.key === 'ArrowLeft' && !e.repeat) goBack();
+  if (e.target.tagName==='INPUT') return;
+  if (e.key==='Enter') saveTags();
+  if (e.key==='ArrowRight') skip();
+  if (e.key==='ArrowLeft') goBack();
 });
 
-// ── Init ──────────────────────────────────────────────────────────
-buildTagPanel();
+buildPanel();
 loadItems();
 </script>
 </body>
