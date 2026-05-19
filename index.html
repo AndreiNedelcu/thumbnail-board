@@ -318,6 +318,94 @@
   .related-card img { width:100%; height:100%; object-fit:cover; display:block; }
 
   /* ── TOAST ── */
+  /* ── EDIT TAGS PANEL (slides from right inside lightbox) ─────── */
+  #lb-edit-panel {
+    position:fixed; top:0; right:-460px; bottom:0; width:440px; z-index:300;
+    background:var(--surface); border-left:1px solid var(--border);
+    box-shadow:-12px 0 40px rgba(0,0,0,0.4);
+    transition:right .25s ease;
+    display:flex; flex-direction:column;
+    font-family:'Inter',sans-serif;
+  }
+  #lb-edit-panel.open { right:0; }
+  .lep-head {
+    flex-shrink:0; padding:18px 20px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .lep-head h3 { font-size:14px; font-weight:800; letter-spacing:1.2px; color:var(--text-bright); }
+  .lep-head h3 span { background:var(--brand-grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .lep-close { background:none; border:none; color:var(--muted); cursor:pointer; padding:4px; display:flex; }
+  .lep-close:hover { color:var(--text-bright); }
+  .lep-body { flex:1; overflow-y:auto; padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+  .lep-section-head { font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; }
+  .lep-current {
+    background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    padding:12px; min-height:40px;
+    display:flex; flex-wrap:wrap; gap:6px; align-items:flex-start;
+  }
+  .lep-current:empty::before { content:'no tags yet'; color:var(--muted); font-size:12px; }
+  .lep-chip {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 11px; border-radius:14px; font-size:12px; font-weight:600;
+    color:var(--text-bright); border:1px solid transparent;
+  }
+  .lep-chip .dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+  .lep-chip .x { cursor:pointer; opacity:.6; font-size:14px; line-height:1; margin-left:2px;
+                  width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center; }
+  .lep-chip .x:hover { opacity:1; }
+  .lep-search {
+    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    color:var(--text-bright); font-family:inherit; font-size:13px; padding:10px 14px; outline:none;
+  }
+  .lep-search:focus { border-color:var(--mint); box-shadow:0 0 0 3px rgba(58,236,186,0.08); }
+  .lep-newrow {
+    display:flex; gap:5px;
+    padding:10px; background:var(--surface2); border:1px dashed var(--border-hover); border-radius:10px;
+  }
+  .lep-newcat {
+    background:var(--surface3); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-bright); font-family:inherit; font-size:11px; font-weight:600;
+    padding:6px 8px; outline:none; cursor:pointer; min-width:90px;
+  }
+  .lep-newsub {
+    flex:1; background:var(--surface3); border:1px solid var(--border); border-radius:7px;
+    color:var(--text-bright); font-family:inherit; font-size:11px; padding:6px 10px; outline:none; min-width:0;
+  }
+  .lep-newadd {
+    padding:6px 12px; border:none; border-radius:7px; background:var(--brand-grad); color:#0d1117;
+    font-family:inherit; font-size:11px; font-weight:700; cursor:pointer;
+  }
+  .lep-sections { display:flex; flex-direction:column; gap:12px; }
+  .lep-cat { display:flex; flex-direction:column; gap:6px; }
+  .lep-cat-head { display:flex; align-items:center; gap:7px; font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); }
+  .lep-cat-head .dot { width:6px; height:6px; border-radius:50%; }
+  .lep-cat-head .count { opacity:.5; font-weight:600; }
+  .lep-cat-grid { display:flex; flex-wrap:wrap; gap:4px; }
+  .lep-sug {
+    padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600;
+    background:var(--surface3); color:var(--text); border:1px solid transparent;
+    cursor:pointer; transition:all .12s;
+  }
+  .lep-sug:hover { color:var(--text-bright); border-color:var(--border-hover); }
+  .lep-sug.custom { color:var(--mint); border-color:rgba(58,236,186,.25); }
+  .lep-foot {
+    flex-shrink:0; padding:14px 20px; border-top:1px solid var(--border);
+    display:flex; gap:10px;
+  }
+  .lep-cancel {
+    flex:1; padding:11px; border-radius:10px;
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
+    font-family:inherit; font-size:13px; font-weight:600; cursor:pointer;
+  }
+  .lep-cancel:hover { color:var(--text-bright); background:var(--surface3); }
+  .lep-save {
+    flex:1; padding:11px; border-radius:10px;
+    background:var(--brand-grad); color:#0d1117; border:none;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .lep-save:hover { box-shadow:0 6px 20px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .lep-save:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
+
   #toast {
     position:fixed; bottom:32px; left:50%; z-index:999;
     transform:translateX(-50%) translateY(16px);
@@ -468,6 +556,39 @@
         <div class="related-grid" id="lb-related"></div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Edit Tags side panel (slides from right) -->
+<div id="lb-edit-panel">
+  <div class="lep-head">
+    <h3>EDIT<span>TAGS</span></h3>
+    <button class="lep-close" onclick="closeEditPanel()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+  </div>
+  <div class="lep-body">
+    <div>
+      <div class="lep-section-head">Current tags · click × to remove</div>
+      <div class="lep-current" id="lep-tags"></div>
+    </div>
+    <div>
+      <div class="lep-section-head">Search to add</div>
+      <input class="lep-search" id="lep-search" placeholder="e.g. happy, colorful, celebrity" autocomplete="off" data-1p-ignore data-lpignore="true">
+    </div>
+    <div>
+      <div class="lep-section-head">Create new tag</div>
+      <div class="lep-newrow">
+        <select class="lep-newcat" id="lep-newcat"></select>
+        <input class="lep-newsub" id="lep-newsub" placeholder="custom subtag" autocomplete="off" data-1p-ignore>
+        <button class="lep-newadd" onclick="lepCreateCustom()">+</button>
+      </div>
+    </div>
+    <div class="lep-sections" id="lep-sections"></div>
+  </div>
+  <div class="lep-foot">
+    <button class="lep-cancel" onclick="closeEditPanel()">Cancel</button>
+    <button class="lep-save" id="lep-save" onclick="saveEditPanel()">Save</button>
   </div>
 </div>
 
@@ -795,6 +916,7 @@ function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
   document.body.style.overflow = '';
   lbHistory = []; // clear history on close
+  closeEditPanel();
 }
 
 function navigate(dir) {
@@ -837,11 +959,8 @@ function renderLightbox() {
   copyBtn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy image`;
   copyBtn.onclick = () => copyImage(v.id, copyBtn);
 
-  // Edit tags button — opens tagger at this specific video
-  document.getElementById('lb-tagger').onclick = () => {
-    const param = v.eid ? `eid=${v.eid}` : `vid=${v.id}`;
-    window.open(`tagger.html?${param}`, '_blank');
-  };
+  // Edit tags button — slides the inline edit panel from the right
+  document.getElementById('lb-tagger').onclick = () => openEditPanel(v);
 
   // Delete button
   document.getElementById('lb-delete').onclick = () => showDeleteConfirm(v.id, v.title || v.id);
@@ -1070,6 +1189,199 @@ async function saveLbTags(v, newTags) {
   }
   applyFilters();
 }
+
+// ── Edit Tags side panel (inline replacement for tagger.html) ─────
+let _editTargetVideo = null;
+let _editTags = [];
+
+// CUSTOM tag store for the panel, persisted to localStorage
+const LEP_CUSTOM = {};
+Object.keys(CATS).forEach(c => LEP_CUSTOM[c] = new Set());
+
+function lepLoadCustomFromLocalStorage() {
+  try {
+    const raw = localStorage.getItem('tb-lep-custom-tags');
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    for (const [cat, subs] of Object.entries(obj)) {
+      if (!CATS[cat] || !Array.isArray(subs)) continue;
+      for (const s of subs) LEP_CUSTOM[cat].add(s);
+    }
+  } catch {}
+}
+function lepSaveCustom() {
+  const obj = {};
+  for (const [cat, set] of Object.entries(LEP_CUSTOM)) if (set.size) obj[cat] = [...set];
+  try { localStorage.setItem('tb-lep-custom-tags', JSON.stringify(obj)); } catch {}
+}
+function lepDiscoverFromBoard() {
+  // Also pick up custom tags already present in the board
+  for (const v of allVideos) {
+    for (const t of (v.tags || [])) {
+      const dash = t.indexOf('-');
+      if (dash < 1) continue;
+      const cat = t.slice(0, dash).toUpperCase();
+      const sub = t.slice(dash + 1);
+      if (!CATS[cat]) continue;
+      if (!CATS[cat].subs.includes(sub) && !LEP_CUSTOM[cat].has(sub)) {
+        LEP_CUSTOM[cat].add(sub);
+      }
+    }
+  }
+}
+
+function lepCatsMerged() {
+  // CATS subs are stored as "category-subtag" already in this file's CATS
+  // So we build a fresh map cat → {color, subs:[plainSubtag strings], official:Set}
+  const out = {};
+  for (const [cat, cfg] of Object.entries(CATS)) {
+    const official = new Set();
+    const subs = [];
+    for (const fullTag of cfg.subs) {
+      const dash = fullTag.indexOf('-');
+      const sub = dash > 0 ? fullTag.slice(dash + 1) : fullTag;
+      official.add(sub); subs.push(sub);
+    }
+    for (const sub of LEP_CUSTOM[cat]) if (!subs.includes(sub)) subs.push(sub);
+    out[cat] = { color: cfg.color, subs, official };
+  }
+  return out;
+}
+
+function openEditPanel(video) {
+  if (!video) return;
+  lepLoadCustomFromLocalStorage();
+  lepDiscoverFromBoard();
+  _editTargetVideo = video;
+  _editTags = [...(video.tags || [])];
+  // Fill the category dropdown
+  const sel = document.getElementById('lep-newcat');
+  sel.innerHTML = Object.keys(CATS).map(c => `<option value="${c}">${c}</option>`).join('');
+  document.getElementById('lep-search').value = '';
+  lepRenderCurrent();
+  lepRenderSections('');
+  document.getElementById('lb-edit-panel').classList.add('open');
+}
+
+function closeEditPanel() {
+  document.getElementById('lb-edit-panel').classList.remove('open');
+  _editTargetVideo = null;
+  _editTags = [];
+}
+
+function lepColor(tag) {
+  const dash = tag.indexOf('-');
+  if (dash < 1) return '#333';
+  const cat = tag.slice(0, dash).toUpperCase();
+  return (CATS[cat] && CATS[cat].color) || '#333';
+}
+
+function lepRenderCurrent() {
+  document.getElementById('lep-tags').innerHTML = _editTags.map(t => {
+    const c = lepColor(t);
+    return `<span class="lep-chip" style="background:${c}22;border-color:${c}66">
+      <span class="dot" style="background:${c}"></span>${esc(t)}
+      <span class="x" onclick="lepRemove('${esc(t)}')">×</span>
+    </span>`;
+  }).join('');
+}
+
+function lepRemove(tag) {
+  _editTags = _editTags.filter(t => t !== tag);
+  lepRenderCurrent();
+  lepRenderSections(document.getElementById('lep-search').value);
+}
+
+function lepAdd(tag) {
+  if (!_editTags.includes(tag)) _editTags.push(tag);
+  lepRenderCurrent();
+  lepRenderSections(document.getElementById('lep-search').value);
+}
+
+function lepRenderSections(q) {
+  const cur = new Set(_editTags);
+  const ql = (q || '').toLowerCase().trim();
+  const data = lepCatsMerged();
+  const html = [];
+  for (const [cat, info] of Object.entries(data)) {
+    const visible = info.subs.filter(sub => {
+      const full = `${cat.toLowerCase()}-${sub}`;
+      if (cur.has(full)) return false;
+      if (!ql) return true;
+      return sub.includes(ql) || full.includes(ql) || cat.toLowerCase().includes(ql);
+    });
+    if (!visible.length) continue;
+    html.push(`
+      <div class="lep-cat">
+        <div class="lep-cat-head">
+          <span class="dot" style="background:${info.color}"></span>${cat}
+          <span class="count">${visible.length}</span>
+        </div>
+        <div class="lep-cat-grid">
+          ${visible.map(sub => {
+            const full = `${cat.toLowerCase()}-${sub}`;
+            const isCustom = !info.official.has(sub);
+            return `<span class="lep-sug${isCustom ? ' custom' : ''}" onclick="lepAdd('${esc(full)}')">${esc(sub)}</span>`;
+          }).join('')}
+        </div>
+      </div>`);
+  }
+  document.getElementById('lep-sections').innerHTML = html.join('') ||
+    `<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">No matches — create one above</div>`;
+}
+
+function lepCreateCustom() {
+  const cat = document.getElementById('lep-newcat').value;
+  const raw = document.getElementById('lep-newsub').value.trim();
+  if (!raw) return;
+  const sub = raw.toLowerCase().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
+  if (!sub) { showToast('Invalid tag name', 'error'); return; }
+  LEP_CUSTOM[cat].add(sub);
+  lepSaveCustom();
+  const full = `${cat.toLowerCase()}-${sub}`;
+  lepAdd(full);
+  document.getElementById('lep-newsub').value = '';
+  showToast(`Created ${full}`, 'success');
+}
+
+async function saveEditPanel() {
+  if (!_editTargetVideo) return;
+  const v = _editTargetVideo;
+  const btn = document.getElementById('lep-save');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await TBApi.fetch('/api/update', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: v.eid || v.id, vid: v.id, tags: _editTags,
+        name: v.title, channel: v.channel || '', views: v.views || ''
+      })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      // Update in-memory + lightbox
+      v.tags = [..._editTags];
+      renderLbTags(v);
+      applyFilters();
+      showToast('Tags updated', 'success');
+      closeEditPanel();
+    } else {
+      showToast(d.msg || 'Update failed', 'error');
+    }
+  } catch (e) {
+    showToast(e.message || 'Error', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+// Wire search box + Enter on custom subtag
+document.addEventListener('DOMContentLoaded', () => {
+  const s = document.getElementById('lep-search');
+  if (s) s.addEventListener('input', e => lepRenderSections(e.target.value));
+  const ns = document.getElementById('lep-newsub');
+  if (ns) ns.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lepCreateCustom(); } });
+});
 
 // ── Publish ───────────────────────────────────────────────────────
 // Manual publish button removed — auto-publish runs on every add/update.
