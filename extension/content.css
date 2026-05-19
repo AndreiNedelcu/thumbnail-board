@@ -59,6 +59,61 @@
   box-shadow: 0 4px 16px rgba(233, 69, 96, .35);
 }
 
+/* ── Per-card hover save button (home / search / feed) ── */
+.tb-card-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 50;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #0d1117;
+  background: linear-gradient(135deg, #3aecba 0%, #524add 100%);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .15s, transform .15s, background .15s, box-shadow .15s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+  font-family: inherit;
+}
+/* Show on hover of any reasonable parent — covers all YT card variants */
+ytd-thumbnail:hover .tb-card-btn,
+ytd-rich-item-renderer:hover .tb-card-btn,
+ytd-video-renderer:hover .tb-card-btn,
+ytd-grid-video-renderer:hover .tb-card-btn,
+ytd-compact-video-renderer:hover .tb-card-btn {
+  opacity: 1;
+  transform: translateY(0);
+}
+.tb-card-btn:hover {
+  box-shadow: 0 6px 20px rgba(58, 236, 186, .35);
+  transform: translateY(0) scale(1.05);
+}
+.tb-card-btn[data-state="loading"] {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  cursor: progress;
+}
+.tb-card-btn[data-state="saved"] {
+  opacity: 1 !important;            /* always visible when already saved */
+  transform: translateY(0) !important;
+  background: rgba(58, 236, 186, .95);
+  color: #0d1117;
+  box-shadow: 0 4px 12px rgba(58, 236, 186, .35);
+}
+.tb-card-btn[data-state="saved"]:hover {
+  background: #3aecba;
+}
+.tb-card-btn[data-state="error"] {
+  background: #e94560;
+  color: #fff;
+}
+
 /* ── Toast ── */
 #tb-toast {
   position: fixed;
