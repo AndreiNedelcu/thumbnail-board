@@ -405,6 +405,19 @@ function updateCardBtnState(btn, isInBoard, state = null) {
 
 // ── Dropdown menu ─────────────────────────────────────────────────
 let _openMenu = null;
+let _hoverOpenTimer = null;
+let _hoverCloseTimer = null;
+
+function scheduleMenuClose(delay = 300) {
+  if (_hoverCloseTimer) clearTimeout(_hoverCloseTimer);
+  _hoverCloseTimer = setTimeout(() => {
+    _hoverCloseTimer = null;
+    closeMenu();
+  }, delay);
+}
+function cancelMenuClose() {
+  if (_hoverCloseTimer) { clearTimeout(_hoverCloseTimer); _hoverCloseTimer = null; }
+}
 
 function closeMenu() {
   if (_openMenu) { _openMenu.remove(); _openMenu = null; }
@@ -469,6 +482,9 @@ function openMenu(btn, info) {
     if (act === 'open')      window.open(`https://img.youtube.com/vi/${info.id}/maxresdefault.jpg`, '_blank');
     if (act === 'delete')    await removeFromBoard(btn, info);
   });
+  // Keep open while the mouse is over the menu; close once it leaves.
+  menu.addEventListener('mouseenter', cancelMenuClose);
+  menu.addEventListener('mouseleave', () => scheduleMenuClose());
   setTimeout(() => {
     document.addEventListener('click', _onDocClickClose, true);
     document.addEventListener('scroll', closeMenu, true);
@@ -680,14 +696,36 @@ function injectIntoYTControls(ytContainer) {
   btn.dataset.vid = vid;
   btn.title = 'Save to board';
   updateCardBtnState(btn, savedVideoIds.has(vid));
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+
+  const openForThisBtn = () => {
     if (btn.dataset.state === 'loading') return;
     const info = getCardInfo(card) || { id: vid, title: '', channel: '', views: '' };
     info.id = vid;
     openMenu(btn, info);
+  };
+
+  // Hover-to-open: small delay to avoid accidental triggers on quick mouse-overs
+  btn.addEventListener('mouseenter', () => {
+    cancelMenuClose();
+    if (_hoverOpenTimer) clearTimeout(_hoverOpenTimer);
+    if (_openMenu && _openMenu.dataset.forVid === vid) return;
+    _hoverOpenTimer = setTimeout(() => {
+      _hoverOpenTimer = null;
+      openForThisBtn();
+    }, 120);
   });
+  btn.addEventListener('mouseleave', () => {
+    if (_hoverOpenTimer) { clearTimeout(_hoverOpenTimer); _hoverOpenTimer = null; }
+    scheduleMenuClose();
+  });
+  // Click still works as a fallback (touch / keyboard)
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (_hoverOpenTimer) { clearTimeout(_hoverOpenTimer); _hoverOpenTimer = null; }
+    openForThisBtn();
+  });
+
   ytContainer.appendChild(btn);
 }
 
