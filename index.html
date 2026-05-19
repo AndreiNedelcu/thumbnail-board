@@ -169,7 +169,7 @@
   }
   .related-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 8px;
   }
   .related-card {
@@ -205,6 +205,7 @@
       <input id="search" type="text" placeholder="Search by tag, title or channel…" autocomplete="off">
     </div>
     <div class="stats" id="stats"></div>
+    <div id="eagle-status" style="display:none; font-size:12px; color:#ff6b35; white-space:nowrap;">🦅 Eagle live</div>
   </div>
   <div class="filters" id="filters"></div>
 </header>
@@ -415,14 +416,14 @@ function renderLightbox() {
       onclick="filterByTag('${esc(t)}')">${esc(t)}</span>`;
   }).join('');
 
-  // Related (shared tags score)
+  // Related — sorted by shared tag count descending, show 20
   const tagSet = new Set(v.tags);
   const related = allVideos
     .filter(r => r.id !== v.id)
     .map(r => ({ v: r, score: r.tags.filter(t => tagSet.has(t)).length }))
     .filter(x => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 12);
+    .sort((a, b) => b.score - a.score || a.v.title.localeCompare(b.v.title))
+    .slice(0, 20);
 
   document.getElementById('lb-related').innerHTML = related.map((x, i) => `
     <div class="related-card" onclick="jumpToRelated('${x.v.id}')">
@@ -502,25 +503,28 @@ async function copyImage(videoId, btn) {
 }
 
 // ── Open in Eagle ────────────────────────────────────────────────
+const IS_LOCAL = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
 async function openInEagle(videoId) {
-  // Only works when Eagle is running locally
-  try {
-    const res = await fetch(`http://localhost:41595/api/item/list?limit=5&keyword=${videoId}`, {
-      signal: AbortSignal.timeout(3000)
-    });
-    const data = await res.json();
-    const item = data.data?.[0];
-    if (item?.id) {
-      // Try Eagle URL scheme to open the item
-      window.location.href = `eagle://item/open?id=${item.id}`;
-      showToast('Opening in Eagle…');
-    } else {
-      showToast('Not found in Eagle library');
+  if (IS_LOCAL) {
+    // Use local server proxy — no CORS issues
+    try {
+      const res = await fetch(`/api/eagle/open?videoId=${videoId}`, {
+        signal: AbortSignal.timeout(4000)
+      });
+      const data = await res.json();
+      if (data.ok && data.eagle_id) {
+        window.location.href = `eagle://item/open?id=${data.eagle_id}`;
+        showToast('Opening in Eagle…');
+      } else {
+        showToast(data.msg || 'Not found in Eagle');
+      }
+    } catch(e) {
+      showToast('Server not responding — is server.py running?');
     }
-  } catch(e) {
-    // Eagle API not reachable (probably on GitHub Pages)
-    // Fall back: open Eagle and copy the ID
-    showToast('Eagle not reachable — search for "' + videoId + '" manually');
+  } else {
+    // On GitHub Pages: can't reach localhost
+    showToast('Eagle only works in local mode — run server.py');
   }
 }
 
@@ -551,7 +555,24 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') navigate(1);
 });
 
+// Show Eagle indicator + use live data if local
+async function checkEagleStatus() {
+  if (!IS_LOCAL) return;
+  try {
+    const res = await fetch('/api/eagle/status', { signal: AbortSignal.timeout(2000) });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('eagle-status').style.display = '';
+      // Reload live data from server
+      const r2 = await fetch('/api/data');
+      allVideos = await r2.json();
+      applyFilters();
+    }
+  } catch(e) {}
+}
+
 init();
+checkEagleStatus();
 </script>
 </body>
 </html>
