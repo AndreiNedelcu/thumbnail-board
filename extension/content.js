@@ -235,8 +235,7 @@ async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
   const info = getVideoInfo();
   if (!info || !info.id) {
-    showToast('❌ No video ID detected — try refreshing the page (F5)');
-    console.warn('[ThumbnailBoard] getVideoId failed. URL:', location.href);
+    showToast('❌ No ID. URL: ' + location.href.slice(0, 120) + ' | stored: ' + currentVideoId);
     return;
   }
   videoData = info;
