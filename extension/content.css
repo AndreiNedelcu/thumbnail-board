@@ -87,10 +87,18 @@
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
-/* Visibility is now controlled by the JS hover listener via .tb-show
-   class — CSS :hover is unreliable because YouTube swaps the thumbnail
-   for an inline preview iframe that breaks the hover chain. */
-.tb-card-btn.tb-show {
+/* Show on hover OR when JS adds .tb-show (e.g. while the dropdown
+   menu is open / a save is loading, so it doesn't blink off). */
+ytd-thumbnail:hover .tb-card-btn,
+ytd-rich-item-renderer:hover .tb-card-btn,
+ytd-video-renderer:hover .tb-card-btn,
+ytd-grid-video-renderer:hover .tb-card-btn,
+ytd-compact-video-renderer:hover .tb-card-btn,
+ytd-rich-grid-media:hover .tb-card-btn,
+yt-lockup-view-model:hover .tb-card-btn,
+ytm-rich-item-renderer:hover .tb-card-btn,
+.tb-card-btn.tb-show,
+.tb-card-btn:hover {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
