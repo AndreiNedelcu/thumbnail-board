@@ -146,28 +146,42 @@ def extract_vid_id(item):
         if m: return m.group(1)
     return None
 
-def build_new_from_eagle(items, existing_by_id):
-    """Build only NEW entries from Eagle items not already in data.json."""
-    result, seen_ids = [], set(existing_by_id.keys())
-    for item in items:
-        vid_id = extract_vid_id(item)
-        if not vid_id: continue
-        tags = canonicalize_tags(item.get("tags") or [])
-        if not tags: continue
-        if vid_id in seen_ids: continue
-        seen_ids.add(vid_id)
-        result.append({"id": vid_id, "title": item.get("name",""), "channel":"", "views":"",
-                        "tags": tags, "eid": item.get("id","")})
-    return result
+def sync_with_eagle(eagle_items, dataset):
+    """
+    Sync dataset with Eagle items:
+    - Items already in dataset with an eid: update tags from Eagle if changed
+    - Items in Eagle with a YouTube URL and tags but not in dataset: add them
+    Returns (updated_dataset, n_updated, n_added)
+    """
+    # Build lookup maps
+    by_vid_id = {v["id"]: v for v in dataset}
+    by_eid    = {v["eid"]: v for v in dataset if v.get("eid")}
 
-def merge_dataset(existing, new_items):
-    """Merge new Eagle items into existing dataset, preserving existing entries."""
-    combined = list(existing)
-    existing_ids = {v["id"] for v in existing}
-    for item in new_items:
-        if item["id"] not in existing_ids:
-            combined.append(item)
-    return combined
+    n_updated, n_added = 0, 0
+    seen_vids = set(by_vid_id.keys())
+
+    for item in eagle_items:
+        eagle_id = item.get("id", "")
+        eagle_tags = canonicalize_tags(item.get("tags") or [])
+
+        # ── Update existing entry by eid ──
+        if eagle_id and eagle_id in by_eid:
+            entry = by_eid[eagle_id]
+            if eagle_tags and set(eagle_tags) != set(entry.get("tags", [])):
+                entry["tags"] = eagle_tags
+                n_updated += 1
+            continue
+
+        # ── Add new entry ──
+        vid_id = extract_vid_id(item)
+        if not vid_id or not eagle_tags: continue
+        if vid_id in seen_vids: continue
+        seen_vids.add(vid_id)
+        dataset.append({"id": vid_id, "title": item.get("name",""), "channel":"", "views":"",
+                         "tags": eagle_tags, "eid": eagle_id})
+        n_added += 1
+
+    return dataset, n_updated, n_added
 
 # ── Auto-sync thread ──────────────────────────────────────────────
 
@@ -182,17 +196,12 @@ def load_dataset():
 def force_sync():
     global _dataset, _last_count
     try:
-        existing_by_id = {v["id"]: v for v in _dataset}
         items = get_all_eagle_items()
-        new_items = build_new_from_eagle(items, existing_by_id)
-        if new_items:
-            merged = merge_dataset(_dataset, new_items)
-            _dataset = merged
-            _last_count = len(merged)
-            DATA_FILE.write_text(json.dumps(merged, ensure_ascii=False, separators=(",",":")))
-            print(f"[sync] Force sync: added {len(new_items)} new → {len(merged)} total", flush=True)
-        else:
-            print(f"[sync] Force sync: no new items (total: {len(_dataset)})", flush=True)
+        dataset, n_updated, n_added = sync_with_eagle(items, list(_dataset))
+        _dataset = dataset
+        _last_count = len(dataset)
+        DATA_FILE.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",",":")))
+        print(f"[sync] Force sync: +{n_added} new, {n_updated} updated → {len(dataset)} total", flush=True)
     except Exception as e:
         print(f"[sync] Force sync error: {e}", flush=True)
 
@@ -200,15 +209,15 @@ def sync_loop():
     global _dataset, _last_count
     while True:
         try:
-            existing_by_id = {v["id"]: v for v in _dataset}
             items = get_all_eagle_items()
             new_items = build_new_from_eagle(items, existing_by_id)
-            if new_items:
-                merged = merge_dataset(_dataset, new_items)
-                _dataset = merged
-                _last_count = len(merged)
-                DATA_FILE.write_text(json.dumps(merged, ensure_ascii=False, separators=(",",":")))
-                print(f"[sync] Added {len(new_items)} new thumbnails → {len(merged)} total", flush=True)
+            items = get_all_eagle_items()
+            dataset, n_updated, n_added = sync_with_eagle(items, list(_dataset))
+            if n_updated or n_added:
+                _dataset = dataset
+                _last_count = len(dataset)
+                DATA_FILE.write_text(json.dumps(dataset, ensure_ascii=False, separators=(",",":")))
+                print(f"[sync] +{n_added} new, {n_updated} updated → {len(dataset)} total", flush=True)
         except Exception as e:
             print(f"[sync] Error: {e}", flush=True)
         time.sleep(SYNC_EVERY)
