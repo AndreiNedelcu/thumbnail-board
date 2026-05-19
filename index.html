@@ -51,6 +51,31 @@
   .broken-btn { display:none; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:transparent; border:1px solid #e9456044; color:#e94560; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s; }
   .broken-btn:hover { background:#e9456022; }
   .broken-btn.visible { display:flex; }
+
+  /* ── SELECT MODE ── */
+  .select-btn { display:flex; align-items:center; gap:5px; padding:5px 12px; border-radius:7px; background:var(--surface2); border:1px solid var(--border); color:var(--muted); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s; }
+  .select-btn:hover { color:var(--text); border-color:rgba(255,255,255,.2); }
+  .select-btn.active { background:#1a2a3a; border-color:#4fc3f7; color:#4fc3f7; }
+  .sel-delete-btn { display:none; align-items:center; gap:5px; padding:5px 14px; border-radius:7px; background:#e94560; border:none; color:#fff; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; transition:all .15s; }
+  .sel-delete-btn:hover { background:#c73050; }
+  .sel-delete-btn.visible { display:flex; }
+
+  /* Card selection state */
+  body.select-mode .card { cursor:default; }
+  body.select-mode .card:hover { transform:none; box-shadow:none; }
+  body.select-mode .card:hover .card-overlay { opacity:0; }
+  .card .sel-check {
+    display:none; position:absolute; top:8px; right:8px; z-index:4;
+    width:22px; height:22px; border-radius:50%; background:rgba(0,0,0,.55);
+    border:2px solid rgba(255,255,255,.5); align-items:center; justify-content:center;
+    transition:all .15s;
+  }
+  body.select-mode .card .sel-check { display:flex; }
+  body.select-mode .card:hover .sel-check { border-color:#fff; background:rgba(0,0,0,.7); }
+  .card.selected .sel-check { background:#4fc3f7; border-color:#4fc3f7; }
+  .card.selected .sel-check::after { content:'✓'; color:#fff; font-size:13px; font-weight:800; line-height:1; }
+  .card.selected { outline:2px solid #4fc3f7; }
+  body.select-mode .card:hover { outline:1px solid rgba(255,255,255,.3); }
   .size-wrap { display:flex; align-items:center; gap:7px; }
   .size-wrap svg { color:var(--muted); flex-shrink:0; }
   #size-slider { -webkit-appearance:none; appearance:none; width:80px; height:3px; background:var(--surface3); border-radius:2px; outline:none; cursor:pointer; }
@@ -203,6 +228,8 @@
       <input id="size-slider" type="range" min="160" max="480" value="260" oninput="setCardSize(this.value)">
     </div>
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">🗑 Delete unavailable</button>
+    <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">☐ Select</button>
+    <button class="sel-delete-btn" id="sel-delete-btn" onclick="deleteSelected()">🗑 Delete <span id="sel-count">0</span></button>
     <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">🏷 Tagger</a>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
@@ -488,7 +515,8 @@ function renderGrid() {
   empty.style.display = 'none';
 
   grid.innerHTML = visibleVideos.map((v, i) => `
-    <div class="card" onclick="openLightbox(${i})">
+    <div class="card${selectedIds.has(v.id) ? ' selected' : ''}" onclick="handleCardClick(event,${i},'${v.id}')">
+      <div class="sel-check"></div>
       <img loading="lazy"
         src="https://img.youtube.com/vi/${v.id}/maxresdefault.jpg"
         onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${v.id}/mqdefault.jpg';this.parentElement.classList.add('broken')"
@@ -752,6 +780,77 @@ async function saveLbTags(v, newTags) {
     showToast('⚠️ Saved locally — start tagger.command to sync to Eagle');
   }
   applyFilters(); // re-render grid in background
+}
+
+// ── Select mode ───────────────────────────────────────────────────
+let selectMode = false;
+let selectedIds = new Set();
+
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedIds.clear();
+  document.body.classList.toggle('select-mode', selectMode);
+  const btn = document.getElementById('select-btn');
+  btn.classList.toggle('active', selectMode);
+  btn.textContent = selectMode ? '✕ Cancel' : '☐ Select';
+  updateSelBar();
+  renderGrid();
+}
+
+function handleCardClick(e, index, videoId) {
+  if (selectMode) {
+    toggleCardSelect(videoId);
+  } else {
+    openLightbox(index);
+  }
+}
+
+function toggleCardSelect(videoId) {
+  if (selectedIds.has(videoId)) {
+    selectedIds.delete(videoId);
+  } else {
+    selectedIds.add(videoId);
+  }
+  // Toggle .selected on the card element directly (no full re-render)
+  const cards = document.querySelectorAll('.card');
+  cards.forEach(card => {
+    const vid = visibleVideos[Array.from(cards).indexOf(card)]?.id;
+    if (vid) card.classList.toggle('selected', selectedIds.has(vid));
+  });
+  updateSelBar();
+}
+
+function updateSelBar() {
+  const btn = document.getElementById('sel-delete-btn');
+  const count = selectedIds.size;
+  document.getElementById('sel-count').textContent = count;
+  btn.classList.toggle('visible', selectMode && count > 0);
+}
+
+async function deleteSelected() {
+  if (!selectedIds.size) return;
+  const ids = [...selectedIds];
+  if (!confirm(`Delete ${ids.length} selected thumbnail${ids.length > 1 ? 's' : ''}?`)) return;
+  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      const r = await fetch(`${apiBase}/api/delete`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const d = await r.json();
+      if (d.ok || (d.msg && d.msg.includes('not found'))) {
+        const i = allVideos.findIndex(v => v.id === id);
+        if (i !== -1) allVideos.splice(i, 1);
+        deleted++;
+      }
+    } catch {}
+  }
+  selectedIds.clear();
+  toggleSelectMode(); // exit select mode
+  applyFilters();
+  showToast(`🗑 Deleted ${deleted} thumbnail${deleted !== 1 ? 's' : ''}`);
 }
 
 // ── Delete ────────────────────────────────────────────────────────
