@@ -122,7 +122,8 @@
 <div id="toast"></div>
 
 <script>
-const EAGLE = 'http://localhost:41595';
+// All calls go through our local server proxy (avoids CORS issues with Eagle POST)
+const SERVER = '';  // same origin: http://localhost:3000
 const FOLDER = 'MPBRJ4DRT0IR0';
 
 const CATS = {
@@ -144,35 +145,24 @@ let queue = [], history = [], idx = 0, current = null;
 let selected = new Set();
 let totalAll = 0, preTagged = 0;
 
-// ── Load all items (paginated through all orderings) ──────────────
+// ── Load all items via server proxy (MCP → all 2006 items) ───────
 async function loadItems() {
   msg('Loading items from Eagle…');
-  const seen = new Set(), items = [];
   try {
-    for (const order of ['CREATEDATE','NAME','FILESIZE','MODIFYDATE','WIDTH','HEIGHT']) {
-      let offset = 0;
-      while (true) {
-        const r = await fetch(`${EAGLE}/api/item/list?folders[]=${FOLDER}&limit=200&offset=${offset}&orderBy=${order}`);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        const d = await r.json();
-        const batch = d.data || [];
-        if (!batch.length) break;
-        for (const b of batch) { if (!seen.has(b.id)) { seen.add(b.id); items.push(b); } }
-        if (batch.length < 200) break;
-        offset += 200;
-      }
-      msg(`Loaded ${items.length} items so far…`);
-    }
-  } catch(e) {
-    msg(`❌ Cannot reach Eagle (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
-    return;
-  }
+    const r = await fetch(`${SERVER}/api/eagle/all-items`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    const items = d.data || [];
+    msg(`Loaded ${items.length} items…`);
 
-  totalAll = items.length;
-  preTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
-  queue = items.filter(i => !(i.tags||[]).some(isOfficial));
-  idx = 0;
-  render();
+    totalAll = items.length;
+    preTagged = items.filter(i => (i.tags||[]).some(isOfficial)).length;
+    queue = items.filter(i => !(i.tags||[]).some(isOfficial));
+    idx = 0;
+    render();
+  } catch(e) {
+    msg(`❌ Cannot reach server (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
+  }
 }
 
 function msg(t) { document.getElementById('load-msg').textContent = t; }
@@ -309,21 +299,23 @@ async function saveTags() {
 
   const newTags = [...new Set([...(current.tags||[]), ...selected])];
   try {
-    const r = await fetch(`${EAGLE}/api/item/update`, {
+    const r = await fetch(`${SERVER}/api/eagle/update`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({id:current.id, tags:newTags})
     });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     if (d.status === 'success') {
       current.tags = newTags;
       history.push(idx); idx++;
       toast(`✅ ${selected.size} tag${selected.size>1?'s':''} saved`);
-      // Also push to website in background via server if available
-      fetch('http://localhost:3000/api/sync').catch(()=>{});
+      fetch(`${SERVER}/api/sync`).catch(()=>{});
       render();
-    } else { throw new Error(JSON.stringify(d)); }
+    } else { throw new Error(d.message || JSON.stringify(d)); }
   } catch(e) {
-    toast(`❌ ${e.message.includes('fetch') ? 'Open via tagger.command, not the .html file' : e.message}`);
+    const hint = (e.message.includes('fetch') || e.message.includes('Failed'))
+      ? 'Open via tagger.command, not the .html file' : e.message;
+    toast(`❌ ${hint}`);
   } finally { btn.textContent='Save tags'; refreshBtns(); }
 }
 
