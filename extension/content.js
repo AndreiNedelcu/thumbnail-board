@@ -64,8 +64,10 @@ function getVideoInfo() {
   const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
     || document.title.replace(' - YouTube','').trim();
   const channel = document.querySelector('ytd-channel-name yt-formatted-string a, #channel-name a')?.textContent?.trim() || '';
-  const viewsEl = document.querySelector('#info-strings yt-formatted-string, #info .yt-spec-button-shape-next ~ span');
-  const views = viewsEl?.textContent?.trim().replace(/\s*views?/i,'') || '';
+  // Find the element that actually contains a view count (number + "view"), not dates
+  const infoStrings = [...document.querySelectorAll('#info-strings yt-formatted-string, ytd-watch-info-text yt-formatted-string')];
+  const viewsEl = infoStrings.find(el => /[\d,\.KkMmBb]+\s*views?/i.test(el.textContent));
+  const views = viewsEl?.textContent?.trim().replace(/\s*views?/i,'').trim() || '';
   return { id, title, channel, views };
 }
 

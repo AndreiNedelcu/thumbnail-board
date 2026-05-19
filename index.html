@@ -166,6 +166,8 @@
   .lb-btn-copy  { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
   .lb-btn-copy:hover { background:var(--surface3); }
   .lb-btn-copy.copied { background:#1a3a1a; color:#4caf50; border-color:#4caf5055; }
+  .lb-btn-tagger { background:var(--surface2); color:var(--muted); border:1px solid var(--border); }
+  .lb-btn-tagger:hover { background:var(--surface3); color:var(--text); }
   .lb-btn-delete { background:transparent; color:#666; border:1px solid #333; margin-left:auto; }
   .lb-btn-delete:hover { background:#2a0a0a; color:#e94560; border-color:#e9456044; }
 
@@ -270,6 +272,10 @@
         <button class="lb-btn lb-btn-copy" id="lb-copy">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copy image
+        </button>
+        <button class="lb-btn lb-btn-tagger" id="lb-tagger">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+          Edit tags
         </button>
         <button class="lb-btn lb-btn-delete" id="lb-delete">
           <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
@@ -583,6 +589,12 @@ function renderLightbox() {
   copyBtn.className = 'lb-btn lb-btn-copy';
   copyBtn.innerHTML = `<svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy image`;
   copyBtn.onclick = () => copyImage(v.id, copyBtn);
+
+  // Edit tags button — opens tagger at this specific video
+  document.getElementById('lb-tagger').onclick = () => {
+    const param = v.eid ? `eid=${v.eid}` : `vid=${v.id}`;
+    window.open(`http://localhost:3000/tagger.html?${param}`, '_blank');
+  };
 
   // Delete button
   document.getElementById('lb-delete').onclick = () => showDeleteConfirm(v.id, v.title || v.id);

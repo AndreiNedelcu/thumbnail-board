@@ -379,6 +379,15 @@ class Handler(BaseHTTPRequestHandler):
                 "folderId": FOLDER_ID
             })
             eid = eagle_result.get("data","")
+            # Eagle's addFromURL doesn't return the item ID — search by website URL
+            if not eid:
+                import time; time.sleep(1)  # give Eagle a moment to index
+                try:
+                    search = eagle_get(f"/api/item/list?keyword={vid_id}&limit=5")
+                    for item in (search.get("data") or []):
+                        if vid_id in (item.get("website","") + item.get("annotation","")):
+                            eid = item.get("id",""); break
+                except: pass
             if not eid: eid = ""
             # Add to dataset
             entry = {"id": vid_id, "title": title, "channel": channel, "views": views, "tags": tags, "eid": eid}

@@ -193,8 +193,33 @@ async function loadItems() {
 
     totalAll = items.length;
     preTagged = items.filter(isDone).length;
-    queue = items.filter(i => !isDone(i));
-    idx = 0;
+
+    // Check if we were asked to jump to a specific item (?eid= or ?vid=)
+    const params = new URLSearchParams(location.search);
+    const jumpEid = params.get('eid');
+    const jumpVid = params.get('vid');
+
+    if (jumpEid || jumpVid) {
+      // Show ALL items (including already-tagged) so we can edit any item
+      queue = [...items];
+      const jumpIdx = items.findIndex(i => {
+        if (jumpEid && i.id === jumpEid) return true;
+        if (jumpVid) {
+          const m = (i.url||i.annotation||'').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+          return m && m[1] === jumpVid;
+        }
+        return false;
+      });
+      idx = jumpIdx >= 0 ? jumpIdx : 0;
+      // Pre-load existing tags into selection
+      if (idx >= 0 && queue[idx]) {
+        const item = queue[idx];
+        savedSelections[item.id] = new Set(item.tags || []);
+      }
+    } else {
+      queue = items.filter(i => !isDone(i));
+      idx = 0;
+    }
     render();
   } catch(e) {
     msg(`❌ Cannot reach server (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
