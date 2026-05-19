@@ -20,23 +20,24 @@ let videoData = { id:'', title:'', channel:'', views:'' };
 let panelOpen = false;
 
 function getVideoId() {
-  // Try location.href first
+  // Most reliable: URL parameter
   let m = location.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (m) return m[1];
-  // Fallback: canonical link tag (more reliable on SPA navigation)
+  // Fallback: document.URL (sometimes differs from location.href in content scripts)
+  m = document.URL.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  if (m) return m[1];
+  // Fallback: canonical link
   const canonical = document.querySelector('link[rel="canonical"]');
-  if (canonical) {
+  if (canonical?.href) {
     m = canonical.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
     if (m) return m[1];
   }
-  // Fallback: ytInitialData
-  try {
-    const scripts = document.querySelectorAll('script');
-    for (const s of scripts) {
-      const match = s.textContent.match(/"videoId":"([A-Za-z0-9_-]{11})"/);
-      if (match) return match[1];
-    }
-  } catch {}
+  // Fallback: og:url meta tag
+  const ogUrl = document.querySelector('meta[property="og:url"]');
+  if (ogUrl?.content) {
+    m = ogUrl.content.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (m) return m[1];
+  }
   return null;
 }
 
@@ -229,7 +230,12 @@ function refreshPreview() {
 
 async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
-  videoData = getVideoInfo() || videoData;
+  const info = getVideoInfo();
+  if (!info || !info.id) {
+    showToast('❌ Could not detect video ID — try refreshing the page');
+    return;
+  }
+  videoData = info;
   document.getElementById('tb-thumb').src = `https://img.youtube.com/vi/${videoData.id}/maxresdefault.jpg`;
   document.getElementById('tb-title').textContent = videoData.title;
   document.getElementById('tb-channel').textContent = videoData.channel;
@@ -280,31 +286,36 @@ function showToast(msg) {
   t._timer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
+function isWatchPage() {
+  return location.href.includes('youtube.com/watch');
+}
+
 function init() {
+  if (!isWatchPage()) return; // only run on video pages
   const id = getVideoId();
   if (!id) return;
-  if (document.getElementById('tb-btn')) {
-    const btn = document.getElementById('tb-btn');
-    btn.classList.remove('in-board');
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
-    checkInBoard(id).then(inBoard => {
-      if (inBoard) {
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
-        btn.classList.add('in-board');
-      }
-    });
-    return;
+
+  const existing = document.getElementById('tb-btn');
+  if (existing) {
+    // Already injected — just update state
+    existing.classList.remove('in-board');
+    existing.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
+    if (panelOpen) closePanel();
+  } else {
+    buildPanel();
   }
-  buildPanel();
+
   checkInBoard(id).then(inBoard => {
+    const btn = document.getElementById('tb-btn');
+    if (!btn) return;
     if (inBoard) {
-      const btn = document.getElementById('tb-btn');
       btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
       btn.classList.add('in-board');
     }
   });
 }
 
+// Handle SPA navigation via URL changes
 let lastUrl = location.href;
 new MutationObserver(() => {
   if (location.href !== lastUrl) {
@@ -312,5 +323,8 @@ new MutationObserver(() => {
     setTimeout(init, 1500);
   }
 }).observe(document.body, { childList: true, subtree: true });
+
+// Also listen for YouTube's custom navigation event
+document.addEventListener('yt-navigate-finish', () => setTimeout(init, 800));
 
 setTimeout(init, 1500);

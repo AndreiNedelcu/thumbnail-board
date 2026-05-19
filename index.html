@@ -781,7 +781,8 @@ async function confirmDelete() {
       body: JSON.stringify({ id: _deleteId })
     });
     const d = await r.json();
-    if (d.ok) {
+    if (d.ok || (d.msg && d.msg.includes('not found'))) {
+      // Remove from local array regardless — if server says not found, it's already gone
       const idx = videos.findIndex(v => v.id === _deleteId);
       if (idx !== -1) videos.splice(idx, 1);
       hideDeleteConfirm();

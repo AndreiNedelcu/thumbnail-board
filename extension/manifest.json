@@ -1,16 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Thumbnail Board",
-  "version": "1.0",
+  "version": "1.1",
   "description": "Save YouTube thumbnails to your Thumbnail Board with tags",
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://www.youtube.com/*",
     "http://localhost:3000/*"
   ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
-      "matches": ["https://www.youtube.com/watch*"],
+      "matches": ["https://www.youtube.com/*"],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
