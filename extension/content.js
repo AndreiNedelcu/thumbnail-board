@@ -18,6 +18,7 @@ const CATS = {
 let selected = new Set();
 let videoData = { id:'', title:'', channel:'', views:'' };
 let panelOpen = false;
+let currentVideoId = null; // set by init() when successfully detected
 
 function getVideoId() {
   // Most reliable: URL parameter
@@ -38,6 +39,8 @@ function getVideoId() {
     m = ogUrl.content.match(/[?&]v=([A-Za-z0-9_-]{11})/);
     if (m) return m[1];
   }
+  // Last resort: use ID stored when init() last ran successfully
+  if (currentVideoId) return currentVideoId;
   return null;
 }
 
@@ -294,13 +297,15 @@ function isWatchPage() {
 function init() {
   const existing = document.getElementById('tb-btn');
   if (!isWatchPage()) {
-    // Hide button when navigating away from a video page
+    // Hide button and clear state when navigating away from a video page
     if (existing) existing.style.display = 'none';
     if (panelOpen) closePanel();
+    currentVideoId = null;
     return;
   }
   const id = getVideoId();
   if (!id) return;
+  currentVideoId = id; // store for use in togglePanel()
 
   // Show button (it may have been hidden)
   if (existing) existing.style.display = '';
