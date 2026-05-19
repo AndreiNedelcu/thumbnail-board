@@ -212,6 +212,26 @@
   }
   .toolbar-spacer { flex:1; }
 
+  /* Sort segmented control */
+  .sort-group {
+    display:inline-flex; align-items:center;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; padding:3px;
+  }
+  .sort-btn {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:6px 11px; border:none; background:transparent;
+    color:var(--muted); font-family:inherit; font-size:12px; font-weight:600;
+    cursor:pointer; border-radius:7px;
+    transition:all .15s;
+  }
+  .sort-btn:hover { color:var(--text); }
+  .sort-btn.active {
+    background:var(--surface3); color:var(--text-bright);
+    box-shadow:0 1px 3px rgba(0,0,0,.25);
+  }
+  .sort-btn svg { width:13px; height:13px; }
+
   /* ── GRID ── */
   main { padding:0 0 60px; }
   #grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(var(--card-size,280px),1fr)); gap:18px; }
@@ -468,10 +488,24 @@
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       <input id="size-slider" type="range" min="160" max="480" value="280" oninput="setCardSize(this.value)">
     </div>
-    <button class="tagger-btn" id="shuffle-btn" onclick="shuffleVideos()" title="Randomise order">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
-      Shuffle
-    </button>
+    <div class="sort-group" id="sort-group">
+      <button class="sort-btn active" data-sort="default" onclick="setSort('default')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        Default
+      </button>
+      <button class="sort-btn" data-sort="recent" onclick="setSort('recent')" title="Most recently added first">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Recent
+      </button>
+      <button class="sort-btn" data-sort="views" onclick="setSort('views')" title="Most views first">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+        Views
+      </button>
+      <button class="sort-btn" data-sort="shuffle" onclick="setSort('shuffle')" title="Random order">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
+        Shuffle
+      </button>
+    </div>
     <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       Delete unavailable
@@ -618,6 +652,80 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 // ── State ─────────────────────────────────────────────────────────
 let allVideos = [], visibleVideos = [];
 let shuffleOrder = null; // when set, an array of video IDs in shuffled order
+let currentSort = 'default'; // 'default' | 'recent' | 'views' | 'shuffle'
+const STATE_KEY = 'tb-board-state';
+
+// ── Persistent state (sort + search + scroll position) ───────────
+function saveState() {
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({
+      sort: currentSort,
+      search: searchQuery,
+      scrollY: window.scrollY,
+    }));
+  } catch {}
+}
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
+    if (s.sort) currentSort = s.sort;
+    if (typeof s.search === 'string') searchQuery = s.search;
+    return s.scrollY || 0;
+  } catch { return 0; }
+}
+
+// ── View-count parsing (1.2M, 847K, 1,234 → number) ─────────────
+function parseViews(v) {
+  if (!v) return 0;
+  const s = String(v).trim().replace(/,/g, '');
+  const m = s.match(/^([\d.]+)\s*([KkMmBb]?)/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]);
+  if (!isFinite(n)) return 0;
+  const suf = m[2].toLowerCase();
+  if (suf === 'k') return n * 1_000;
+  if (suf === 'm') return n * 1_000_000;
+  if (suf === 'b') return n * 1_000_000_000;
+  return n;
+}
+
+// ── Sort a filtered array according to currentSort ──────────────
+function applySort(arr) {
+  if (currentSort === 'views') {
+    return [...arr].sort((a, b) => parseViews(b.views) - parseViews(a.views));
+  }
+  if (currentSort === 'recent') {
+    // Newer items get appended at the end of data.json — reverse for newest-first
+    const idx = new Map(allVideos.map((v, i) => [v.id, i]));
+    return [...arr].sort((a, b) => (idx.get(b.id) ?? 0) - (idx.get(a.id) ?? 0));
+  }
+  if (currentSort === 'shuffle' && shuffleOrder) {
+    const rank = new Map(shuffleOrder.map((id, i) => [id, i]));
+    return [...arr].sort((a, b) => (rank.get(a.id) ?? 1e9) - (rank.get(b.id) ?? 1e9));
+  }
+  // 'default' — original data.json order
+  return arr;
+}
+
+function setSort(name) {
+  currentSort = name;
+  if (name === 'shuffle' && !shuffleOrder) {
+    // Build a one-time shuffle order
+    const ids = allVideos.map(v => v.id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    shuffleOrder = ids;
+  }
+  // Update button visuals
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === name);
+  });
+  applyFilters();
+  window.scrollTo({ top: 0, behavior: 'instant' });
+  saveState();
+}
 let activeCategory = 'ALL';
 let activeSubcat = null;
 let searchQuery = '';
@@ -626,6 +734,9 @@ let expandedCat = null;
 
 // ── Init ──────────────────────────────────────────────────────────
 async function init() {
+  // Restore persisted state BEFORE fetching (so currentSort/searchQuery are set)
+  const savedScrollY = loadState();
+
   const res = await fetch('data.json?v=' + Date.now());
   allVideos = await res.json();
 
@@ -641,15 +752,45 @@ async function init() {
   });
 
   if (typeof updateAllTags === 'function') updateAllTags();
+
+  // Reflect restored state in the UI
+  if (searchQuery) {
+    document.getElementById('search').value = searchQuery;
+    document.getElementById('clear-search').style.display = '';
+    const mini = document.getElementById('mini-search');
+    if (mini) mini.value = searchQuery;
+  }
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === currentSort);
+  });
+  // If shuffle was the saved sort, generate an order
+  if (currentSort === 'shuffle' && !shuffleOrder) {
+    const ids = allVideos.map(v => v.id);
+    for (let i = ids.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [ids[i], ids[j]] = [ids[j], ids[i]];
+    }
+    shuffleOrder = ids;
+  }
+
   applyFilters();
+
+  // Restore scroll position after the grid has rendered + images allocated
+  if (savedScrollY > 0) {
+    // Wait a tick so layout is settled
+    setTimeout(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' }), 50);
+  }
 }
 
-// Show sticky mini-header when scrolled past hero
+// Show sticky mini-header when scrolled past hero + persist scrollY
+let _scrollSaveTimer = null;
 window.addEventListener('scroll', () => {
   const hero = document.querySelector('.hero');
   const mini = document.getElementById('mini-header');
-  if (!hero || !mini) return;
-  mini.classList.toggle('visible', hero.getBoundingClientRect().bottom < 0);
+  if (hero && mini) mini.classList.toggle('visible', hero.getBoundingClientRect().bottom < 0);
+  // Debounced save (~200ms after scroll stops)
+  if (_scrollSaveTimer) clearTimeout(_scrollSaveTimer);
+  _scrollSaveTimer = setTimeout(saveState, 200);
 });
 
 // Sync mini-search ↔ main search (both ways)
@@ -663,6 +804,7 @@ document.addEventListener('DOMContentLoaded', () => {
       searchQuery = v;
       document.getElementById('clear-search').style.display = v ? '' : 'none';
       applyFilters();
+      saveState();
     });
   }
 });
@@ -774,34 +916,21 @@ function applyFilters() {
     }
     return true;
   });
-  // Apply shuffle order if active
-  if (shuffleOrder) {
-    const rank = new Map(shuffleOrder.map((id, i) => [id, i]));
-    visibleVideos.sort((a, b) => {
-      const ra = rank.has(a.id) ? rank.get(a.id) : 1e9;
-      const rb = rank.has(b.id) ? rank.get(b.id) : 1e9;
-      return ra - rb;
-    });
-  }
+  visibleVideos = applySort(visibleVideos);
   renderGrid();
 }
 
-function shuffleVideos() {
-  // Fisher-Yates shuffle of all video IDs — persists across filters
-  const ids = allVideos.map(v => v.id);
-  for (let i = ids.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [ids[i], ids[j]] = [ids[j], ids[i]];
-  }
-  shuffleOrder = ids;
-  applyFilters();
-}
+// Kept for backwards compatibility — Shuffle is now one of the sort options
+function shuffleVideos() { setSort('shuffle'); }
 
 function clearSearch() {
   document.getElementById('search').value = '';
   searchQuery = '';
   document.getElementById('clear-search').style.display = 'none';
+  const mini = document.getElementById('mini-search');
+  if (mini) mini.value = '';
   applyFilters();
+  saveState();
 }
 
 // Track broken cards after images load
@@ -1089,6 +1218,7 @@ document.getElementById('search').addEventListener('input', e => {
   const mini = document.getElementById('mini-search');
   if (mini) mini.value = searchQuery;
   applyFilters();
+  saveState();
 });
 document.getElementById('lb-close').onclick = closeLightbox;
 document.getElementById('lb-prev').onclick = () => navigate(-1);
