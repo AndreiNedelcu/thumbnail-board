@@ -154,9 +154,22 @@
   .confirm-delete:disabled { opacity:.5; cursor:not-allowed; }
 
   .lb-tags-section h4, .lb-related h4 { font-size:11px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-bottom:10px; }
+  .lb-tags-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .lb-tags-header h4 { margin-bottom:0; }
+  .lb-add-tag-btn { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:2px 9px; font-size:11px; font-weight:600; cursor:pointer; transition:all .15s; }
+  .lb-add-tag-btn:hover { color:var(--text); border-color:rgba(255,255,255,.3); }
+  .lb-tag-search-wrap { display:none; margin-bottom:10px; position:relative; }
+  .lb-tag-search-wrap.open { display:block; }
+  .lb-tag-search { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; padding:7px 12px; outline:none; }
+  .lb-tag-search:focus { border-color:#7c4dff55; }
+  .lb-tag-suggestions { display:flex; flex-wrap:wrap; gap:5px; margin-top:7px; }
+  .lb-tag-sug { padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; cursor:pointer; background:var(--surface2); border:1px solid var(--border); color:var(--muted); transition:all .12s; }
+  .lb-tag-sug:hover { color:var(--text); border-color:rgba(255,255,255,.3); }
   .lb-tags { display:flex; flex-wrap:wrap; gap:6px; }
-  .lb-tag { padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; transition:opacity .15s; border:1px solid transparent; }
-  .lb-tag:hover { opacity:.72; }
+  .lb-tag { padding:4px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; transition:opacity .15s; border:1px solid transparent; display:flex; align-items:center; gap:5px; }
+  .lb-tag:hover { opacity:.8; }
+  .lb-tag-x { opacity:.6; font-size:13px; cursor:pointer; line-height:1; }
+  .lb-tag-x:hover { opacity:1; }
 
   .lb-divider { border:none; border-top:1px solid var(--border); margin:0 -24px; }
   .related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
@@ -230,7 +243,14 @@
         </button>
       </div>
       <div class="lb-tags-section">
-        <h4>Tags</h4>
+        <div class="lb-tags-header">
+          <h4>Tags</h4>
+          <button class="lb-add-tag-btn" onclick="toggleTagSearch()">+ add tag</button>
+        </div>
+        <div class="lb-tag-search-wrap" id="lb-tag-search-wrap">
+          <input class="lb-tag-search" id="lb-tag-search" placeholder="Search tags… e.g. colorful" autocomplete="off">
+          <div class="lb-tag-suggestions" id="lb-tag-suggestions"></div>
+        </div>
         <div class="lb-tags" id="lb-tags"></div>
       </div>
       <hr class="lb-divider">
@@ -494,12 +514,10 @@ function renderLightbox() {
   document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
   document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
 
-  // Tags
-  document.getElementById('lb-tags').innerHTML = v.tags.map(t => {
-    const c = tagStyle(t);
-    return `<span class="lb-tag" style="background:${c.bg};color:#fff;border-color:${c.color}44"
-      onclick="filterByTag('${esc(t)}')">${esc(t)}</span>`;
-  }).join('');
+  // Tags — close search if open
+  document.getElementById('lb-tag-search-wrap').classList.remove('open');
+  document.getElementById('lb-tag-search').value = '';
+  renderLbTags(v);
 
   // Related — sorted by shared tags count
   const tagSet = new Set(v.tags);
@@ -597,6 +615,95 @@ document.addEventListener('keydown', e => {
 });
 
 init();
+
+// ── Tag editing in lightbox ───────────────────────────────────────
+const ALL_TAGS = (() => {
+  const CATS = {
+    style:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'],
+    mood:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'],
+    text:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'],
+    element:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'],
+    camera:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'],
+    subject:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'],
+    formation:['flat-lay','line','grid','v'],
+    topic:['comparison','product-showcase','space','secret','social-media','size'],
+    callout:['magnifier'],
+    backdrop:['dark','light','blurry'],
+    channel:['theseniordev-main','theseniordev-podcast'],
+  };
+  return Object.entries(CATS).flatMap(([cat, subs]) => subs.map(s => `${cat}-${s}`));
+})();
+
+function renderLbTags(v) {
+  document.getElementById('lb-tags').innerHTML = (v.tags||[]).map(t => {
+    const c = tagStyle(t);
+    return `<span class="lb-tag" style="background:${c.bg};color:#fff;border-color:${c.color}44">
+      <span onclick="filterByTag('${esc(t)}')">${esc(t)}</span>
+      <span class="lb-tag-x" onclick="removeLbTag('${esc(t)}')">×</span>
+    </span>`;
+  }).join('');
+}
+
+function toggleTagSearch() {
+  const wrap = document.getElementById('lb-tag-search-wrap');
+  const inp = document.getElementById('lb-tag-search');
+  const open = wrap.classList.toggle('open');
+  if (open) { inp.focus(); updateTagSuggestions(''); }
+}
+
+function updateTagSuggestions(query) {
+  const v = videos[currentIndex];
+  const existing = new Set(v.tags||[]);
+  const q = query.toLowerCase();
+  const matches = ALL_TAGS.filter(t => !existing.has(t) && (!q || t.includes(q))).slice(0, 20);
+  // also allow custom tag if typed something not in list
+  const sugs = document.getElementById('lb-tag-suggestions');
+  sugs.innerHTML = matches.map(t => {
+    const c = tagStyle(t);
+    return `<span class="lb-tag-sug" onclick="addLbTag('${t}')" style="border-color:${c.color}44;color:${c.color}">${t}</span>`;
+  }).join('') + (q && !ALL_TAGS.includes(q) && !existing.has(q)
+    ? `<span class="lb-tag-sug" onclick="addLbTag('${q}')" style="border-color:#7c4dff44;color:#7c4dff">+ "${q}"</span>`
+    : '');
+}
+
+document.getElementById('lb-tag-search').addEventListener('input', e => updateTagSuggestions(e.target.value));
+document.getElementById('lb-tag-search').addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lb-tag-search-wrap').classList.remove('open');
+});
+
+async function addLbTag(tag) {
+  const v = videos[currentIndex];
+  if (!v || (v.tags||[]).includes(tag)) return;
+  const newTags = [...(v.tags||[]), tag];
+  await saveLbTags(v, newTags);
+  document.getElementById('lb-tag-search').value = '';
+  updateTagSuggestions('');
+}
+
+async function removeLbTag(tag) {
+  const v = videos[currentIndex];
+  if (!v) return;
+  const newTags = (v.tags||[]).filter(t => t !== tag);
+  await saveLbTags(v, newTags);
+}
+
+async function saveLbTags(v, newTags) {
+  v.tags = newTags;
+  renderLbTags(v);
+  try {
+    // Update Eagle if we have an eid
+    if (v.eid) {
+      await fetch('http://localhost:3000/api/eagle/update', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id: v.eid, tags: newTags})
+      });
+    }
+    showToast('✅ Tags updated');
+  } catch(e) {
+    showToast('⚠️ Saved locally — start tagger.command to sync to Eagle');
+  }
+  applyFilters(); // re-render grid in background
+}
 
 // ── Delete ────────────────────────────────────────────────────────
 let _deleteId = null;
