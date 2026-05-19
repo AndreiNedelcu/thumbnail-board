@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="api-client.js"></script>
 <style>
   :root {
     --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
@@ -184,29 +185,27 @@ function extractVid(item) {
 }
 
 async function loadItems() {
-  msg('Loading items from Eagle…');
+  msg('Loading items…');
   try {
-    // Load Eagle items AND data.json in parallel
-    const [eagleResp, boardResp] = await Promise.all([
-      fetch(`${SERVER}/api/eagle/all-items`),
-      fetch(`${SERVER}/api/data`)
-    ]);
-    if (!eagleResp.ok) throw new Error(`HTTP ${eagleResp.status}`);
-    const eagleData = await eagleResp.json();
-    const boardData = boardResp.ok ? await boardResp.json() : [];
-    const items = eagleData.data || [];
-    msg(`Loaded ${items.length} Eagle items…`);
+    // Load all items from data.json (source of truth — works on localhost and cloud)
+    const dataResp = await fetch(`${SERVER}/data.json?v=${Date.now()}`)
+      .catch(() => fetch(`${SERVER}/api/data`));
+    if (!dataResp.ok) throw new Error(`HTTP ${dataResp.status}`);
+    const boardData = await dataResp.json();
 
-    // Build lookup: videoId → data.json entry (source of truth for tags)
-    const boardByVid = new Map(boardData.map(v => [v.id, v]));
-    const boardByEid = new Map(boardData.filter(v => v.eid).map(v => [v.eid, v]));
+    // Normalise: tagger items reuse "id" (videoId) and synthesise a YouTube URL
+    const items = boardData.map(v => ({
+      id: v.eid || v.id,                                   // Eagle id if present, else videoId
+      name: v.title || v.id,
+      url: `https://www.youtube.com/watch?v=${v.id}`,
+      annotation: `Channel: ${v.channel || ''}\nViews: ${v.views || ''}\nhttps://www.youtube.com/watch?v=${v.id}`,
+      tags: v.tags || [],
+      _videoId: v.id,
+    }));
+    msg(`Loaded ${items.length} items…`);
 
-    // Override Eagle tags with data.json tags (always up-to-date, not cached)
+    // Extract custom tags to global CATS
     items.forEach(item => {
-      const entry = boardByEid.get(item.id) || boardByVid.get(extractVid(item));
-      if (entry) item.tags = entry.tags || item.tags;
-      
-      // Extract custom tags to global CATS
       (item.tags || []).forEach(t => {
         const parts = t.split('-');
         const cat = parts[0].toUpperCase();
@@ -217,51 +216,33 @@ async function loadItems() {
       });
     });
 
-    // Build set of video IDs already tagged in data.json (source of truth)
-    const taggedInBoard = new Set(
-      boardData.filter(v => (v.tags||[]).some(isOfficial)).map(v => v.id)
-    );
-
-    // An item is "tagged" if its video ID is in data.json OR it has official tags in Eagle
-    const isDone = i => {
-      const vid = extractVid(i);
-      if (vid && taggedInBoard.has(vid)) return true;
-      return (i.tags||[]).some(isOfficial);
-    };
-
+    const isDone = i => (i.tags || []).some(isOfficial);
     totalAll = items.length;
     preTagged = items.filter(isDone).length;
 
-    // Check if we were asked to jump to a specific item (?eid= or ?vid=)
+    // Jump to specific item?  ?eid= or ?vid=
     const params = new URLSearchParams(location.search);
     const jumpEid = params.get('eid');
     const jumpVid = params.get('vid');
 
     if (jumpEid || jumpVid) {
-      // Show ALL items (including already-tagged) so we can edit any item
       queue = [...items];
-      const jumpIdx = items.findIndex(i => {
-        if (jumpEid && i.id === jumpEid) return true;
-        if (jumpVid) {
-          const m = (i.url||i.annotation||'').match(/[?&]v=([A-Za-z0-9_-]{11})/);
-          return m && m[1] === jumpVid;
-        }
-        return false;
-      });
+      const jumpIdx = items.findIndex(i =>
+        (jumpEid && i.id === jumpEid) ||
+        (jumpVid && i._videoId === jumpVid)
+      );
       idx = jumpIdx >= 0 ? jumpIdx : 0;
-      // Pre-load existing tags into selection
       if (idx >= 0 && queue[idx]) {
-        const item = queue[idx];
-        savedSelections[item.id] = new Set(item.tags || []);
+        savedSelections[queue[idx].id] = new Set(queue[idx].tags || []);
       }
     } else {
       queue = items.filter(i => !isDone(i));
       idx = 0;
     }
-    buildPanel(); // Rebuild panel with custom tags extracted from items
+    buildPanel();
     render();
   } catch(e) {
-    msg(`❌ Cannot reach server (${e.message}).\n\nOpen via tagger.command — not the .html file directly.`);
+    msg(`Cannot reach data source (${e.message}).`);
   }
 }
 
@@ -342,9 +323,8 @@ function render() {
     : new Set(current.tags || []);
   document.getElementById('main').style.display = 'grid';
 
-  // Image
-  const m = (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/);
-  const vid = m ? m[1] : null;
+  // Image — prefer pre-computed _videoId
+  const vid = current._videoId || (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1] || null;
   const img = document.getElementById('timg');
   if (vid) {
     img.src = `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`;
@@ -461,35 +441,26 @@ async function saveTags() {
   const btn = document.getElementById('btn-save');
   btn.disabled=true; btn.textContent='Saving…';
 
-  const newTags = [...selected]; // replace, not merge — so removed tags are actually removed
-  // extract video ID so server can match by vid if eid is missing
-  const vidMatch = (current.url||current.annotation||'').match(/[?&]v=([A-Za-z0-9_-]{11})/);
-  const vid = vidMatch ? vidMatch[1] : null;
+  const newTags = [...selected];
+  const vid = current._videoId || (current.url||'').match(/[?&]v=([A-Za-z0-9_-]{11})/)?.[1] || null;
   try {
-    const r = await fetch(`${SERVER}/api/eagle/update`, {
+    const r = await TBApi.fetch('/api/update', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        id: current.id,        // Eagle item ID
-        vid,                   // YouTube video ID
-        tags: newTags,
-        name: current.name || '',
-        annotation: current.annotation || '',
-        url: current.url || ''
+        id: current.id, vid, tags: newTags,
+        name: current.name || '', channel: '', views: ''
       })
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
-    if (d.status === 'success') {
+    if (d.ok || d.status === 'success') {
       current.tags = newTags;
       history.push(idx); idx++;
-      toast(`✅ ${selected.size} tag${selected.size>1?'s':''} saved`);
-      fetch(`${SERVER}/api/sync`).catch(()=>{});
+      toast(`${selected.size} tag${selected.size>1?'s':''} saved`, 'success');
       render();
-    } else { throw new Error(d.message || JSON.stringify(d)); }
+    } else { throw new Error(d.msg || d.message || JSON.stringify(d)); }
   } catch(e) {
-    const hint = (e.message.includes('fetch') || e.message.includes('Failed'))
-      ? 'Open via tagger.command, not the .html file' : e.message;
-    toast(`❌ ${hint}`);
+    toast(e.message || 'Save failed', 'error');
   } finally { btn.textContent='Save tags'; refreshBtns(); }
 }
 

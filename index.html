@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="api-client.js"></script>
 <style>
   :root {
     /* theSeniorDev palette */
@@ -395,7 +396,7 @@
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       Delete <span id="sel-count">0</span>
     </button>
-    <a href="http://localhost:3000/tagger.html" target="_blank" class="tagger-btn">
+    <a href="tagger.html" target="_blank" class="tagger-btn">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>
       Tagger
     </a>
@@ -711,20 +712,36 @@ async function deleteAllBroken() {
     return visibleVideos[idx]?.id;
   }).filter(Boolean);
   if (!confirm(`Delete ${ids.length} unavailable thumbnails?`)) return;
-  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
   let deleted = 0;
-  for (const id of ids) {
+  // Use bulk-delete endpoint when on cloud (single commit). Falls back to per-item on localhost.
+  if (!TBApi.isLocal) {
     try {
-      const r = await fetch(`${apiBase}/api/delete`, {
+      const r = await TBApi.fetch('/api/bulk-delete', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id})
+        body: JSON.stringify({ ids })
       });
       const d = await r.json();
-      if (d.ok) { const i = videos.findIndex(v => v.id === id); if (i !== -1) videos.splice(i, 1); deleted++; }
+      if (d.ok) { deleted = d.deleted; }
     } catch {}
+  } else {
+    for (const id of ids) {
+      try {
+        const r = await TBApi.fetch('/api/delete', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({id})
+        });
+        const d = await r.json();
+        if (d.ok) deleted++;
+      } catch {}
+    }
+  }
+  // Remove deleted items from local state
+  for (const id of ids) {
+    const i = allVideos.findIndex(v => v.id === id);
+    if (i !== -1) allVideos.splice(i, 1);
   }
   applyFilters();
-  showToast(`🗑 Deleted ${deleted} unavailable thumbnails`);
+  showToast(`Deleted ${deleted} unavailable thumbnails`, 'success');
 }
 
 function setCardSize(val) {
@@ -827,7 +844,7 @@ function renderLightbox() {
   // Edit tags button — opens tagger at this specific video
   document.getElementById('lb-tagger').onclick = () => {
     const param = v.eid ? `eid=${v.eid}` : `vid=${v.id}`;
-    window.open(`http://localhost:3000/tagger.html?${param}`, '_blank');
+    window.open(`tagger.html?${param}`, '_blank');
   };
 
   // Delete button
@@ -1045,19 +1062,17 @@ async function saveLbTags(v, newTags) {
   v.tags = newTags;
   renderLbTags(v);
   try {
-    // Update Eagle if we have an eid
-    if (v.eid) {
-      const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
-      await fetch(`${apiBase}/api/eagle/update`, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({id: v.eid, tags: newTags})
-      });
-    }
-    showToast('✅ Tags updated');
+    const r = await TBApi.fetch('/api/update', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: v.eid || v.id, vid: v.id, tags: newTags, name: v.title, channel: v.channel, views: v.views })
+    });
+    const d = await r.json();
+    if (d.ok) showToast('Tags updated', 'success');
+    else showToast(d.msg || 'Update failed', 'error');
   } catch(e) {
-    showToast('⚠️ Saved locally — start tagger.command to sync to Eagle');
+    showToast(e.message || 'Cannot reach server', 'error');
   }
-  applyFilters(); // re-render grid in background
+  applyFilters();
 }
 
 // ── Publish ───────────────────────────────────────────────────────
@@ -1131,26 +1146,37 @@ async function deleteSelected() {
   if (!selectedIds.size) return;
   const ids = [...selectedIds];
   if (!confirm(`Delete ${ids.length} selected thumbnail${ids.length > 1 ? 's' : ''}?`)) return;
-  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
   let deleted = 0;
-  for (const id of ids) {
+  if (!TBApi.isLocal) {
+    // Cloud: bulk-delete (single commit)
     try {
-      const r = await fetch(`${apiBase}/api/delete`, {
+      const r = await TBApi.fetch('/api/bulk-delete', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ ids })
       });
       const d = await r.json();
-      if (d.ok || (d.msg && d.msg.includes('not found'))) {
-        const i = allVideos.findIndex(v => v.id === id);
-        if (i !== -1) allVideos.splice(i, 1);
-        deleted++;
-      }
-    } catch {}
+      if (d.ok) deleted = d.deleted;
+    } catch (e) { showToast(e.message, 'error'); }
+  } else {
+    for (const id of ids) {
+      try {
+        const r = await TBApi.fetch('/api/delete', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+        const d = await r.json();
+        if (d.ok || (d.msg && d.msg.includes('not found'))) deleted++;
+      } catch {}
+    }
+  }
+  for (const id of ids) {
+    const i = allVideos.findIndex(v => v.id === id);
+    if (i !== -1) allVideos.splice(i, 1);
   }
   selectedIds.clear();
-  toggleSelectMode(); // exit select mode
+  toggleSelectMode();
   applyFilters();
-  showToast(`🗑 Deleted ${deleted} thumbnail${deleted !== 1 ? 's' : ''}`);
+  showToast(`Deleted ${deleted} thumbnail${deleted !== 1 ? 's' : ''}`, 'success');
 }
 
 // ── Delete ────────────────────────────────────────────────────────
@@ -1171,28 +1197,25 @@ async function confirmDelete() {
   if (!_deleteId) return;
   const btn = document.getElementById('confirm-delete-btn');
   btn.disabled = true; btn.textContent = 'Deleting…';
-  // Use relative URL when on localhost, absolute when on GitHub Pages
-  const apiBase = location.hostname === 'localhost' ? '' : 'http://localhost:3000';
   try {
-    const r = await fetch(`${apiBase}/api/delete`, {
+    const r = await TBApi.fetch('/api/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: _deleteId })
     });
     const d = await r.json();
     if (d.ok || (d.msg && d.msg.includes('not found'))) {
-      // Remove from local array regardless — if server says not found, it's already gone
-      const idx = videos.findIndex(v => v.id === _deleteId);
-      if (idx !== -1) videos.splice(idx, 1);
+      const idx = allVideos.findIndex(v => v.id === _deleteId);
+      if (idx !== -1) allVideos.splice(idx, 1);
       hideDeleteConfirm();
       closeLightbox();
       applyFilters();
-      showToast('Thumbnail deleted');
+      showToast('Thumbnail deleted', 'success');
     } else {
-      showToast('❌ ' + (d.msg || 'Delete failed'));
+      showToast(d.msg || 'Delete failed', 'error');
     }
   } catch(e) {
-    showToast('❌ Open http://localhost:3000 in your browser to use delete');
+    showToast(e.message || 'Delete failed', 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Delete';
   }

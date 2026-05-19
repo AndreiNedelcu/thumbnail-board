@@ -1,5 +1,10 @@
 // ── Thumbnail Board Extension ─────────────────────────────────────
-const SERVER = 'http://localhost:3000';
+// Tries Cloudflare Worker first, falls back to localhost if unreachable.
+// CHANGE WORKER_URL after deploying the Worker.
+const WORKER_URL = 'https://thumbnail-board-api.theseniordev.workers.dev';
+const LOCAL_URL  = 'http://localhost:3000';
+let SERVER = WORKER_URL;  // updated by health check below
+let AUTH_TOKEN = '';      // loaded from chrome.storage
 
 const CATS = {
   STYLE:     { color:'#e94560', bg:'#533483', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
@@ -88,9 +93,47 @@ function getVideoInfo() {
   return { id, title, channel, views };
 }
 
+// ── Auth + endpoint detection ─────────────────────────────────────
+async function loadAuthToken() {
+  try {
+    const r = await chrome.storage.local.get(['tbAuthToken']);
+    AUTH_TOKEN = r.tbAuthToken || '';
+  } catch { AUTH_TOKEN = ''; }
+}
+
+async function saveAuthToken(t) {
+  AUTH_TOKEN = t.trim();
+  try { await chrome.storage.local.set({ tbAuthToken: AUTH_TOKEN }); } catch {}
+}
+
+/** Pick best reachable endpoint. Tries Worker, falls back to localhost. */
+async function detectServer() {
+  try {
+    const r = await fetch(`${WORKER_URL}/api/health`, { method:'GET' });
+    if (r.ok) { SERVER = WORKER_URL; return; }
+  } catch {}
+  try {
+    const r = await fetch(`${LOCAL_URL}/api/data`, { method:'GET' });
+    if (r.ok) { SERVER = LOCAL_URL; return; }
+  } catch {}
+  // Default to worker if neither responded (server.py might still be starting)
+  SERVER = WORKER_URL;
+}
+
+/** Wrapper around fetch that adds auth header when targeting the Worker. */
+async function tbFetch(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (SERVER === WORKER_URL && (options.method || 'GET').toUpperCase() !== 'GET') {
+    if (!AUTH_TOKEN) await loadAuthToken();
+    if (AUTH_TOKEN) headers['X-Auth-Token'] = AUTH_TOKEN;
+  }
+  return fetch(SERVER + path, { ...options, headers });
+}
+
 async function checkInBoard(id) {
   try {
-    const r = await fetch(`${SERVER}/api/data`);
+    // Always read data.json from the public GitHub Pages (or local server) — no auth needed
+    const r = await tbFetch(`/api/data`);
     const data = await r.json();
     return data.some(v => v.id === id);
   } catch { return false; }
@@ -308,8 +351,21 @@ async function saveToBoard() {
   if (!selected.size) return;
   const btn = document.getElementById('tb-save-btn');
   btn.disabled = true; btn.textContent = 'Saving…';
+  // Ensure we have an auth token if we're hitting the cloud Worker
+  if (SERVER === WORKER_URL && !AUTH_TOKEN) {
+    await loadAuthToken();
+    if (!AUTH_TOKEN) {
+      const t = prompt('Paste your Thumbnail Board access token:');
+      if (t) await saveAuthToken(t);
+    }
+    if (!AUTH_TOKEN) {
+      showToast('❌ No access token — get one from your board owner');
+      btn.disabled = false; btn.textContent = 'Save to Board';
+      return;
+    }
+  }
   try {
-    const r = await fetch(`${SERVER}/api/add`, {
+    const r = await tbFetch(`/api/add`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...videoData, tags: [...selected] })
@@ -321,11 +377,15 @@ async function saveToBoard() {
       const floatBtn = document.getElementById('tb-btn');
       floatBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
       floatBtn.classList.add('in-board');
+    } else if (r.status === 401) {
+      AUTH_TOKEN = '';
+      try { await chrome.storage.local.remove(['tbAuthToken']); } catch {}
+      showToast('❌ Invalid token — try Save again to re-enter it');
     } else {
       showToast(`❌ ${d.msg || 'Error saving'}`);
     }
   } catch(e) {
-    showToast('❌ Server not running — open tagger.command first');
+    showToast('❌ Cannot reach server');
   } finally {
     btn.disabled = false; btn.textContent = 'Save to Board';
   }
@@ -401,4 +461,8 @@ chrome.runtime.onMessage.addListener((msg) => {
   }
 });
 
-setTimeout(init, 1500);
+// Kick off: detect best endpoint + load token, then init
+(async () => {
+  await Promise.all([detectServer(), loadAuthToken()]);
+  setTimeout(init, 1500);
+})();
