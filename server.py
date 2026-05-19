@@ -343,17 +343,21 @@ class Handler(BaseHTTPRequestHandler):
             # If successful, sync tags into data.json right away
             if result.get("status") == "success":
                 eagle_id = body.get("id","")
+                vid      = body.get("vid","")
                 new_tags = canonicalize_tags(body.get("tags",[]))
-                # Find by eid and update tags
+                # Find by eid first, then fall back to video id
                 updated = False
                 for entry in _dataset:
-                    if entry.get("eid") == eagle_id:
+                    if (eagle_id and entry.get("eid") == eagle_id) or \
+                       (vid and entry.get("id") == vid):
                         entry["tags"] = new_tags
+                        if eagle_id and not entry.get("eid"):
+                            entry["eid"] = eagle_id  # back-fill missing eid
                         updated = True
                         break
                 if updated:
                     DATA_FILE.write_text(json.dumps(_dataset, ensure_ascii=False, separators=(",",":")))
-                    print(f"[update] Synced tags for {eagle_id} → data.json", flush=True)
+                    print(f"[update] Synced tags for eid={eagle_id} vid={vid} → data.json", flush=True)
             self.send_json(result)
             return
 

@@ -406,11 +406,14 @@ async function saveTags() {
   const btn = document.getElementById('btn-save');
   btn.disabled=true; btn.textContent='Saving…';
 
-  const newTags = [...new Set([...(current.tags||[]), ...selected])];
+  const newTags = [...selected]; // replace, not merge — so removed tags are actually removed
+  // extract video ID so server can match by vid if eid is missing
+  const vidMatch = (current.url||current.annotation||'').match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  const vid = vidMatch ? vidMatch[1] : null;
   try {
     const r = await fetch(`${SERVER}/api/eagle/update`, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({id:current.id, tags:newTags})
+      body: JSON.stringify({id:current.id, vid, tags:newTags})
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
