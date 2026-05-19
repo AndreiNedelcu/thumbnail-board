@@ -19,7 +19,6 @@ let selected = new Set();
 let videoData = { id:'', title:'', channel:'', views:'' };
 let panelOpen = false;
 
-// ── Get video info from page ──────────────────────────────────────
 function getVideoId() {
   const m = location.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   return m ? m[1] : null;
@@ -28,15 +27,14 @@ function getVideoId() {
 function getVideoInfo() {
   const id = getVideoId();
   if (!id) return null;
-  const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1.style-scope.ytd-video-primary-info-renderer')?.textContent?.trim()
+  const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
     || document.title.replace(' - YouTube','').trim();
-  const channel = document.querySelector('#channel-name a, ytd-channel-name a, #owner #channel-name')?.textContent?.trim() || '';
-  const viewsEl = document.querySelector('#info-strings yt-formatted-string, #info span');
+  const channel = document.querySelector('ytd-channel-name yt-formatted-string a, #channel-name a')?.textContent?.trim() || '';
+  const viewsEl = document.querySelector('#info-strings yt-formatted-string, #info .yt-spec-button-shape-next ~ span');
   const views = viewsEl?.textContent?.trim().replace(/\s*views?/i,'') || '';
   return { id, title, channel, views };
 }
 
-// ── Check if already in board ─────────────────────────────────────
 async function checkInBoard(id) {
   try {
     const r = await fetch(`${SERVER}/api/data`);
@@ -47,14 +45,11 @@ async function checkInBoard(id) {
 
 // ── Build UI ──────────────────────────────────────────────────────
 function buildPanel() {
-  // Floating button
   const btn = document.createElement('button');
   btn.id = 'tb-btn';
-  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg> Save to Board`;
-  btn.onclick = () => togglePanel();
+  btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
   document.body.appendChild(btn);
 
-  // Panel
   const panel = document.createElement('div');
   panel.id = 'tb-panel';
   panel.innerHTML = `
@@ -77,65 +72,85 @@ function buildPanel() {
     </div>`;
   document.body.appendChild(panel);
 
-  // Toast
   const toast = document.createElement('div');
   toast.id = 'tb-toast';
   document.body.appendChild(toast);
 
-  document.getElementById('tb-close').onclick = () => closePanel();
-  document.getElementById('tb-cancel-btn').onclick = () => closePanel();
-  document.getElementById('tb-save-btn').onclick = () => saveToBoard();
-
   buildTagPanel();
+
+  // Event listeners (no inline onclick — required for content scripts)
+  btn.addEventListener('click', () => togglePanel());
+  document.getElementById('tb-close').addEventListener('click', closePanel);
+  document.getElementById('tb-cancel-btn').addEventListener('click', closePanel);
+  document.getElementById('tb-save-btn').addEventListener('click', saveToBoard);
 }
 
 function buildTagPanel() {
   const scroll = document.getElementById('tb-tags-scroll');
   scroll.innerHTML = '';
+
   Object.entries(CATS).forEach(([cat, cfg]) => {
-    const subs = cfg.subs.map(sub => {
-      const tag = `${cat.toLowerCase()}-${sub}`;
-      return `<button class="tb-tag-btn" data-tag="${tag}"
-        onclick="tbToggle('${tag}',this,'${cfg.bg}','${cfg.color}')">${sub}</button>`;
-    }).join('');
     const sec = document.createElement('div');
     sec.className = 'tb-cat-section';
-    sec.innerHTML = `
-      <div class="tb-cat-title">
-        <span class="tb-cat-dot" style="background:${cfg.color}"></span>${cat}
-        <button class="tb-cat-add-btn" onclick="tbToggleInput('${cat}')">+ add</button>
-      </div>
-      <div class="tb-tag-grid" id="tb-grid-${cat}">${subs}</div>
-      <div class="tb-custom-row" id="tb-custom-${cat}">
-        <input class="tb-custom-inp" id="tb-inp-${cat}" placeholder="e.g. neon"
-          onkeydown="if(event.key==='Enter'){tbAddCustom('${cat}');event.preventDefault();}">
-        <button class="tb-custom-add" onclick="tbAddCustom('${cat}')">Add</button>
-      </div>`;
+
+    // Title row
+    const titleRow = document.createElement('div');
+    titleRow.className = 'tb-cat-title';
+    titleRow.innerHTML = `<span class="tb-cat-dot" style="background:${cfg.color}"></span>${cat}`;
+    const addBtn = document.createElement('button');
+    addBtn.className = 'tb-cat-add-btn';
+    addBtn.textContent = '+ add';
+    addBtn.addEventListener('click', () => toggleCustomInput(cat));
+    titleRow.appendChild(addBtn);
+    sec.appendChild(titleRow);
+
+    // Tag grid
+    const grid = document.createElement('div');
+    grid.className = 'tb-tag-grid';
+    grid.id = `tb-grid-${cat}`;
+    cfg.subs.forEach(sub => {
+      const tag = `${cat.toLowerCase()}-${sub}`;
+      const tagBtn = document.createElement('button');
+      tagBtn.className = 'tb-tag-btn';
+      tagBtn.dataset.tag = tag;
+      tagBtn.textContent = sub;
+      tagBtn.addEventListener('click', () => toggleTag(tag, tagBtn, cfg.bg, cfg.color));
+      grid.appendChild(tagBtn);
+    });
+    sec.appendChild(grid);
+
+    // Custom input row
+    const customRow = document.createElement('div');
+    customRow.className = 'tb-custom-row';
+    customRow.id = `tb-custom-${cat}`;
+    const inp = document.createElement('input');
+    inp.className = 'tb-custom-inp';
+    inp.id = `tb-inp-${cat}`;
+    inp.placeholder = 'e.g. neon';
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); addCustomTag(cat); }
+      e.stopPropagation();
+    });
+    const addTagBtn = document.createElement('button');
+    addTagBtn.className = 'tb-custom-add';
+    addTagBtn.textContent = 'Add';
+    addTagBtn.addEventListener('click', () => addCustomTag(cat));
+    customRow.appendChild(inp);
+    customRow.appendChild(addTagBtn);
+    sec.appendChild(customRow);
+
     scroll.appendChild(sec);
   });
 }
 
-// ── Tag functions (global so onclick works) ───────────────────────
-window.tbToggle = function(tag, btn, bg, color) {
-  if (selected.has(tag)) {
-    selected.delete(tag);
-    btn.classList.remove('sel'); btn.style.cssText = '';
-  } else {
-    selected.add(tag);
-    btn.classList.add('sel');
-    btn.style.background = bg; btn.style.color = '#fff'; btn.style.borderColor = 'transparent';
-  }
-  refreshPreview();
-};
-
-window.tbToggleInput = function(cat) {
+function toggleCustomInput(cat) {
   const row = document.getElementById(`tb-custom-${cat}`);
   const inp = document.getElementById(`tb-inp-${cat}`);
   const open = row.classList.toggle('open');
   if (open) inp.focus();
-};
+}
 
-window.tbAddCustom = function(cat) {
+function addCustomTag(cat) {
   const inp = document.getElementById(`tb-inp-${cat}`);
   const raw = inp.value.trim().toLowerCase().replace(/\s+/g,'-');
   if (!raw) return;
@@ -143,18 +158,40 @@ window.tbAddCustom = function(cat) {
   const grid = document.getElementById(`tb-grid-${cat}`);
   if (!grid.querySelector(`[data-tag="${tag}"]`)) {
     const cfg = CATS[cat];
-    const btn = document.createElement('button');
-    btn.className = 'tb-tag-btn';
-    btn.dataset.tag = tag;
-    btn.textContent = raw;
-    btn.onclick = () => tbToggle(tag, btn, cfg.bg, cfg.color);
-    grid.appendChild(btn);
+    const tagBtn = document.createElement('button');
+    tagBtn.className = 'tb-tag-btn';
+    tagBtn.dataset.tag = tag;
+    tagBtn.textContent = raw;
+    tagBtn.addEventListener('click', () => toggleTag(tag, tagBtn, cfg.bg, cfg.color));
+    grid.appendChild(tagBtn);
   }
   const btn = grid.querySelector(`[data-tag="${tag}"]`);
-  if (btn && !selected.has(tag)) tbToggle(tag, btn, CATS[cat].bg, CATS[cat].color);
+  if (btn && !selected.has(tag)) toggleTag(tag, btn, CATS[cat].bg, CATS[cat].color);
   inp.value = '';
   document.getElementById(`tb-custom-${cat}`).classList.remove('open');
-};
+}
+
+function toggleTag(tag, btn, bg, color) {
+  if (selected.has(tag)) {
+    selected.delete(tag);
+    btn.classList.remove('sel');
+    btn.style.cssText = '';
+  } else {
+    selected.add(tag);
+    btn.classList.add('sel');
+    btn.style.background = bg;
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'transparent';
+  }
+  refreshPreview();
+}
+
+function untagSelected(tag) {
+  selected.delete(tag);
+  const btn = document.querySelector(`.tb-tag-btn[data-tag="${tag}"]`);
+  if (btn) { btn.classList.remove('sel'); btn.style.cssText = ''; }
+  refreshPreview();
+}
 
 function refreshPreview() {
   const preview = document.getElementById('tb-sel-preview');
@@ -164,29 +201,22 @@ function refreshPreview() {
     preview.innerHTML = [...selected].map(t => {
       const cat = t.split('-')[0].toUpperCase();
       const cfg = CATS[cat] || { bg:'#333' };
-      return `<span class="tb-sel-tag" style="background:${cfg.bg}">${t}
-        <span class="tb-sel-x" onclick="tbUntag('${t}')">×</span></span>`;
+      return `<span class="tb-sel-tag" style="background:${cfg.bg}">${t} <span class="tb-sel-x" data-untag="${t}">×</span></span>`;
     }).join('');
+    // Attach untag listeners
+    preview.querySelectorAll('.tb-sel-x').forEach(x => {
+      x.addEventListener('click', () => untagSelected(x.dataset.untag));
+    });
   }
   document.getElementById('tb-save-btn').disabled = selected.size === 0;
 }
 
-window.tbUntag = function(tag) {
-  selected.delete(tag);
-  const btn = document.querySelector(`.tb-tag-btn[data-tag="${tag}"]`);
-  if (btn) { btn.classList.remove('sel'); btn.style.cssText = ''; }
-  refreshPreview();
-};
-
-// ── Panel open/close ──────────────────────────────────────────────
 async function togglePanel() {
   if (panelOpen) { closePanel(); return; }
   videoData = getVideoInfo() || videoData;
-  // Update panel content
   document.getElementById('tb-thumb').src = `https://img.youtube.com/vi/${videoData.id}/maxresdefault.jpg`;
   document.getElementById('tb-title').textContent = videoData.title;
   document.getElementById('tb-channel').textContent = videoData.channel;
-  // Reset tags
   selected.clear();
   document.querySelectorAll('.tb-tag-btn.sel').forEach(b => { b.classList.remove('sel'); b.style.cssText = ''; });
   refreshPreview();
@@ -199,7 +229,6 @@ function closePanel() {
   panelOpen = false;
 }
 
-// ── Save ──────────────────────────────────────────────────────────
 async function saveToBoard() {
   if (!selected.size) return;
   const btn = document.getElementById('tb-save-btn');
@@ -212,9 +241,8 @@ async function saveToBoard() {
     });
     const d = await r.json();
     if (d.ok) {
-      showToast(`✅ Saved to board with ${selected.size} tags!`);
+      showToast(`✅ Saved with ${selected.size} tags!`);
       closePanel();
-      // Update button state
       const floatBtn = document.getElementById('tb-btn');
       floatBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
       floatBtn.classList.add('in-board');
@@ -222,7 +250,7 @@ async function saveToBoard() {
       showToast(`❌ ${d.msg || 'Error saving'}`);
     }
   } catch(e) {
-    showToast('❌ Cannot reach server — make sure tagger.command is running');
+    showToast('❌ Server not running — open tagger.command first');
   } finally {
     btn.disabled = false; btn.textContent = 'Save to Board';
   }
@@ -236,15 +264,13 @@ function showToast(msg) {
   t._timer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
-// ── Init (re-runs on YouTube SPA navigation) ──────────────────────
 function init() {
   const id = getVideoId();
   if (!id) return;
   if (document.getElementById('tb-btn')) {
-    // Update existing button on navigation
     const btn = document.getElementById('tb-btn');
     btn.classList.remove('in-board');
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg> Save to Board`;
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg> Save to Board`;
     checkInBoard(id).then(inBoard => {
       if (inBoard) {
         btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> In Board`;
@@ -263,15 +289,12 @@ function init() {
   });
 }
 
-// Handle YouTube SPA navigation
 let lastUrl = location.href;
-const observer = new MutationObserver(() => {
+new MutationObserver(() => {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
-    setTimeout(init, 1500); // wait for page to load
+    setTimeout(init, 1500);
   }
-});
-observer.observe(document.body, { childList: true, subtree: true });
+}).observe(document.body, { childList: true, subtree: true });
 
-// Initial run
 setTimeout(init, 1500);
