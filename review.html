@@ -77,13 +77,51 @@
     transition:border-color .15s, box-shadow .15s;
   }
   .tag-add:focus { border-color:var(--mint); box-shadow:0 0 0 3px rgba(58,236,186,0.08); }
-  .tag-suggestions { display:flex; flex-wrap:wrap; gap:5px; max-height:180px; overflow-y:auto; padding:4px 0; }
+
+  /* Custom tag creator */
+  .new-tag-row {
+    display:flex; gap:6px; margin-top:8px;
+    padding:10px; background:var(--surface2); border:1px dashed var(--border-h); border-radius:10px;
+  }
+  .new-tag-cat {
+    background:var(--surface3); border:1px solid var(--border); border-radius:8px;
+    color:var(--bright); font-family:inherit; font-size:12px; font-weight:600;
+    padding:8px 10px; outline:none; cursor:pointer;
+  }
+  .new-tag-sub {
+    flex:1; background:var(--surface3); border:1px solid var(--border); border-radius:8px;
+    color:var(--bright); font-family:inherit; font-size:12px; padding:8px 12px; outline:none;
+  }
+  .new-tag-sub:focus { border-color:var(--mint); }
+  .new-tag-add {
+    padding:8px 14px; border:none; border-radius:8px;
+    background:var(--grad); color:#0d1117;
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .new-tag-add:hover { box-shadow:0 4px 12px rgba(58,236,186,.2); }
+
+  /* Suggestion sections */
+  .tag-sections { max-height:340px; overflow-y:auto; padding:4px 6px 4px 0; }
+  .tag-sections::-webkit-scrollbar { width:5px; }
+  .tag-sections::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:3px; }
+  .tag-section { margin-bottom:14px; }
+  .tag-section:last-child { margin-bottom:0; }
+  .tag-section-head {
+    display:flex; align-items:center; gap:8px; margin-bottom:6px;
+    font-size:10px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--muted);
+  }
+  .tag-section-head .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+  .tag-section-head .count { color:var(--muted); opacity:.5; font-weight:600; }
+  .tag-section-grid { display:flex; flex-wrap:wrap; gap:4px; }
   .tag-sug {
     padding:4px 10px; border-radius:12px; font-size:11px; font-weight:600;
-    background:var(--surface3); color:var(--muted); border:1px solid transparent;
+    background:var(--surface3); color:var(--text); border:1px solid transparent;
     cursor:pointer; transition:all .12s;
   }
   .tag-sug:hover { color:var(--bright); border-color:var(--border-h); }
+  .tag-sug.custom { color:var(--mint); border-color:rgba(58,236,186,.25); }
+  .tag-sug.custom:hover { background:rgba(58,236,186,.08); }
 
   .actions { display:flex; gap:10px; margin-top:8px; }
   .btn {
@@ -137,8 +175,13 @@
     </div>
     <div>
       <div class="tags-head" style="margin-bottom:8px">Add tag</div>
-      <input class="tag-add" id="tagInput" placeholder="search… e.g. mood-happy" autocomplete="off" data-1p-ignore>
-      <div class="tag-suggestions" id="sugs" style="margin-top:8px"></div>
+      <input class="tag-add" id="tagInput" placeholder="search… e.g. happy, colorful, celebrity" autocomplete="off" data-1p-ignore data-lpignore="true">
+      <div class="new-tag-row">
+        <select class="new-tag-cat" id="newTagCat"></select>
+        <input class="new-tag-sub" id="newTagSub" placeholder="custom subtag, e.g. watercolor" autocomplete="off" data-1p-ignore>
+        <button class="new-tag-add" onclick="createCustomTag()">+ Create</button>
+      </div>
+      <div class="tag-sections" id="sugs" style="margin-top:14px"></div>
     </div>
     <div class="actions">
       <button class="btn btn-reject" onclick="reject()">Reject</button>
@@ -156,28 +199,73 @@
 <div id="toast"></div>
 
 <script>
-const ALL_TAGS = (() => {
-  const C = {
-    style:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'],
-    mood:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'],
-    text:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'],
-    element:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'],
-    camera:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'],
-    subject:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'],
-    formation:['flat-lay','line','grid','v'],
-    topic:['comparison','product-showcase','space','secret','social-media','size'],
-    callout:['magnifier'],
-    backdrop:['dark','light','blurry'],
-    channel:['theseniordev-main','theseniordev-podcast'],
-  };
-  return Object.entries(C).flatMap(([cat,subs]) => subs.map(s => `${cat}-${s}`));
-})();
+// Tag taxonomy with category colors (matches the board)
+const CATS = {
+  STYLE:     { color:'#e94560', subs:['colorful','high-contrast','minimal','split-screen','illustration','handdrawn','3d','photoshopped','collage','anatomy','busy','match-split','monochrome','pattern','dissolving','photo-composite'] },
+  MOOD:      { color:'#4caf50', subs:['dramatic','happy','serious','entertaining','confused','exhausted','frustrated','sad','surprised','skeptical'] },
+  TEXT:      { color:'#7c4dff', subs:['identity','callout','question','normative-claim','number','quote','forward-referencing','cta','in-center','in-background','direct-address','chat','answer'] },
+  ELEMENT:   { color:'#ff6d00', subs:['celebrity','graphic','chart','unusual','glow','logo','screen','money','in-background','fire','hand','in-foreground','in-motion','obfuscation','eye','map','vehicle','pile','damage','animal','food','book','brain','crowd','emoji','notification','checkbox','review','building'] },
+  CAMERA:    { color:'#00bcd4', subs:['medium-shot','close-up','overhead-shot','full-shot','aerial-shot','back-shot','unusual'] },
+  SUBJECT:   { color:'#ffab40', subs:['in-motion','holding-object','count-two','count-many','in-background','unusual-pose','talking','laying','sitting','clone'] },
+  FORMATION: { color:'#ab47bc', subs:['flat-lay','line','grid','v'] },
+  TOPIC:     { color:'#26a69a', subs:['comparison','product-showcase','space','secret','social-media','size'] },
+  CALLOUT:   { color:'#d4e157', subs:['magnifier'] },
+  BACKDROP:  { color:'#ec407a', subs:['dark','light','blurry'] },
+  CHANNEL:   { color:'#3aecba', subs:['theseniordev-main','theseniordev-podcast'] },
+};
+// Tracks custom tags discovered from data.json or created in this session
+const CUSTOM = {};  // { CATEGORY: Set<subtag> }
+Object.keys(CATS).forEach(c => CUSTOM[c] = new Set());
+
+function tagsByCat() {
+  // Merge official + custom per category
+  const out = {};
+  for (const [cat, cfg] of Object.entries(CATS)) {
+    const subs = [...cfg.subs, ...CUSTOM[cat]];
+    out[cat] = { color: cfg.color, subs, official: new Set(cfg.subs) };
+  }
+  return out;
+}
+
+function allTags() {
+  const out = [];
+  for (const [cat, cfg] of Object.entries(CATS)) {
+    cfg.subs.forEach(s => out.push(`${cat.toLowerCase()}-${s}`));
+    [...CUSTOM[cat]].forEach(s => out.push(`${cat.toLowerCase()}-${s}`));
+  }
+  return out;
+}
 
 let items = [];
 let idx = 0;
 let initialTotal = 0;
 
+async function loadBoardCustomTags() {
+  // Pull data.json so we discover custom tags already on the public board
+  try {
+    const r = await fetch('/data.json?v=' + Date.now());
+    const data = await r.json();
+    for (const v of data) {
+      for (const t of (v.tags || [])) {
+        const dash = t.indexOf('-');
+        if (dash < 1) continue;
+        const cat = t.slice(0, dash).toUpperCase();
+        const sub = t.slice(dash + 1);
+        if (!CATS[cat]) continue;
+        if (!CATS[cat].subs.includes(sub)) CUSTOM[cat].add(sub);
+      }
+    }
+  } catch {}
+}
+
+function fillCategoryDropdown() {
+  const sel = document.getElementById('newTagCat');
+  sel.innerHTML = Object.keys(CATS).map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
 async function load() {
+  await loadBoardCustomTags();
+  fillCategoryDropdown();
   const r = await fetch('/api/review-items');
   items = await r.json();
   initialTotal = items.length;
@@ -223,11 +311,56 @@ function removeTag(t) {
 
 function renderSuggestions(q) {
   const cur = new Set(items[idx]?.tags || []);
-  const ql = q.toLowerCase();
-  const matches = ALL_TAGS.filter(t => !cur.has(t) && t.includes(ql)).slice(0, 30);
-  document.getElementById('sugs').innerHTML = matches.map(t =>
-    `<span class="tag-sug" onclick="addTag('${esc(t)}')">${esc(t)}</span>`
-  ).join('');
+  const ql = (q || '').toLowerCase().trim();
+  const data = tagsByCat();
+
+  const html = [];
+  for (const [cat, info] of Object.entries(data)) {
+    const visible = info.subs.filter(sub => {
+      const full = `${cat.toLowerCase()}-${sub}`;
+      if (cur.has(full)) return false;
+      if (!ql) return true;
+      // Match against subtag or full tag or category
+      return sub.includes(ql) || full.includes(ql) || cat.toLowerCase().includes(ql);
+    });
+    if (!visible.length) continue;
+    html.push(`
+      <div class="tag-section">
+        <div class="tag-section-head">
+          <span class="dot" style="background:${info.color}"></span>
+          ${cat}
+          <span class="count">${visible.length}</span>
+        </div>
+        <div class="tag-section-grid">
+          ${visible.map(sub => {
+            const full = `${cat.toLowerCase()}-${sub}`;
+            const isCustom = !info.official.has(sub);
+            return `<span class="tag-sug${isCustom ? ' custom' : ''}" onclick="addTag('${esc(full)}')" title="${isCustom ? 'custom tag' : ''}">${esc(sub)}</span>`;
+          }).join('')}
+        </div>
+      </div>
+    `);
+  }
+  document.getElementById('sugs').innerHTML = html.join('') ||
+    `<div style="text-align:center;color:var(--muted);padding:20px;font-size:12px">No matches. Create a custom tag below ↓</div>`;
+}
+
+function createCustomTag() {
+  const cat = document.getElementById('newTagCat').value;
+  const subRaw = document.getElementById('newTagSub').value.trim();
+  if (!subRaw) return;
+  // Normalise: lowercase, hyphenated, alphanumeric + dashes
+  const sub = subRaw.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!sub) { toast('Invalid tag name', 'error'); return; }
+  CUSTOM[cat].add(sub);
+  const full = `${cat.toLowerCase()}-${sub}`;
+  addTag(full);
+  document.getElementById('newTagSub').value = '';
+  toast(`Created ${full}`, 'success');
 }
 
 function addTag(t) {
@@ -241,9 +374,17 @@ document.getElementById('tagInput').addEventListener('input', e => renderSuggest
 document.getElementById('tagInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const v = e.target.value.trim().toLowerCase();
-    if (v && ALL_TAGS.includes(v)) addTag(v);
-    e.target.value = ''; renderSuggestions('');
+    if (v && allTags().includes(v)) {
+      addTag(v);
+      e.target.value = '';
+      renderSuggestions('');
+    }
   }
+});
+
+// Enter in the custom tag input also triggers Create
+document.getElementById('newTagSub').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); createCustomTag(); }
 });
 
 async function approve() {
