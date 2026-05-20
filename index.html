@@ -549,7 +549,8 @@
   #toast svg { flex-shrink:0; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
 
-  /* Inbox FAB — fixed top-right link, survives hero + sticky header */
+  /* Inbox FAB — visible only over the hero. Hidden when the sticky
+     mini-header is visible (body.scrolled-past-hero) to avoid overlap. */
   .inbox-fab {
     position:fixed; top:14px; right:18px; z-index:60;
     display:inline-flex; align-items:center; gap:8px;
@@ -558,9 +559,12 @@
     border:1px solid var(--border);
     font-family:inherit; font-size:12px; font-weight:700;
     color:var(--text); text-decoration:none; letter-spacing:.3px;
-    transition:all .15s;
+    transition:opacity .2s, transform .2s, background .15s, color .15s, border-color .15s;
   }
   .inbox-fab:hover { color:var(--text-bright); border-color:var(--border-hover); background:rgba(23,30,37,0.95); transform:translateY(-1px); }
+  body.scrolled-past-hero .inbox-fab {
+    opacity:0; pointer-events:none; transform:translateY(-8px);
+  }
   .inbox-fab-badge {
     min-width:20px; height:20px; padding:0 6px; border-radius:10px;
     background:var(--surface3); color:var(--muted);
@@ -967,6 +971,7 @@ function _syncScrollUI() {
   const topBtn = document.getElementById('back-to-top');
   if (mini)   mini.classList.toggle('visible', scrolledPast);
   if (topBtn) topBtn.classList.toggle('visible', scrolledPast);
+  document.body.classList.toggle('scrolled-past-hero', scrolledPast);
 }
 window.addEventListener('scroll', () => {
   _syncScrollUI();
