@@ -144,10 +144,17 @@
   .mini-sort-btn.active { color:var(--text-bright); background:var(--surface3); }
   .mini-sort-btn svg { width:14px; height:14px; }
   .mini-shuffle {
-    width:30px; height:30px; padding:0; border-radius:8px;
-    display:inline-flex; align-items:center; justify-content:center;
+    width:32px; height:32px; padding:0 !important; border-radius:8px;
+    display:inline-flex !important; align-items:center; justify-content:center;
+    color: var(--text-bright) !important;
+    gap: 0 !important;
   }
-  .mini-shuffle svg { width:13px; height:13px; }
+  .mini-shuffle:hover { color: var(--mint) !important; }
+  .mini-shuffle svg {
+    width: 14px !important; height: 14px !important;
+    color: inherit; stroke: currentColor;
+    flex-shrink: 0;
+  }
   /* Active select mode in the mini nav */
   .mini-select.active {
     background:#1a2a3a !important;
@@ -462,9 +469,11 @@
   /* Floating back-to-top button */
   #back-to-top {
     position:fixed; bottom:24px; right:24px; z-index:80;
-    width:44px; height:44px; border:none; border-radius:50%;
-    background:var(--surface); color:var(--text);
+    width:44px; height:44px;
     border:1px solid var(--border);
+    border-radius:50%;
+    background:var(--surface);
+    color:var(--text-bright);
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; opacity:0; transform:translateY(8px);
     pointer-events:none;
@@ -472,10 +481,16 @@
     box-shadow:0 8px 24px rgba(0,0,0,.4);
     -webkit-backdrop-filter:blur(10px);
     backdrop-filter:blur(10px);
+    padding: 0;
+    font-family: inherit;
   }
   #back-to-top.visible { opacity:1; transform:translateY(0); pointer-events:auto; }
-  #back-to-top:hover { background:var(--surface2); color:var(--text-bright); border-color:var(--mint); }
-  #back-to-top svg { width:18px; height:18px; }
+  #back-to-top:hover { background:var(--surface2); color:var(--mint); border-color:var(--mint); }
+  #back-to-top svg {
+    width:20px !important; height:20px !important;
+    color: inherit; stroke: currentColor;
+    flex-shrink: 0;
+  }
 
   #toast {
     position:fixed; bottom:32px; left:50%; z-index:999;
