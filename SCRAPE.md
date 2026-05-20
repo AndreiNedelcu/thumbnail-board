@@ -1,5 +1,13 @@
 # YouTube niche scraper
 
+> **Note (current state):** Today the scraper is **local-only** — it runs on the
+> user's Mac via `yt-dlp` (no API key needed) and produces a candidates file you
+> curate through a localhost UI. A **web-based scraper page** (a separate tab on
+> the GitHub Pages board, so anyone with the AUTH_TOKEN can scrape and curate
+> from a browser) is the next planned feature. It will likely use the YouTube
+> Data API v3 — yt-dlp can't run inside a Cloudflare Worker. See the "What's
+> NOT done yet" section of `ONBOARDING.md`.
+
 Pipeline to find great thumbnails from your niche and curate them
 before adding to the board.
 

@@ -1,5 +1,12 @@
 # Migration to Cloudflare Workers
 
+> **Status: COMPLETE.** This migration has already been done. The Worker is live at
+> `https://thumbnail-board-api.andrei-nndd.workers.dev` and the board reads/writes
+> through it. `server.py` is retired (kept on disk only as a backup reference).
+>
+> This file is kept as the historical playbook in case the Worker ever has to be
+> redeployed from scratch (new Cloudflare account, lost secrets, etc.).
+
 This guide walks you through replacing `server.py` with a Cloudflare Worker
 so the board, tagger, and extension work without your Mac being on.
 
@@ -101,17 +108,17 @@ https://thumbnail-board-api.YOUR-USERNAME.workers.dev
 
 Open these two files and replace the placeholder URL:
 
-**`/Users/andrei/thumbnail-board/api-client.js`** line 13:
+**`/Users/andrei/thumbnail-board/api-client.js`**:
 ```js
-const WORKER_URL = 'https://thumbnail-board-api.theseniordev.workers.dev';
+const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
 ```
-Change to your actual URL from Step 5.
+Change to your actual URL from Step 5 if redeploying.
 
-**`/Users/andrei/thumbnail-board/extension/content.js`** line 4:
+**`/Users/andrei/thumbnail-board/extension/content.js`**:
 ```js
-const WORKER_URL = 'https://thumbnail-board-api.theseniordev.workers.dev';
+const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
 ```
-Same — change to your URL.
+Same — change to your URL if redeploying.
 
 Then commit & push:
 ```bash
