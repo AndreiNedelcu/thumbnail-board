@@ -219,6 +219,17 @@ async function handleDelete(body, env) {
     return filtered;
   }, `data: delete ${vid}`);
   if (result.msg === 'No change') return json({ ok: false, msg: 'Not found' });
+
+  // Also evict from eagle-pending.json so auto_tag.py doesn't re-publish
+  // the same id on its next run (that was creating a delete → re-add loop).
+  try {
+    await mutate(env, (pending) => {
+      const filtered = pending.filter(p => p.id !== vid);
+      if (filtered.length === pending.length) return null;
+      return filtered;
+    }, `pending: drop ${vid} (deleted from board)`, PENDING_PATH);
+  } catch {}
+
   return json({ ok: true, msg: `Deleted ${vid}` });
 }
 
@@ -261,6 +272,17 @@ async function handleBulkDelete(body, env) {
     if (filtered.length === dataset.length) return null;
     return filtered;
   }, `data: bulk-delete ${ids.length} items`);
+
+  // Also evict from eagle-pending.json so auto_tag.py won't re-publish them
+  // on its next tick (that was the delete → re-add loop the user reported).
+  try {
+    await mutate(env, (pending) => {
+      const filtered = pending.filter(p => !idSet.has(p.id));
+      if (filtered.length === pending.length) return null;
+      return filtered;
+    }, `pending: drop ${ids.length} deleted from board`, PENDING_PATH);
+  } catch {}
+
   return json({ ok: true, deleted: ids.length, total: result.count });
 }
 
