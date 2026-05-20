@@ -1815,8 +1815,14 @@ async function confirmDelete() {
   }
 }
 
-document.getElementById('confirm-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('confirm-modal')) hideDeleteConfirm();
+// confirm-modal is declared AFTER this script in the HTML, so it isn't
+// in the DOM yet at parse time. Wait for DOMContentLoaded.
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = document.getElementById('confirm-modal');
+  if (!modal) return;
+  modal.addEventListener('click', e => {
+    if (e.target === modal) hideDeleteConfirm();
+  });
 });
 </script>
 
