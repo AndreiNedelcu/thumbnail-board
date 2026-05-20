@@ -685,7 +685,15 @@ async function runScrape() {
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
     const s = d.stats || {};
-    toast(`Scrape done · +${d.added} new · seen ${s.discovered||0} → niche ${s.after_filters||0} → outlier ${s.after_outlier||0}`, 'success');
+    // Detect "all YouTube calls failed with quota exceeded" so the toast tells
+    // the user what's actually wrong instead of generic "0 new candidates".
+    const errs = s.errors || [];
+    const quotaHits = errs.filter(e => /quota|403/i.test(e)).length;
+    if (s.discovered === 0 && quotaHits >= 5) {
+      toast(`YouTube API quota agotada hoy (${quotaHits} errors). Se resetea a medianoche Pacific (~07:00 UTC). Reintenta entonces.`, 'error');
+    } else {
+      toast(`Scrape done · +${d.added} new · seen ${s.discovered||0} → niche ${s.after_filters||0} → outlier ${s.after_outlier||0}`, 'success');
+    }
     await load();
   } catch (e) {
     toast('Scrape failed: ' + e.message, 'error');
