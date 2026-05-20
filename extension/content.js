@@ -160,6 +160,32 @@ async function fetchOEmbed(vid) {
 }
 
 /**
+ * Last-resort view-count fallback: fetch the watch page HTML directly and
+ * mine ytInitialPlayerResponse out of it. Costs one extra fetch (~50KB)
+ * but ONLY runs when getCardInfo/getWatchPageInfo couldn't find views.
+ * Works because the extension is already running on youtube.com — same
+ * origin, no CORS.
+ */
+async function fetchViewCountFromWatchHTML(vid) {
+  try {
+    const r = await fetch(`https://www.youtube.com/watch?v=${vid}`);
+    if (!r.ok) return '';
+    const html = await r.text();
+    const re = /\\?"viewCount\\?"\s*:\s*\\?"(\d+)\\?"/g;
+    let best = 0;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const n = parseInt(m[1], 10);
+      if (n > best) best = n;
+    }
+    if (best <= 0) return '';
+    if (best >= 1_000_000) return (best/1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (best >= 1_000)     return (best/1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(best);
+  } catch { return ''; }
+}
+
+/**
  * Try getWatchPageInfo up to N times with a small delay between attempts —
  * the watch page populates the title bit-by-bit as YT's SPA renders, so a
  * one-shot scrape catches a half-empty DOM if you click "Save" right after
@@ -419,15 +445,17 @@ async function callOllama(imageB64, title) {
 async function saveVideo(info, progress = () => {}) {
   if (!info || !info.id) throw new Error('No video info');
 
-  // Last-line-of-defense oEmbed fallback when info came from a card extractor
-  // (search / channel / sidebar) that couldn't find title or channel. Doesn't
-  // touch views — those have to come from DOM/ytInitialData.
+  // Last-line-of-defense fallbacks when info came from a card extractor
+  // (search / channel / sidebar) that couldn't find title, channel or views.
   if (!info.title || !info.channel) {
     const oe = await fetchOEmbed(info.id);
     if (oe) {
       if (!info.title)   info.title   = oe.title   || info.title;
       if (!info.channel) info.channel = oe.channel || info.channel;
     }
+  }
+  if (!info.views) {
+    info.views = await fetchViewCountFromWatchHTML(info.id);
   }
   if (!info.title || !info.channel || !info.views) {
     console.warn('[ThumbnailBoard] partial metadata being saved ' + info.id + ': ' + JSON.stringify({
