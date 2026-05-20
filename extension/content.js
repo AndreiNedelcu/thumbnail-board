@@ -89,7 +89,23 @@ function getCardInfo(card) {
   const title = card.querySelector('#video-title, yt-formatted-string.ytd-rich-grid-media, a#video-title-link')?.textContent?.trim()
     || link.getAttribute('title')?.trim() || '';
 
-  const channel = card.querySelector('ytd-channel-name a, .ytd-channel-name a, #text > a, .ytd-video-meta-block a')?.textContent?.trim() || '';
+  // Channel — most reliable signal is a link that points to a channel
+  // page (/@handle, /channel/UC..., /user/...). Skip the watch link.
+  let channel = '';
+  const channelLink = card.querySelector(
+    'a[href^="/@"], a[href^="/channel/"], a[href^="/user/"], a[href^="/c/"], ' +
+    'ytd-channel-name a, .ytd-channel-name a, .ytd-video-meta-block a:not([href*="/watch"])'
+  );
+  if (channelLink) channel = channelLink.textContent.trim();
+  // Fallback: anchor inside the metadata block (whichever is first that isn't a watch link)
+  if (!channel) {
+    for (const a of card.querySelectorAll('a')) {
+      const h = a.getAttribute('href') || '';
+      if (!h || /\/watch\?v=/.test(h)) continue;
+      const t = (a.textContent || '').trim();
+      if (t && t.length < 80 && !/views?/i.test(t)) { channel = t; break; }
+    }
+  }
 
   // Views — walk every short text node inside the card looking for the
   // "X views" pattern. More robust than guessing selectors since YouTube
