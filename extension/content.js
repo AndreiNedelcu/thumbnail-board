@@ -963,10 +963,12 @@ function injectIntoYTControls(ytContainer) {
   if (!m) return;
   const vid = m[1];
 
-  // If this card already has the absolute fallback button (from scanCards),
-  // remove it — the inline-preview YT-controls variant looks more native
-  // when both are technically applicable (home feed cards).
-  card?.querySelector('.tb-card-btn')?.remove();
+  // Remove any pre-existing absolute fallback buttons for this same video.
+  // Globally — buscar por data-vid en TODO el documento. El card ancestor
+  // que encontramos arriba a veces es un container intermedio y el
+  // .tb-card-btn está en una rama hermana, así que querySelector dentro
+  // del card a veces fallaba. El selector global por data-vid es robusto.
+  document.querySelectorAll(`.tb-card-btn[data-vid="${vid}"]`).forEach(b => b.remove());
 
   const btn = document.createElement('button');
   btn.className = 'tb-yt-btn';
