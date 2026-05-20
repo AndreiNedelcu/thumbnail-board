@@ -39,7 +39,7 @@
     "min_views": 50000,
     "max_age_days": 730,
     "min_duration_seconds": 90,
-    "min_outlier_score": 2.0,
+    "min_outlier_score": 1.5,
     "cap_per_run": 30,
     "max_inbox_size": 100
   }
