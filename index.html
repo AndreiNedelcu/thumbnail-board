@@ -883,7 +883,7 @@ async function init() {
   // Reflect restored state in the UI
   if (searchQuery) {
     document.getElementById('search').value = searchQuery;
-    document.getElementById('clear-search').style.display = '';
+    document.getElementById('clear-search').style.display = 'inline-flex';
     const mini = document.getElementById('mini-search');
     if (mini) mini.value = searchQuery;
     const miniClear = document.getElementById('mini-clear-search');
@@ -945,7 +945,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const main = document.getElementById('search');
       main.value = v;
       searchQuery = v;
-      document.getElementById('clear-search').style.display = v ? '' : 'none';
+      document.getElementById('clear-search').style.display = v ? 'inline-flex' : 'none';
       document.getElementById('mini-clear-search').classList.toggle('visible', !!v);
       applyFilters();
       saveState();
@@ -1337,7 +1337,7 @@ function lightboxBack() {
 function filterByTag(tag) {
   closeLightbox();
   document.getElementById('search').value = tag;
-  document.getElementById('clear-search').style.display = '';
+  document.getElementById('clear-search').style.display = 'inline-flex';
   searchQuery = tag;
   applyFilters();
 }
@@ -1393,7 +1393,7 @@ function showToast(msg, type='info') {
 // ── Events ────────────────────────────────────────────────────────
 document.getElementById('search').addEventListener('input', e => {
   searchQuery = e.target.value;
-  document.getElementById('clear-search').style.display = searchQuery ? '' : 'none';
+  document.getElementById('clear-search').style.display = searchQuery ? 'inline-flex' : 'none';
   const mini = document.getElementById('mini-search');
   if (mini) mini.value = searchQuery;
   const miniClear = document.getElementById('mini-clear-search');
