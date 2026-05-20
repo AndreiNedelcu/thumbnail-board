@@ -89,31 +89,39 @@
   }
   .commit-btn.danger:hover { background:rgba(233,69,96,0.22); color:#fff; box-shadow:none; transform:none; }
 
-  /* Split button — main approve + dropdown caret.
-     The two halves brighten together: hover on EITHER triggers both via
-     `.split-btn-group:hover`. No inset separator — they read as one piece. */
-  .split-btn-group { display:inline-flex; position:relative; }
+  /* Split button — single visual unit.
+     Background lives on the WRAPPER; both halves are transparent surfaces.
+     One DOM element owns the color → no chance of two transitions racing. */
+  .split-btn-group {
+    display:inline-flex; position:relative;
+    background:#004ac1; border-radius:9px;
+    transition:background .15s;
+  }
+  .split-btn-group:hover:not(.is-disabled) { background:#0058e5; }
+  .split-btn-group.is-disabled { background:#1f2730; }
+  .split-btn-group.is-disabled .commit-btn,
+  .split-btn-group.is-disabled .split-caret { color:rgba(255,255,255,0.35); cursor:not-allowed; }
+
   .split-btn-group .commit-btn {
+    background:transparent;
     border-radius:9px 0 0 9px;
-    padding:8px 14px;
+    padding:8px 8px 8px 14px;
+    color:#fff;
+    transition:none;
   }
-  /* Suppress the standalone .commit-btn lift/glow when it's part of the split */
-  .split-btn-group .commit-btn:hover { transform:none; box-shadow:none; }
-  /* Both halves brighten in lockstep when the group is hovered */
-  .split-btn-group:hover .commit-btn:not(:disabled),
-  .split-btn-group:hover .split-caret:not(:disabled) {
-    background:#0058e5;
-  }
+  .split-btn-group .commit-btn:hover { background:transparent; transform:none; box-shadow:none; }
+  .split-btn-group .commit-btn:disabled { opacity:1; }
 
   .split-caret {
-    padding:0 10px;
+    background:transparent; border:none; color:#fff;
+    padding:0 10px 0 4px;
     border-radius:0 9px 9px 0;
-    background:#004ac1; color:#fff; border:none;
-    cursor:pointer; transition:background .15s;
+    cursor:pointer;
     display:inline-flex; align-items:center; justify-content:center;
+    transition:background .15s;
   }
-  .split-caret:disabled { opacity:.4; cursor:not-allowed; }
-  .split-caret.open:not(:disabled) { background:#003a99; }
+  .split-caret:disabled { opacity:1; cursor:not-allowed; }
+  .split-caret.open:not(:disabled) { background:rgba(0,0,0,0.20); }
   .split-caret svg { width:11px; height:11px; transition:transform .18s; }
   .split-caret.open svg { transform:rotate(180deg); }
 
@@ -524,6 +532,7 @@ function updateStats() {
   document.getElementById('approvePendingBtn').disabled = noKept;
   document.getElementById('splitCaretBtn').disabled    = noKept;
   document.getElementById('approveBoardBtn').disabled  = noKept;
+  document.querySelector('.split-btn-group')?.classList.toggle('is-disabled', noKept);
   document.getElementById('rejectBtn').disabled = rejected === 0;
   if (noKept) closeSplitMenu();
 }
