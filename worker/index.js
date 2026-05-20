@@ -208,23 +208,60 @@ async function handleBulkDelete(body, env) {
 async function handleUpdate(body, env) {
   const vid = body.vid || body.id || '';
   if (!vid) return json({ ok: false, msg: 'No id' }, 400);
-  const tags = canonicaliseTags(body.tags);
+  const hasTags    = Array.isArray(body.tags);
+  const hasViews   = typeof body.views === 'string';
+  const hasTitle   = typeof body.title === 'string' || typeof body.name === 'string';
+  const hasChannel = typeof body.channel === 'string';
+  const tags = hasTags ? canonicaliseTags(body.tags) : null;
+  const titleVal = body.title ?? body.name ?? '';
+
   const result = await mutate(env, (dataset) => {
     const idx = dataset.findIndex(v => v.id === vid || v.eid === vid);
     if (idx === -1) {
-      // create new entry (item was in Eagle/extension but not in dataset yet)
       const entry = {
-        id: body.vid || vid, title: body.name || '', channel: body.channel || '',
-        views: body.views || '', tags, eid: body.eid || (body.id !== body.vid ? body.id : ''),
+        id: body.vid || vid, title: titleVal, channel: body.channel || '',
+        views: body.views || '', tags: tags || [],
+        eid: body.eid || (body.id !== body.vid ? body.id : ''),
       };
       return [...dataset, entry];
     }
     const copy = [...dataset];
-    copy[idx] = { ...copy[idx], tags };
-    if (body.eid && !copy[idx].eid) copy[idx].eid = body.eid;
+    const updated = { ...copy[idx] };
+    if (hasTags)    updated.tags    = tags;
+    if (hasViews)   updated.views   = body.views;
+    if (hasTitle)   updated.title   = titleVal;
+    if (hasChannel) updated.channel = body.channel;
+    if (body.eid && !updated.eid) updated.eid = body.eid;
+    copy[idx] = updated;
     return copy;
-  }, `data: update tags for ${vid}`);
+  }, `data: update ${vid}`);
   return json({ ok: true, count: result.count });
+}
+
+async function handleUpdateBatch(body, env) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return json({ ok: false, msg: 'No items' }, 400);
+  let updated = 0;
+  let added = 0;
+  const result = await mutate(env, (dataset) => {
+    const copy = [...dataset];
+    for (const it of items) {
+      const vid = it.vid || it.id;
+      if (!vid) continue;
+      const idx = copy.findIndex(v => v.id === vid || v.eid === vid);
+      if (idx === -1) continue;            // batch is for backfill, not insert
+      const cur = { ...copy[idx] };
+      if (typeof it.views   === 'string') cur.views   = it.views;
+      if (typeof it.title   === 'string') cur.title   = it.title;
+      if (typeof it.channel === 'string') cur.channel = it.channel;
+      if (Array.isArray(it.tags))         cur.tags    = canonicaliseTags(it.tags);
+      copy[idx] = cur;
+      updated++;
+    }
+    if (!updated) return null;
+    return copy;
+  }, `data: batch update ${items.length} items`);
+  return json({ ok: true, updated, added });
 }
 
 // ── Main fetch handler ───────────────────────────────────────────
@@ -252,10 +289,11 @@ export default {
       try { body = await req.json(); }
       catch { return json({ ok: false, msg: 'Bad JSON' }, 400); }
       try {
-        if (path === '/api/add')         return await handleAdd(body, env);
-        if (path === '/api/add-batch')   return await handleAddBatch(body, env);
-        if (path === '/api/delete')      return await handleDelete(body, env);
-        if (path === '/api/bulk-delete') return await handleBulkDelete(body, env);
+        if (path === '/api/add')          return await handleAdd(body, env);
+        if (path === '/api/add-batch')    return await handleAddBatch(body, env);
+        if (path === '/api/delete')       return await handleDelete(body, env);
+        if (path === '/api/bulk-delete')  return await handleBulkDelete(body, env);
+        if (path === '/api/update-batch') return await handleUpdateBatch(body, env);
         if (path === '/api/update' || path === '/api/eagle/update')
                                           return await handleUpdate(body, env);
       } catch (e) {

@@ -91,13 +91,19 @@ function getCardInfo(card) {
 
   const channel = card.querySelector('ytd-channel-name a, .ytd-channel-name a, #text > a, .ytd-video-meta-block a')?.textContent?.trim() || '';
 
-  // Views — first metadata line is usually "X views"
+  // Views — walk every short text node inside the card looking for the
+  // "X views" pattern. More robust than guessing selectors since YouTube
+  // keeps changing the metadata DOM.
   let views = '';
-  const metaSpans = card.querySelectorAll('.inline-metadata-item, #metadata-line span, .ytd-video-meta-block span');
-  for (const s of metaSpans) {
-    const t = (s.textContent || '').trim();
-    if (/^[\d,.KkMmBb]+\s*views?/i.test(t)) {
-      views = t.replace(/\s*views?/i, '').trim();
+  const all = card.querySelectorAll('*');
+  for (const el of all) {
+    if (el.children.length > 0) continue;      // only leaf text nodes
+    const t = (el.textContent || '').trim();
+    if (!t || t.length > 30) continue;
+    const m = t.match(/^([\d,. ]+\s*[KkMmBb]?)\s*views?$/i);
+    if (m) {
+      // Normalise: drop trailing "views", collapse spaces, keep K/M/B suffix
+      views = m[1].replace(/\s+/g, '').trim();
       break;
     }
   }
