@@ -86,22 +86,21 @@ function getWatchPageInfo() {
     return String(n);
   }
   try {
-    // 1) ytInitialPlayerResponse.videoDetails.viewCount — exact, always present
+    // 1) Tolerant regex over the WHOLE document. Matches:
+    //    "viewCount":"123456"
+    //    \"viewCount\":\"123456\"   (escaped, when YT embeds JSON inside a JS string)
+    //    "viewCount" : "123456"     (whitespace variants)
+    // We grab every match in the document and take the largest plausible one
+    // (the page also has shortViewCount, dislikes, etc — view count is the biggest).
     const html = document.documentElement.innerHTML;
-    const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});(?=\s*var)/s)
-           || html.match(/"videoDetails"\s*:\s*\{[^}]*?"viewCount"\s*:\s*"(\d+)"/);
-    if (m) {
-      // If the second pattern matched, m[1] is the count directly
-      if (/^\d+$/.test(m[1])) {
-        views = fmtN(parseInt(m[1], 10));
-      } else {
-        try {
-          const data = JSON.parse(m[1]);
-          const vc = parseInt(data?.videoDetails?.viewCount || '0', 10);
-          views = fmtN(vc);
-        } catch {}
-      }
+    const re = /\\?"viewCount\\?"\s*:\s*\\?"(\d+)\\?"/g;
+    let best = 0;
+    let m;
+    while ((m = re.exec(html)) !== null) {
+      const n = parseInt(m[1], 10);
+      if (n > best) best = n;
     }
+    if (best > 0) views = fmtN(best);
   } catch {}
   if (!views) {
     try {
@@ -191,11 +190,13 @@ async function getWatchPageInfoReady() {
     }
   }
   if (!info.title || !info.channel || !info.views) {
-    console.warn('[ThumbnailBoard] partial metadata for watch', info.id, {
+    // Use JSON.stringify so the error tracker doesn't render this as
+    // "[object Object]" — that hides the actual missing field.
+    console.warn('[ThumbnailBoard] partial metadata for watch ' + info.id + ': ' + JSON.stringify({
       title: info.title || '(empty)',
       channel: info.channel || '(empty)',
       views: info.views || '(empty)',
-    });
+    }));
   }
   return info;
 }
@@ -429,11 +430,11 @@ async function saveVideo(info, progress = () => {}) {
     }
   }
   if (!info.title || !info.channel || !info.views) {
-    console.warn('[ThumbnailBoard] partial metadata being saved', info.id, {
+    console.warn('[ThumbnailBoard] partial metadata being saved ' + info.id + ': ' + JSON.stringify({
       title: info.title || '(empty)',
       channel: info.channel || '(empty)',
       views: info.views || '(empty)',
-    });
+    }));
   }
 
   // Duplicate check FIRST — saves the 10s Ollama call
