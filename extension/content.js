@@ -679,11 +679,42 @@ function injectCardButton(thumbContainer, watchLink) {
   });
 }
 
+// Every YouTube card container we want to surface our button on. New
+// layouts get added here — yt-lockup-view-model is the post-2024 search
+// result, ytd-grid-video-renderer is the legacy channel-tab grid, etc.
+const CARD_SELECTORS = [
+  'ytd-rich-item-renderer',
+  'ytd-video-renderer',
+  'ytd-grid-video-renderer',
+  'ytd-compact-video-renderer',
+  'ytd-rich-grid-media',
+  'ytd-reel-item-renderer',
+  'yt-lockup-view-model',
+  'ytm-rich-item-renderer',
+].join(',');
+
 function scanCards() {
-  // We only inject into YouTube's own inline-preview controls stack
-  // (.ytInlinePlayerControlsTopRightControls). That gives one well-
-  // integrated button per hover — no duplicates, no conflicts.
+  // 1) Cards that get YT's inline-preview overlay (home feed) — append our
+  //    button to the inline-preview controls stack so it sits next to YT's
+  //    mute and captions buttons. Looks the most "native" here.
   document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
+
+  // 2) Cards on search results, channel pages, sidebar suggestions, etc.
+  //    These don't get inline-preview controls, so we drop an
+  //    absolute-positioned button into the thumbnail container instead.
+  for (const card of document.querySelectorAll(CARD_SELECTORS)) {
+    // If this card already has any of our buttons, skip
+    if (card.querySelector('.tb-yt-btn, .tb-card-btn')) continue;
+    const watchLink = card.querySelector('a[href*="/watch?v="]');
+    if (!watchLink) continue;
+    const thumbContainer =
+         card.querySelector('a#thumbnail')
+      || card.querySelector('ytd-thumbnail')
+      || card.querySelector('yt-thumbnail-view-model')
+      || card.querySelector('yt-image-view-model')
+      || watchLink;
+    injectCardButton(thumbContainer, watchLink);
+  }
 }
 
 // ── Init + SPA navigation ─────────────────────────────────────────
@@ -805,20 +836,23 @@ function injectIntoYTControls(ytContainer) {
   ytContainer.appendChild(btn);
 }
 
-// Watch the whole DOM for the YT controls container being added or removed
+// Watch the whole DOM for YT containers being added/removed — both the
+// inline-preview stack (home) and the regular card elements (search /
+// channel / sidebar). Calls scanCards() which handles both paths.
 const ytObserver = new MutationObserver((muts) => {
+  let needsScan = false;
   for (const mut of muts) {
     for (const node of mut.addedNodes) {
       if (node.nodeType !== 1) continue;
       if (node.classList?.contains('ytInlinePlayerControlsTopRightControls')) {
         injectIntoYTControls(node);
-      } else if (node.querySelectorAll) {
-        node.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
+      } else if (node.matches?.(CARD_SELECTORS) || node.querySelector?.(CARD_SELECTORS)
+               || node.querySelector?.('.ytInlinePlayerControlsTopRightControls')) {
+        needsScan = true;
       }
     }
   }
-  // Defensive: always re-scan for any controls we missed
-  document.querySelectorAll('.ytInlinePlayerControlsTopRightControls').forEach(injectIntoYTControls);
+  if (needsScan) scanCards();
 });
 ytObserver.observe(document.body, { childList: true, subtree: true });
 
