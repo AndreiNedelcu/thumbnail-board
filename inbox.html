@@ -674,11 +674,12 @@ function timeUntilPTMidnight() {
   const hh = parseInt(parts.find(p => p.type === 'hour').value, 10);
   const mm = parseInt(parts.find(p => p.type === 'minute').value, 10);
   const ss = parseInt(parts.find(p => p.type === 'second').value, 10);
-  // Seconds until next 00:00 PT
   let secsLeft = (24 - hh) * 3600 - mm * 60 - ss;
   if (secsLeft <= 0) secsLeft += 86400;
+  // Round up the last partial minute so we never display the misleading "0m"
+  if (secsLeft < 60) return '< 1m · retry shortly';
   const h = Math.floor(secsLeft / 3600);
-  const m = Math.floor((secsLeft % 3600) / 60);
+  const m = Math.ceil((secsLeft % 3600) / 60);
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
