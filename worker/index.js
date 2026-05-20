@@ -168,8 +168,8 @@ function formatViewCount(n) {
  * blank title/channel/views. Costs 1 quota unit per call.
  */
 async function fillMissingMetadata(entry, env) {
-  if (entry.title && entry.channel && entry.views) return entry;     // nothing to do
-  if (!env.YOUTUBE_API_KEY) return entry;                            // no key, can't help
+  if (entry.title && entry.channel && entry.views) return entry;
+  if (!env.YOUTUBE_API_KEY) return entry;
   try {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(entry.id)}&key=${env.YOUTUBE_API_KEY}`;
     const r = await fetch(url);
@@ -197,7 +197,9 @@ async function handleAdd(body, env) {
   };
 
   // Server-side fallback for the chrome extension when it fails to scrape
-  // YouTube's DOM (selectors change every couple of months).
+  // YouTube's DOM (selectors change every couple of months). Silent if the
+  // YouTube Data API is over quota — extension falls through with whatever
+  // metadata it managed to grab.
   await fillMissingMetadata(entry, env);
 
   const result = await mutate(env, (dataset) => {
