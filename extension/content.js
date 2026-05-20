@@ -13,6 +13,11 @@ let AUTH_TOKEN = '';
 let currentVideoId = null;
 let saving = new Set();              // video IDs currently being saved
 const savedVideoIds = new Set();     // cache of what's in the board
+// Video IDs that have at any point received the inline-preview button.
+// Once a card proves it gets inline-preview controls (home feed), we
+// never re-inject the absolute .tb-card-btn for it, even when YT
+// briefly removes the overlay between hovers.
+const _hasInlineBtnVids = new Set();
 
 // ── Taxonomy (must match Worker canonicaliseTags + auto_tag.py) ───
 const CATS = {
@@ -874,10 +879,12 @@ function scanCards() {
     if (!m) continue;
     const vid = m[1];
 
-    // Skip if ANY button (card-style or yt-controls-style) already exists
-    // for this vid anywhere in the document. Container ancestors can
-    // diverge between branches, so document-wide is the only reliable check.
+    // Skip if ANY button already exists for this vid anywhere in the doc.
     if (document.querySelector(`.tb-card-btn[data-vid="${vid}"], .tb-yt-btn[data-vid="${vid}"]`)) continue;
+    // Skip if this vid has EVER received the inline-preview button — YT
+    // briefly removes its overlay between hovers, and re-injecting the
+    // .tb-card-btn during that gap is the bug the user keeps reporting.
+    if (_hasInlineBtnVids.has(vid)) continue;
 
     const thumbContainer =
          card.querySelector('a#thumbnail')
@@ -970,12 +977,12 @@ function injectIntoYTControls(ytContainer) {
   if (!m) return;
   const vid = m[1];
 
-  // Remove any pre-existing absolute fallback buttons for this same video.
-  // Globally — buscar por data-vid en TODO el documento. El card ancestor
-  // que encontramos arriba a veces es un container intermedio y el
-  // .tb-card-btn está en una rama hermana, así que querySelector dentro
-  // del card a veces fallaba. El selector global por data-vid es robusto.
+  // Remove any pre-existing absolute fallback buttons for this same video,
+  // and mark this vid as one that has inline-preview controls so scanCards
+  // won't re-inject the .tb-card-btn next time YT briefly clears the
+  // overlay between hovers.
   document.querySelectorAll(`.tb-card-btn[data-vid="${vid}"]`).forEach(b => b.remove());
+  _hasInlineBtnVids.add(vid);
 
   const btn = document.createElement('button');
   btn.className = 'tb-yt-btn';
