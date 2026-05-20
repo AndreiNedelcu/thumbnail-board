@@ -42,7 +42,8 @@ The Worker is publicly readable (`GET /api/data`) but every write endpoint requi
 ### Frontend (served by GitHub Pages)
 | File | Purpose |
 |------|---------|
-| `index.html` | Public board UI — grid, lightbox, sort, search, Edit Tags inline panel |
+| `index.html` | Public board UI — grid, lightbox, sort, search, Edit Tags inline panel, Inbox FAB top-right |
+| `inbox.html` | Web inbox for the scrape bot — outlier-scored candidates, approve→pending / approve→board / reject |
 | `tagger.html` | One-by-one tag editor. Reads data.json directly. Still used for single-item flows but Edit Tags inside the lightbox covers most cases |
 | `api-client.js` | Shared API client. Detects localhost vs cloud, adds `X-Auth-Token`, shows themed login overlay on first write |
 | `review.html` | Local-only UI served by `review.py` to approve/reject AI suggestions |
@@ -51,8 +52,9 @@ The Worker is publicly readable (`GET /api/data`) but every write endpoint requi
 ### Worker (Cloudflare)
 | File | Purpose |
 |------|---------|
-| `worker/index.js` | The whole API; mutates data.json via the GitHub Contents API |
-| `worker/wrangler.toml` | Deploy config; secrets are set via `wrangler secret put NAME` |
+| `worker/index.js` | The whole API; mutates data.json via the GitHub Contents API. Also hosts the inbox endpoints and the `scheduled()` cron handler |
+| `worker/scrape.js` | YouTube Data API v3 scraper + outlier scorer used by the cron + `/api/scrape/run` |
+| `worker/wrangler.toml` | Deploy config; secrets are set via `wrangler secret put NAME`. Cron trigger lives here (commented out until smoke-tested) |
 
 ### Local scripts (Python)
 | File | Purpose |
@@ -77,6 +79,9 @@ The Worker is publicly readable (`GET /api/data`) but every write endpoint requi
 |------|---------|------------|
 | `data.json` | Source of truth — every item the board knows about | YES |
 | `eagle-pending.json` | Queue of items waiting for auto_tag.py to process | YES (was the Eagle snapshot) |
+| `scrape_sources.json` | Channels + queries + thresholds that drive the web scrape bot. Editable by commit | YES |
+| `scrape_inbox.json` | Pending candidates from the scrape bot, awaiting your approve/reject in inbox.html | YES |
+| `scrape_rejected.json` | Bare IDs of candidates you rejected — never re-enter the inbox | YES |
 | `pending_review.json` | AI suggestions waiting for human review | gitignored |
 | `pending_rejected.json` | Rejected AI suggestions kept for analysis | gitignored |
 | `auto_tag_feedback.json` | "AI said X, user kept Y" — fed back into next batch | gitignored |
@@ -101,6 +106,10 @@ All POST endpoints require `X-Auth-Token`.
 | `/api/update` | POST | `{vid, id?, tags?, views?, title?, channel?, eid?}` | Update an existing item; creates one if vid is unknown |
 | `/api/update-batch` | POST | `{items: [{vid, ...}]}` | Update many in ONE commit (used by backfill) |
 | `/api/eagle/update` | POST | (alias of `/api/update`) | Legacy alias kept so old callers still work |
+| `/api/inbox` | GET | – | Returns scrape_inbox.json (public read, CORS open) |
+| `/api/inbox/approve` | POST | `{ids, destination: "pending"\|"board"}` | Move kept candidates from inbox to eagle-pending.json or directly to data.json. Two commits (dest + inbox cleanup) |
+| `/api/inbox/reject` | POST | `{ids}` | Move IDs to scrape_rejected.json, drop from inbox |
+| `/api/scrape/run` | POST | – | Manual trigger of the scrape bot. Same logic as the cron `scheduled()` handler |
 
 The Worker uses the GitHub Contents API (`GET /contents/data.json` → modify → `PUT /contents/data.json`) for every write. It retries up to 3 times on sha conflicts.
 
@@ -204,8 +213,31 @@ The `OLLAMA_ORIGINS` line is also persisted in `~/Library/LaunchAgents/homebrew.
 
 ## Running the YouTube scraper
 
+### Web scrape bot (cloud, primary flow)
+
+Lives entirely in the Worker. Reads `scrape_sources.json`, calls YouTube Data API v3, applies niche/age/views/duration/regex filters, computes an **outlier score** per candidate (median views/day of the channel's last 30 long-form videos), dedups against board + pending + inbox + rejected, and appends the top N to `scrape_inbox.json`.
+
 ```bash
-# edit scrape_config.json to add channels/queries you trust
+# 1. Set the secret (once)
+cd worker
+wrangler secret put YOUTUBE_API_KEY
+wrangler deploy
+
+# 2. Trigger manually from the UI: open inbox.html → "Run scraper now"
+#    Or from CLI:
+curl -X POST -H "X-Auth-Token: $TB_AUTH_TOKEN" \
+  https://thumbnail-board-api.andrei-nndd.workers.dev/api/scrape/run
+
+# 3. Enable the cron (every 6h) by uncommenting [triggers] in worker/wrangler.toml
+#    and redeploying. Do this AFTER the manual smoke test passes.
+```
+
+Edit `scrape_sources.json` (committed in the repo) to add channels / queries or tune `thresholds.min_outlier_score`, `min_views`, `cap_per_run`, etc.
+
+### Local scraper (legacy, still works)
+
+```bash
+# edit scrape_config.json (separate file from the web bot's scrape_sources.json)
 python3 scrape_youtube.py            # writes youtube_candidates.json
 python3 curate.py                    # opens :8766/curate.html — keep/reject grid
 # kept candidates land in eagle-pending.json → auto_tag picks them up next batch
@@ -225,6 +257,6 @@ python3 curate.py                    # opens :8766/curate.html — keep/reject g
 ## What's NOT done yet
 
 These are open and would benefit from a focused session:
-- A **scraper page on the web** (not local-only) — pending request
 - Color-based search and OCR text-in-thumbnail search — pending request
 - Manual upload of arbitrary thumbnails (not from YouTube) — pending request
+- A `POST /api/scrape/config` endpoint so `scrape_sources.json` (thresholds, channels, queries) can be edited from the UI without committing — pending nice-to-have

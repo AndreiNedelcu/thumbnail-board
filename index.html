@@ -548,9 +548,36 @@
   }
   #toast svg { flex-shrink:0; }
   #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Inbox FAB — fixed top-right link, survives hero + sticky header */
+  .inbox-fab {
+    position:fixed; top:14px; right:18px; z-index:60;
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 14px; border-radius:10px;
+    background:rgba(23,30,37,0.82); backdrop-filter:blur(10px);
+    border:1px solid var(--border);
+    font-family:inherit; font-size:12px; font-weight:700;
+    color:var(--text); text-decoration:none; letter-spacing:.3px;
+    transition:all .15s;
+  }
+  .inbox-fab:hover { color:var(--text-bright); border-color:var(--border-hover); background:rgba(23,30,37,0.95); transform:translateY(-1px); }
+  .inbox-fab-badge {
+    min-width:20px; height:20px; padding:0 6px; border-radius:10px;
+    background:var(--surface3); color:var(--muted);
+    font-size:10px; font-weight:800; display:inline-flex; align-items:center; justify-content:center;
+    transition:all .15s;
+  }
+  .inbox-fab-badge.has-items { background:var(--brand-grad); color:#0d1117; }
 </style>
 </head>
 <body>
+
+<!-- Inbox FAB (top-right, fixed) -->
+<a class="inbox-fab" href="inbox.html" title="Scrape inbox">
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+  <span>Inbox</span>
+  <span class="inbox-fab-badge" id="inbox-fab-count">·</span>
+</a>
 
 <!-- Sticky mini header (only shows when scrolled past hero) -->
 <header id="mini-header">
@@ -915,6 +942,21 @@ async function init() {
     setTimeout(() => openLightboxByVideoId(hashMatch[1]), 80);
   }
 }
+
+// Refresh the inbox count badge (non-blocking — fire and forget)
+async function refreshInboxBadge() {
+  const el = document.getElementById('inbox-fab-count');
+  if (!el) return;
+  try {
+    const r = await TBApi.fetch('/api/inbox');
+    if (!r.ok) return;
+    const items = await r.json();
+    const n = Array.isArray(items) ? items.length : 0;
+    el.textContent = String(n);
+    el.classList.toggle('has-items', n > 0);
+  } catch (e) { /* ignore — board still loads */ }
+}
+document.addEventListener('DOMContentLoaded', refreshInboxBadge);
 
 // Show sticky mini-header + back-to-top when scrolled past hero, persist scrollY
 let _scrollSaveTimer = null;

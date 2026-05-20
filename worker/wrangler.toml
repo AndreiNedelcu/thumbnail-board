@@ -8,5 +8,11 @@ DATA_PATH   = "data.json"
 BRANCH      = "main"
 
 # Secrets (set with: wrangler secret put NAME)
-#   GITHUB_TOKEN  — fine-grained PAT with Contents:write on this repo
-#   AUTH_TOKEN    — random string, shared with frontend/extension
+#   GITHUB_TOKEN     — fine-grained PAT with Contents:write on this repo
+#   AUTH_TOKEN       — random string, shared with frontend/extension
+#   YOUTUBE_API_KEY  — YouTube Data API v3 key (Google Cloud Console)
+
+# Scrape bot cron. Stays disabled until the manual smoke test passes,
+# then uncomment to schedule the scheduled() handler every 6 hours.
+# [triggers]
+# crons = ["0 */6 * * *"]

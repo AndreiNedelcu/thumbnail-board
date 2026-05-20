@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox · Thumbnail Board</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="api-client.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
+    --border:rgba(204,218,231,0.08); --border-h:rgba(204,218,231,0.18);
+    --text:#ccdae7; --bright:#fff; --muted:#6e7d8c;
+    --mint:#3aecba; --purple:#524add; --red:#e94560; --amber:#f5a524;
+    --grad:linear-gradient(135deg,#3aecba 0%,#524add 100%);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Inter',sans-serif; background:var(--bg); color:var(--text);
+    min-height:100vh; -webkit-font-smoothing:antialiased; position:relative;
+  }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:rgba(204,218,231,0.12); border-radius:5px; }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(204,218,231,0.22); }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% -5%, rgba(58,236,186,0.12), transparent 55%),
+      radial-gradient(ellipse 900px 600px at 85% 8%, rgba(82,74,221,0.14), transparent 55%);
+  }
+  body > * { position:relative; z-index:1; }
+  a { color:inherit; text-decoration:none; }
+
+  header {
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,17,23,0.92); backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+    padding:16px 28px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  .logo { font-weight:800; font-size:14px; letter-spacing:1.8px; color:var(--bright); }
+  .logo span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .back-link {
+    font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.5px;
+    text-transform:uppercase; padding:6px 10px; border-radius:8px;
+    transition:color .15s, background .15s;
+  }
+  .back-link:hover { color:var(--text); background:var(--surface2); }
+  .stats { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+  .spacer { flex:1; }
+
+  .toolbar-row {
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  }
+  .select, .toggle, .bulk-btn {
+    padding:7px 13px; border-radius:9px;
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    transition:all .15s; display:inline-flex; align-items:center; gap:6px;
+    outline:none;
+  }
+  .select:hover, .toggle:hover, .bulk-btn:hover { color:var(--bright); border-color:var(--border-h); background:var(--surface3); }
+  .toggle.active { color:var(--mint); border-color:rgba(58,236,186,0.4); background:rgba(58,236,186,0.08); }
+  .run-btn {
+    padding:8px 14px; border-radius:9px;
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    transition:all .15s;
+  }
+  .run-btn:hover { color:var(--mint); border-color:rgba(58,236,186,0.4); background:rgba(58,236,186,0.08); }
+  .run-btn:disabled { opacity:.5; cursor:not-allowed; }
+
+  .commit-row {
+    display:flex; gap:8px; align-items:center;
+  }
+  .commit-btn {
+    padding:8px 16px; border-radius:9px;
+    background:var(--grad); color:#0d1117; border:none;
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+    transition:all .15s;
+  }
+  .commit-btn:hover { box-shadow:0 6px 20px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .commit-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+  .commit-btn.secondary {
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
+  }
+  .commit-btn.secondary:hover { color:var(--bright); border-color:var(--border-h); background:var(--surface3); box-shadow:none; transform:none; }
+  .commit-btn.danger {
+    background:rgba(233,69,96,0.12); color:var(--red); border:1px solid rgba(233,69,96,0.3);
+  }
+  .commit-btn.danger:hover { background:rgba(233,69,96,0.22); color:#fff; box-shadow:none; transform:none; }
+
+  main { max-width:1600px; margin:0 auto; padding:24px clamp(20px, 4vw, 48px) 100px; }
+
+  #grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
+    gap:16px;
+  }
+  .card {
+    position:relative; aspect-ratio:16/9;
+    background:var(--surface); border-radius:12px; overflow:hidden;
+    cursor:pointer; transition:transform .15s, box-shadow .15s, outline-color .15s;
+    outline:2px solid transparent; outline-offset:-2px;
+  }
+  .card:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card.kept { outline-color:var(--mint); }
+  .card.rejected { outline-color:rgba(233,69,96,.6); }
+  .card.rejected img { filter:grayscale(.8) brightness(.5); }
+  .card.low-confidence img { opacity:.78; }
+
+  /* Outlier badge */
+  .score-badge {
+    position:absolute; top:8px; right:8px;
+    padding:4px 9px; border-radius:8px;
+    background:rgba(0,0,0,.78); border:1px solid rgba(255,255,255,.15);
+    color:#fff; font-size:12px; font-weight:800; letter-spacing:.3px;
+    display:inline-flex; align-items:center; gap:3px;
+    backdrop-filter:blur(4px);
+  }
+  .score-badge.score-hot   { background:rgba(58,236,186,0.92); color:#0d1117; border-color:rgba(58,236,186,0.3); }
+  .score-badge.score-warm  { background:rgba(245,165,36,0.92); color:#0d1117; border-color:rgba(245,165,36,0.3); }
+  .score-badge.score-tepid { background:rgba(0,0,0,0.78); color:#fff; }
+  .score-badge.low-confidence { opacity:.55; font-style:italic; }
+  .score-badge .x { font-size:9px; opacity:.7; font-weight:700; }
+
+  /* Keep checkmark — appears bottom-right when kept */
+  .keep-tick {
+    position:absolute; bottom:8px; right:8px;
+    width:28px; height:28px; border-radius:50%;
+    background:var(--mint); border:2px solid var(--mint);
+    display:none; align-items:center; justify-content:center;
+  }
+  .keep-tick::after {
+    content:''; width:14px; height:14px;
+    background:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d1117' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='20 6 9 17 4 12'/></svg>") center/contain no-repeat;
+  }
+  .card.kept .keep-tick { display:flex; }
+
+  /* Reject button — hover */
+  .reject-btn {
+    position:absolute; top:8px; left:8px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; opacity:0; transition:all .15s;
+  }
+  .card:hover .reject-btn { opacity:1; }
+  .reject-btn:hover { background:var(--red); border-color:var(--red); }
+  .reject-btn svg { color:#fff; width:14px; height:14px; }
+  .card.rejected .reject-btn { opacity:1; background:var(--red); border-color:var(--red); }
+
+  /* External-link to YouTube */
+  .yt-link {
+    position:absolute; bottom:8px; left:8px;
+    width:26px; height:26px; border-radius:50%;
+    background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0; transition:all .15s;
+  }
+  .card:hover .yt-link { opacity:1; }
+  .yt-link:hover { background:#ff0000; border-color:#ff0000; }
+  .yt-link svg { color:#fff; width:13px; height:13px; }
+
+  /* Meta strip on hover */
+  .card .meta {
+    position:absolute; inset:auto 0 0 0;
+    background:linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 100%);
+    padding:32px 12px 44px;
+    opacity:0; transition:opacity .15s;
+    pointer-events:none;
+  }
+  .card:hover .meta { opacity:1; }
+  .card .title { font-size:12px; font-weight:600; color:#fff; line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .card .sub { font-size:10px; color:rgba(255,255,255,.7); margin-top:3px; display:flex; gap:6px; flex-wrap:wrap; }
+  .card .sub .dot { opacity:.5; }
+
+  #empty {
+    text-align:center; padding:120px 24px; color:var(--muted);
+  }
+  #empty h2 { font-size:24px; color:var(--bright); margin-bottom:8px; font-weight:800; letter-spacing:-0.5px; }
+  #empty p { font-size:14px; line-height:1.6; }
+  #empty button { margin-top:24px; }
+
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
+    font-size:13px; font-weight:600; border:1px solid var(--border);
+    opacity:0; transition:all .25s; pointer-events:none;
+    box-shadow:0 12px 32px rgba(0,0,0,.4); z-index:200; max-width:540px;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* Confirm modal for "Add to board now" (skips auto-tag) */
+  .modal-overlay {
+    position:fixed; inset:0; background:rgba(13,17,23,0.84); backdrop-filter:blur(16px);
+    z-index:300; display:none; align-items:center; justify-content:center; padding:24px;
+  }
+  .modal-overlay.show { display:flex; }
+  .modal {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:28px; max-width:480px; width:100%;
+    box-shadow:0 24px 64px rgba(0,0,0,0.6);
+  }
+  .modal h3 { color:var(--bright); font-size:18px; font-weight:800; margin-bottom:10px; letter-spacing:-.3px; }
+  .modal p { font-size:13px; line-height:1.6; color:var(--muted); margin-bottom:22px; }
+  .modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TB<span>INBOX</span></div>
+  <a class="back-link" href="index.html">← Board</a>
+  <div class="stats" id="stats">Loading…</div>
+
+  <div class="spacer"></div>
+
+  <div class="toolbar-row">
+    <select class="select" id="sortSel" onchange="setSort(this.value)">
+      <option value="score">Sort: score ↓</option>
+      <option value="recent">Sort: recent ↓</option>
+      <option value="views">Sort: views ↓</option>
+    </select>
+    <button class="toggle" id="hcToggle" onclick="toggleHc()">High confidence only</button>
+    <button class="run-btn" id="runBtn" onclick="runScrape()">Run scraper now</button>
+  </div>
+
+  <div class="spacer"></div>
+
+  <div class="toolbar-row">
+    <button class="bulk-btn" onclick="keepAll()">Keep all</button>
+    <button class="bulk-btn" onclick="rejectAll()">Reject all</button>
+    <button class="bulk-btn" onclick="clearAll()">Clear</button>
+  </div>
+
+  <div class="commit-row">
+    <button class="commit-btn"        id="approvePendingBtn" onclick="approve('pending')">Approve → pending</button>
+    <button class="commit-btn secondary" id="approveBoardBtn"   onclick="confirmBoardApprove()">Approve → board</button>
+    <button class="commit-btn danger"  id="rejectBtn"         onclick="rejectMarked()">Reject marked</button>
+  </div>
+</header>
+
+<main>
+  <div id="grid"></div>
+  <div id="empty" style="display:none">
+    <h2>Inbox empty</h2>
+    <p>The scraper bot will fill this up on its next run.<br>You can also trigger it manually now.</p>
+    <button class="run-btn" onclick="runScrape()">Run scraper now</button>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<div class="modal-overlay" id="boardModal">
+  <div class="modal">
+    <h3>Send straight to board?</h3>
+    <p>These will land in <strong>data.json</strong> with no tags. The auto-tag pipeline won't touch them — you'll need to tag them by hand (or run auto_tag.py on them later). For most items, "Approve → pending" is the right choice.</p>
+    <div class="modal-actions">
+      <button class="commit-btn secondary" onclick="closeBoardModal()">Cancel</button>
+      <button class="commit-btn" onclick="closeBoardModal(); approve('board')">Yes, add to board</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let items = [];                        // raw inbox items
+const decisions = new Map();           // id → "keep" | "reject"
+let sortMode = 'score';
+let hcOnly = false;
+
+function esc(s) {
+  return String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
+}
+
+function scoreClass(it) {
+  const s = it.outlierScore || 0;
+  if (s >= 5) return 'score-hot';
+  if (s >= 2) return 'score-warm';
+  return 'score-tepid';
+}
+
+function ageLabel(days) {
+  if (days == null) return '';
+  if (days < 1)   return 'today';
+  if (days < 2)   return '1d';
+  if (days < 30)  return Math.floor(days) + 'd';
+  if (days < 365) return Math.floor(days / 30) + 'mo';
+  return Math.floor(days / 365) + 'y';
+}
+
+async function load() {
+  try {
+    const r = await TBApi.fetch('/api/inbox');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    items = await r.json();
+  } catch (e) {
+    items = [];
+    toast('Failed to load inbox: ' + e.message, 'error');
+  }
+  render();
+}
+
+function filteredSorted() {
+  let list = items.slice();
+  if (hcOnly) list = list.filter(it => it.outlierConfidence === 'high');
+  if (sortMode === 'score') list.sort((a,b) => (b.outlierScore||0) - (a.outlierScore||0));
+  else if (sortMode === 'recent') list.sort((a,b) => new Date(b.addedAt||0) - new Date(a.addedAt||0));
+  else if (sortMode === 'views') list.sort((a,b) => (b.viewsRaw||0) - (a.viewsRaw||0));
+  return list;
+}
+
+function render() {
+  const list = filteredSorted();
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+
+  if (!items.length) {
+    grid.style.display = 'none';
+    empty.style.display = 'block';
+    updateStats();
+    return;
+  }
+  grid.style.display = 'grid';
+  empty.style.display = 'none';
+
+  grid.innerHTML = list.map(it => {
+    const state = decisions.get(it.id) || '';
+    const cls = state === 'keep' ? 'kept' : state === 'reject' ? 'rejected' : '';
+    const lc  = it.outlierConfidence === 'low' ? 'low-confidence' : '';
+    const scoreLabel = it.outlierScore ? `<span class="x">x</span>${it.outlierScore}` : '—';
+    const subParts = [
+      esc(it.channel || ''),
+      it.views ? esc(it.views) + ' views' : '',
+      ageLabel(it.ageDays),
+    ].filter(Boolean);
+    return `
+      <div class="card ${cls} ${lc}" data-id="${esc(it.id)}" onclick="toggle('${esc(it.id)}')">
+        <img loading="lazy"
+             src="https://i.ytimg.com/vi/${esc(it.id)}/maxresdefault.jpg"
+             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(it.id)}/hqdefault.jpg'">
+        <div class="score-badge ${scoreClass(it)} ${lc}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
+          ${scoreLabel}
+        </div>
+        <div class="keep-tick"></div>
+        <div class="reject-btn" onclick="event.stopPropagation(); rejectCard('${esc(it.id)}')" title="Mark reject">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </div>
+        <a class="yt-link" href="https://www.youtube.com/watch?v=${esc(it.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open on YouTube">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        </a>
+        <div class="meta">
+          <div class="title">${esc(it.title)}</div>
+          <div class="sub">
+            ${subParts.map(p => `<span>${p}</span>`).join('<span class="dot">·</span>')}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  updateStats();
+}
+
+function toggle(id) {
+  const cur = decisions.get(id);
+  if (!cur)               decisions.set(id, 'keep');
+  else if (cur === 'keep')   decisions.delete(id);
+  else if (cur === 'reject') decisions.set(id, 'keep');
+  refreshCard(id);
+  updateStats();
+}
+function rejectCard(id) {
+  const cur = decisions.get(id);
+  if (cur === 'reject') decisions.delete(id);
+  else                  decisions.set(id, 'reject');
+  refreshCard(id);
+  updateStats();
+}
+function refreshCard(id) {
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (!card) return;
+  card.classList.remove('kept','rejected');
+  const s = decisions.get(id);
+  if (s === 'keep')   card.classList.add('kept');
+  if (s === 'reject') card.classList.add('rejected');
+}
+function keepAll()   { for (const it of filteredSorted()) decisions.set(it.id, 'keep');   render(); }
+function rejectAll() { for (const it of filteredSorted()) decisions.set(it.id, 'reject'); render(); }
+function clearAll()  { decisions.clear(); render(); }
+
+function setSort(v)  { sortMode = v; render(); }
+function toggleHc()  {
+  hcOnly = !hcOnly;
+  document.getElementById('hcToggle').classList.toggle('active', hcOnly);
+  render();
+}
+
+function updateStats() {
+  let kept=0, rejected=0;
+  for (const v of decisions.values()) { if (v==='keep') kept++; else if (v==='reject') rejected++; }
+  const total = items.length;
+  const shown = filteredSorted().length;
+  const undecided = shown - kept - rejected;
+  document.getElementById('stats').textContent =
+    `${total} pending${hcOnly ? ` · ${shown} high-conf` : ''} · ${kept} keep · ${rejected} reject`;
+  document.getElementById('approvePendingBtn').disabled = kept === 0;
+  document.getElementById('approveBoardBtn').disabled = kept === 0;
+  document.getElementById('rejectBtn').disabled = rejected === 0;
+}
+
+async function approve(destination) {
+  const ids = [...decisions.entries()].filter(([_,v]) => v==='keep').map(([k,_]) => k);
+  if (!ids.length) { toast('Nothing kept', 'error'); return; }
+  const btn = destination === 'board'
+    ? document.getElementById('approveBoardBtn')
+    : document.getElementById('approvePendingBtn');
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = 'Approving…';
+  try {
+    const r = await TBApi.fetch('/api/inbox/approve', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ids, destination }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    toast(`Approved ${d.moved} → ${destination}${d.skipped ? ` · ${d.skipped} already there` : ''}`, 'success');
+    for (const id of ids) decisions.delete(id);
+    await load();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.textContent = oldLabel;
+    updateStats();
+  }
+}
+
+async function rejectMarked() {
+  const ids = [...decisions.entries()].filter(([_,v]) => v==='reject').map(([k,_]) => k);
+  if (!ids.length) { toast('Nothing rejected', 'error'); return; }
+  const btn = document.getElementById('rejectBtn');
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = 'Rejecting…';
+  try {
+    const r = await TBApi.fetch('/api/inbox/reject', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ids }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    toast(`Rejected ${d.rejected} — won't come back`, 'success');
+    for (const id of ids) decisions.delete(id);
+    await load();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    btn.textContent = oldLabel;
+    updateStats();
+  }
+}
+
+async function runScrape() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  const oldLabel = btn.textContent;
+  btn.textContent = 'Scraping…';
+  try {
+    const r = await TBApi.fetch('/api/scrape/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    const s = d.stats || {};
+    toast(`Scrape done · +${d.added} new · seen ${s.discovered||0} → niche ${s.after_filters||0} → outlier ${s.after_outlier||0}`, 'success');
+    await load();
+  } catch (e) {
+    toast('Scrape failed: ' + e.message, 'error');
+  } finally {
+    btn.textContent = oldLabel;
+    btn.disabled = false;
+  }
+}
+
+function confirmBoardApprove() {
+  const ids = [...decisions.entries()].filter(([_,v]) => v==='keep').map(([k,_]) => k);
+  if (!ids.length) { toast('Nothing kept', 'error'); return; }
+  document.getElementById('boardModal').classList.add('show');
+}
+function closeBoardModal() { document.getElementById('boardModal').classList.remove('show'); }
+
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.color = type==='error' ? '#e94560' : type==='success' ? '#3aecba' : '#fff';
+  t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+
+document.getElementById('boardModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeBoardModal();
+});
+
+load();
+</script>
+</body>
+</html>
