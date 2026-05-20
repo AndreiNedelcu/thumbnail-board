@@ -275,16 +275,19 @@
   #empty button { margin-top:24px; }
 
   /* Matrix rain — fires only when the user clicks "Run scraper now"
-     with an empty inbox. Fades in behind the empty-state copy. */
+     with an empty inbox. Subtle by design: binary chars, fade-down mask
+     so the bottom of the screen stays clean. */
   .matrix-canvas {
     position:fixed !important;
     inset:0;
     z-index:0 !important;
     pointer-events:none;
     opacity:0;
-    transition:opacity .8s ease;
+    transition:opacity .9s ease;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%);
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%);
   }
-  .matrix-canvas.active { opacity:0.55; }
+  .matrix-canvas.active { opacity:0.38; }
   @media (prefers-reduced-motion: reduce) { .matrix-canvas { display:none; } }
 
   #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
@@ -696,8 +699,8 @@ function startMatrixRain() {
   window.addEventListener('resize', resize);
   canvas.classList.add('active');
 
-  const fontSize = 16;
-  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789▶◀●○';
+  const fontSize = 14;
+  const chars = '01';
   let cols  = Math.ceil(canvas.width / fontSize);
   let drops = new Array(cols).fill(0).map(() => Math.floor(Math.random() * (canvas.height / fontSize)));
 
@@ -716,7 +719,7 @@ function startMatrixRain() {
     }
 
     ctx.font = `${fontSize}px monospace`;
-    ctx.fillStyle = '#3aecba';
+    ctx.fillStyle = 'rgba(58,236,186,0.62)';
 
     for (let i = 0; i < cols; i++) {
       const ch = chars[Math.floor(Math.random() * chars.length)];
