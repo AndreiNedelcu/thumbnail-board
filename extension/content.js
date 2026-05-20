@@ -52,9 +52,30 @@ function getVideoIdFromWatchPage() {
 function getWatchPageInfo() {
   const id = getVideoIdFromWatchPage();
   if (!id) return null;
-  const title = document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string, h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
+
+  // Title — try ~7 selectors in fall-through order. YouTube renames these
+  // every few months; the meta tags are a last-resort SSR fallback.
+  const title =
+       document.querySelector('h1.ytd-video-primary-info-renderer yt-formatted-string')?.textContent?.trim()
+    || document.querySelector('h1 yt-formatted-string.ytd-watch-metadata')?.textContent?.trim()
+    || document.querySelector('ytd-watch-metadata h1.title yt-formatted-string')?.textContent?.trim()
+    || document.querySelector('ytd-watch-metadata h1')?.textContent?.trim()
+    || document.querySelector('#title h1 yt-formatted-string')?.textContent?.trim()
+    || document.querySelector('#above-the-fold #title h1')?.textContent?.trim()
+    || document.querySelector('meta[name="title"]')?.content
+    || document.querySelector('meta[property="og:title"]')?.content
     || document.title.replace(' - YouTube','').trim();
-  const channel = document.querySelector('ytd-channel-name yt-formatted-string a, #channel-name a')?.textContent?.trim() || '';
+
+  // Channel — likewise. The "Includes paid promotion" label has its own
+  // little container that we explicitly avoid by anchoring on a link.
+  const channel =
+       document.querySelector('ytd-video-owner-renderer ytd-channel-name yt-formatted-string a')?.textContent?.trim()
+    || document.querySelector('ytd-channel-name yt-formatted-string a')?.textContent?.trim()
+    || document.querySelector('#channel-name a')?.textContent?.trim()
+    || document.querySelector('ytd-watch-metadata #owner #channel-name a')?.textContent?.trim()
+    || document.querySelector('link[itemprop="name"]')?.getAttribute('content')
+    || '';
+
   let views = '';
   try {
     for (const script of document.querySelectorAll('script:not([src])')) {
@@ -71,10 +92,25 @@ function getWatchPageInfo() {
     }
   } catch {}
   if (!views) {
-    const el = document.querySelector('ytd-video-view-count-renderer span');
+    const el = document.querySelector('ytd-video-view-count-renderer span, #info span.view-count');
     if (el) views = el.textContent.trim().replace(/\s*views?/i,'').trim();
   }
   return { id, title, channel, views };
+}
+
+/**
+ * Try getWatchPageInfo up to N times with a small delay between attempts —
+ * the watch page populates the title bit-by-bit as YT's SPA renders, so a
+ * one-shot scrape catches a half-empty DOM if you click "Save" right after
+ * arriving on the page. We retry until we have a non-empty title.
+ */
+async function getWatchPageInfoReady() {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const info = getWatchPageInfo();
+    if (info && info.title && info.title.length > 0) return info;
+    await new Promise(r => setTimeout(r, 350));
+  }
+  return getWatchPageInfo(); // last try, possibly still incomplete
 }
 
 /** Extract video info from a card element on home / search / feed. */
@@ -86,8 +122,14 @@ function getCardInfo(card) {
   if (!m) return null;
   const id = m[1];
 
-  const title = card.querySelector('#video-title, yt-formatted-string.ytd-rich-grid-media, a#video-title-link')?.textContent?.trim()
-    || link.getAttribute('title')?.trim() || '';
+  const title =
+       card.querySelector('#video-title')?.textContent?.trim()
+    || card.querySelector('a#video-title-link')?.textContent?.trim()
+    || card.querySelector('yt-formatted-string.ytd-rich-grid-media')?.textContent?.trim()
+    || card.querySelector('h3 a[title]')?.getAttribute('title')?.trim()
+    || link.getAttribute('title')?.trim()
+    || link.getAttribute('aria-label')?.replace(/\s+by\s+.+$/, '').trim()
+    || '';
 
   // Channel — most reliable signal is a link that points to a channel
   // page (/@handle, /channel/UC..., /user/...). Skip the watch link.
@@ -249,6 +291,15 @@ async function callOllama(imageB64, title) {
 /** Save a video given its scraped info. progress is a callback for UI. */
 async function saveVideo(info, progress = () => {}) {
   if (!info || !info.id) throw new Error('No video info');
+
+  // Bail out early if the page didn't render its title in time. The Worker
+  // has a server-side fallback (it'll re-fetch via the YouTube Data API),
+  // so we still pass through, but we warn so the user can wait + retry
+  // when they're on the watch page itself. Cards always have title text.
+  if (!info.title || !info.title.trim()) {
+    console.warn('[ThumbnailBoard] empty title for', info.id, '— server will try to fill it');
+  }
+
   // Duplicate check FIRST — saves the 10s Ollama call
   if (savedVideoIds.has(info.id)) {
     throw new Error('Already in board');
@@ -354,7 +405,8 @@ function setBtnState(state, label) {
 }
 
 async function saveFromWatchPage() {
-  const info = getWatchPageInfo();
+  setBtnState('loading', 'Reading page…');
+  const info = await getWatchPageInfoReady();
   if (!info || !info.id) { setBtnState('error', 'No video ID'); return; }
   if (savedVideoIds.has(info.id)) {
     setBtnState('in-board', 'In Board');

@@ -152,6 +152,38 @@ async function handleData(env) {
   });
 }
 
+/**
+ * Format a raw view count to the "1.2M / 847K / 1234" string used in data.json.
+ */
+function formatViewCount(n) {
+  if (!Number.isFinite(n) || n <= 0) return '';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000)     return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
+}
+
+/**
+ * Last-resort metadata fetch via YouTube Data API v3 — used when the
+ * extension couldn't scrape the watch-page DOM and sent the Worker a
+ * blank title/channel/views. Costs 1 quota unit per call.
+ */
+async function fillMissingMetadata(entry, env) {
+  if (entry.title && entry.channel && entry.views) return entry;     // nothing to do
+  if (!env.YOUTUBE_API_KEY) return entry;                            // no key, can't help
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&id=${encodeURIComponent(entry.id)}&key=${env.YOUTUBE_API_KEY}`;
+    const r = await fetch(url);
+    if (!r.ok) return entry;
+    const data = await r.json();
+    const item = data.items?.[0];
+    if (!item) return entry;
+    if (!entry.title)   entry.title   = item.snippet?.title || '';
+    if (!entry.channel) entry.channel = item.snippet?.channelTitle || '';
+    if (!entry.views)   entry.views   = formatViewCount(parseInt(item.statistics?.viewCount || '0', 10));
+  } catch {}
+  return entry;
+}
+
 async function handleAdd(body, env) {
   const vid = body.id || body.videoId || '';
   if (!vid) return json({ ok: false, msg: 'No video id' }, 400);
@@ -163,10 +195,15 @@ async function handleAdd(body, env) {
     tags: canonicaliseTags(body.tags),
     eid: body.eid || '',
   };
+
+  // Server-side fallback for the chrome extension when it fails to scrape
+  // YouTube's DOM (selectors change every couple of months).
+  await fillMissingMetadata(entry, env);
+
   const result = await mutate(env, (dataset) => {
     if (dataset.some(v => v.id === vid)) return null;
     return [...dataset, entry];
-  }, `data: add ${vid} (${(body.title || '').slice(0, 50)})`);
+  }, `data: add ${vid} (${(entry.title || '').slice(0, 50)})`);
   if (result.msg === 'No change') return json({ ok: false, msg: 'Already in board' });
   return json({ ok: true, entry });
 }
