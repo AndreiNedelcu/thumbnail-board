@@ -25,13 +25,20 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-ROOT       = Path(__file__).parent
-DATA       = ROOT / "data.json"
-SUMMARIES  = ROOT / "summaries"
-MANIFEST   = ROOT / "embedded.json"
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
-WORKERS    = 3
-TIMEOUT    = 60
+ROOT        = Path(__file__).parent
+DATA        = ROOT / "data.json"
+SUMMARIES   = ROOT / "summaries"
+TRANSCRIPTS = ROOT / "transcripts"
+MANIFEST    = ROOT / "embedded.json"
+WORKER_URL  = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKERS     = 3
+TIMEOUT     = 60
+
+# bge-m3 max is ~8192 tokens. Title+tags+summary uses ~400 tokens; leaving
+# ~7000 for the transcript chunk. At ~4 chars/token, that's ~28000 chars,
+# but we truncate at 12000 to keep the embedding focused on the first
+# (most representative) portion of the video.
+TRANSCRIPT_MAX_CHARS = 12_000
 
 OWN_TAGS = {"channel-theseniordev-main", "channel-theseniordev-podcast"}
 
@@ -81,6 +88,7 @@ def save_manifest(ids):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ids", help="Comma-separated IDs to re-embed (skips manifest check)")
+    ap.add_argument("--force", action="store_true", help="Re-embed every video, ignoring embedded.json")
     args = ap.parse_args()
 
     token = os.environ.get("TB_AUTH_TOKEN")
@@ -101,8 +109,11 @@ def main():
             sys.exit(1)
         candidate_ids = sorted(p.stem for p in SUMMARIES.glob("*.txt"))
 
-    # Filter out already-embedded (unless --ids is explicit)
-    todo_ids = candidate_ids if args.ids else [v for v in candidate_ids if v not in embedded]
+    # Filter out already-embedded unless --ids or --force is set
+    if args.ids or args.force:
+        todo_ids = candidate_ids
+    else:
+        todo_ids = [v for v in candidate_ids if v not in embedded]
 
     print(f"To embed: {len(todo_ids)} (skipped {len(candidate_ids) - len(todo_ids)} already in manifest)")
     if not todo_ids:
@@ -122,7 +133,23 @@ def main():
         is_own = any(t in OWN_TAGS for t in tags)
         title = meta.get("title", "")
         channel = meta.get("channel", "")
-        text = f"Title: {title}\nChannel: {channel}\nTags: {', '.join(tags)}\n\nSummary: {summary}"
+
+        # Embed against title + summary + truncated transcript so the user's
+        # input (which is often the raw script of a planned video) matches
+        # directly against the literal text of past videos, not just the
+        # LLM-distilled summary.
+        tx_path = TRANSCRIPTS / f"{vid}.txt"
+        transcript_chunk = ""
+        if tx_path.exists():
+            transcript_chunk = tx_path.read_text()[:TRANSCRIPT_MAX_CHARS]
+
+        text = (
+            f"Title: {title}\n"
+            f"Channel: {channel}\n"
+            f"Tags: {', '.join(tags)}\n\n"
+            f"Summary: {summary}\n\n"
+            f"Transcript: {transcript_chunk}"
+        )
         items.append({
             "id":      vid,
             "text":    text,
