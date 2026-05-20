@@ -690,7 +690,7 @@ async function runScrape() {
     const errs = s.errors || [];
     const quotaHits = errs.filter(e => /quota|403/i.test(e)).length;
     if (s.discovered === 0 && quotaHits >= 5) {
-      toast(`YouTube API quota agotada hoy (${quotaHits} errors). Se resetea a medianoche Pacific (~07:00 UTC). Reintenta entonces.`, 'error');
+      toast('YouTube API quota exceeded — resets at midnight PT', 'error');
     } else {
       toast(`Scrape done · +${d.added} new · seen ${s.discovered||0} → niche ${s.after_filters||0} → outlier ${s.after_outlier||0}`, 'success');
     }
