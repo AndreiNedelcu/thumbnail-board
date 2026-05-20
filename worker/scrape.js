@@ -383,11 +383,15 @@ export async function runScrape(env, sources, excludeIds, blockedChannelIds = ne
   }
   stats.after_outlier = scored.length;
 
-  // 7) Sort by score desc, cap to N
+  // 7) Sort by score desc, cap to N for the inbox
   scored.sort((a, b) => b.outlierScore - a.outlierScore);
   const capped = scored.slice(0, thresholds.cap_per_run);
   stats.kept = capped.length;
   stats.finished_at = new Date().toISOString();
 
-  return { candidates: capped, stats };
+  // Discovery candidates: everything that passed the outlier filter,
+  // not just what fits in the inbox cap. The Worker will lightweight-embed
+  // these into the discovery index so ideas.html can find them later even
+  // if the user never approves them.
+  return { candidates: capped, discoveryCandidates: scored, stats };
 }

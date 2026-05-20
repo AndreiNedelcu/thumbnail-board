@@ -12,6 +12,14 @@ BRANCH      = "main"
 binding    = "VECTORIZE"
 index_name = "thumbnail-board"
 
+# Discovery index: every video the scrape bot ever surfaces (filtered by
+# niche + min_outlier_score) gets a lightweight embedding here, even if
+# the user never approved it. Lets ideas.html find inspiration from the
+# wider YouTube universe, not just the curated board.
+[[vectorize]]
+binding    = "VECTORIZE_DISCOVERY"
+index_name = "thumbnail-discovery"
+
 # Cloudflare Workers AI for embeddings (bge-m3 multilingual, 1024 dims)
 [ai]
 binding = "AI"

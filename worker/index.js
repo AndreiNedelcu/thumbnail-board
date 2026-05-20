@@ -505,6 +505,40 @@ async function handleIdeasEmbed(body, env) {
   }
 }
 
+/**
+ * Index a batch of scrape candidates into the discovery vector index.
+ * Lightweight embedding from title + channel + tags only — no transcript
+ * or summary, because discovery's purpose is fast wide coverage, not deep
+ * matching. Skips any vid already in the board index.
+ */
+async function embedDiscoveryBatch(env, candidates, boardIds) {
+  let added = 0, skipped = 0, failed = 0;
+  for (const c of candidates) {
+    if (boardIds.has(c.id)) { skipped++; continue; }
+    const text =
+      `Title: ${c.title || ''}\n` +
+      `Channel: ${c.channel || ''}\n` +
+      `Score: x${c.outlierScore || 0} · ${c.viewsRaw || 0} views`;
+    try {
+      const vec = await embedText(env, text);
+      await env.VECTORIZE_DISCOVERY.upsert([{
+        id:       c.id,
+        values:   vec,
+        metadata: {
+          title:        String(c.title || '').slice(0, 240),
+          channel:      String(c.channel || '').slice(0, 120),
+          outlierScore: c.outlierScore || 0,
+          source:       'discovery',
+        },
+      }]);
+      added++;
+    } catch (e) {
+      failed++;
+    }
+  }
+  return { added, skipped, failed };
+}
+
 async function handleIdeasRelated(body, env) {
   const id = String(body.id || '').trim();
   if (!id) return json({ ok: false, msg: 'Need id' }, 400);
@@ -540,31 +574,57 @@ async function handleIdeasSearch(body, env) {
   const script = String(body.script || '').trim();
   if (!title && !script) return json({ ok: false, msg: 'Need title or script' }, 400);
 
-  const includeOwn = body.includeOwnChannels !== false; // default true
-  const topK       = Math.max(1, Math.min(50, body.topK || 12));
-  const text       = [title, script].filter(Boolean).join('\n\n');
+  const includeOwn       = body.includeOwnChannels !== false; // default true
+  const includeDiscovery = body.includeDiscovery     !== false; // default true
+  const topK             = Math.max(1, Math.min(50, body.topK || 12));
+  const text             = [title, script].filter(Boolean).join('\n\n');
 
   try {
     const vec = await embedText(env, text);
-    // Over-fetch when excluding own channels so we have room after filter
     const fetchK = includeOwn ? topK : Math.min(topK * 2, 50);
-    const res = await env.VECTORIZE.query(vec, { topK: fetchK, returnMetadata: true });
-    let matches = res.matches || [];
-    if (!includeOwn) {
-      matches = matches.filter(m => !m.metadata?.is_own).slice(0, topK);
-    } else {
-      matches = matches.slice(0, topK);
-    }
-    return json({
-      ok: true,
-      query: { title_chars: title.length, script_chars: script.length },
-      results: matches.map(m => ({
+
+    // Query board (curated, rich embeddings) and discovery (wider, lighter)
+    // in parallel. Then merge by score, preferring board entries on ties.
+    const boardP = env.VECTORIZE.query(vec, { topK: fetchK, returnMetadata: true });
+    const discoP = includeDiscovery
+      ? env.VECTORIZE_DISCOVERY.query(vec, { topK: fetchK, returnMetadata: true })
+      : Promise.resolve({ matches: [] });
+    const [boardR, discoR] = await Promise.all([boardP, discoP]);
+
+    const boardIds = new Set();
+    const merged = [];
+    for (const m of (boardR.matches || [])) {
+      boardIds.add(m.id);
+      merged.push({
         id:      m.id,
         score:   +(m.score || 0).toFixed(3),
         title:   m.metadata?.title   || '',
         channel: m.metadata?.channel || '',
         is_own:  !!m.metadata?.is_own,
-      })),
+        source:  'board',
+      });
+    }
+    for (const m of (discoR.matches || [])) {
+      if (boardIds.has(m.id)) continue; // skip duplicates (board takes precedence)
+      merged.push({
+        id:      m.id,
+        score:   +(m.score || 0).toFixed(3),
+        title:   m.metadata?.title   || '',
+        channel: m.metadata?.channel || '',
+        is_own:  false,
+        source:  'discovery',
+      });
+    }
+    merged.sort((a, b) => b.score - a.score);
+
+    let results = merged;
+    if (!includeOwn) results = results.filter(r => !r.is_own);
+    results = results.slice(0, topK);
+
+    return json({
+      ok: true,
+      query: { title_chars: title.length, script_chars: script.length },
+      results,
     });
   } catch (e) {
     return json({ ok: false, msg: e.message }, 500);
@@ -611,7 +671,25 @@ async function runScrapeAndPersist(env, overrides = {}) {
   }
 
   // 3) Run the scrape
-  const { candidates, stats } = await runScrape(env, sources, excludeIds, blockedChannelIds);
+  const { candidates, discoveryCandidates, stats } = await runScrape(env, sources, excludeIds, blockedChannelIds);
+
+  // 3b) Embed every outlier candidate (capped or not) into the discovery
+  //     index. Skips ids already in the curated board manifest so a vid
+  //     never lives in both indexes. Wide net for ideas.html: even videos
+  //     the user never approved become referenceable.
+  try {
+    let boardIds = new Set();
+    try {
+      const { text } = await ghGet(env, 'embedded.json');
+      if (text) boardIds = new Set(JSON.parse(text));
+    } catch {}
+    const discoStats = await embedDiscoveryBatch(env, discoveryCandidates || [], boardIds);
+    stats.discovery_added   = discoStats.added;
+    stats.discovery_skipped = discoStats.skipped;
+    stats.discovery_failed  = discoStats.failed;
+  } catch (e) {
+    stats.discovery_error = e.message;
+  }
 
   // 4) Append new candidates to the inbox, honouring max_inbox_size.
   //    The cap stops the cron from drowning the user — when the inbox
