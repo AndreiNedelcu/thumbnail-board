@@ -143,6 +143,26 @@ async function videoDetailsBatch(env, ids) {
   return out;
 }
 
+// ── Shorts detection ────────────────────────────────────────────────
+/**
+ * Detect a YouTube Short by following the /shorts/{id} URL:
+ *   - real Short  → stays on  /shorts/{id}  (final URL pathname starts with /shorts/)
+ *   - regular vid → redirects to /watch?v={id}
+ * Needed because Shorts can now be up to 3 min long, so the duration
+ * filter alone (>= 90s) misses ~15% of them.
+ */
+async function isShort(videoId) {
+  try {
+    const r = await fetch(`https://www.youtube.com/shorts/${videoId}`, {
+      method: 'HEAD',
+      headers: { 'User-Agent': 'Mozilla/5.0 (thumbnail-board-worker)' },
+    });
+    return new URL(r.url).pathname.startsWith('/shorts/');
+  } catch {
+    return false; // on network error, don't drop the candidate
+  }
+}
+
 // ── Filters ─────────────────────────────────────────────────────────
 function passesNicheFilter(video, thresholds) {
   const s     = video.snippet || {};
@@ -314,10 +334,23 @@ export async function runScrape(env, sources, excludeIds) {
   const niched = allVideos.filter(v => passesNicheFilter(v, thresholds));
   stats.after_filters = niched.length;
 
+  // 5b) Shorts detection — only for the gray zone (≤ 200s). Longer videos
+  //     can't be Shorts (YouTube cap is 3 min currently).
+  const needShortCheck = niched.filter(v =>
+    parseISO8601Duration(v.contentDetails?.duration) <= 200
+  );
+  const shortFlags = new Map();
+  await Promise.all(needShortCheck.map(async v => {
+    shortFlags.set(v.id, await isShort(v.id));
+  }));
+  const notShorts = niched.filter(v => !shortFlags.get(v.id));
+  stats.after_shorts = notShorts.length;
+  stats.shorts_blocked = niched.length - notShorts.length;
+
   // 6) Outlier scoring (with per-channel baseline cache)
   const baselineCache = new Map();
   const scored = [];
-  for (const v of niched) {
+  for (const v of notShorts) {
     const channelId = v.snippet?.channelId;
     if (!channelId) continue;
     const baseline = await getChannelBaseline(env, channelId, baselineCache);
