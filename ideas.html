@@ -76,6 +76,10 @@
     display:block; font-size:11px; font-weight:700; color:var(--muted);
     text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px;
   }
+  .field label .hint {
+    font-weight:500; text-transform:none; letter-spacing:0;
+    color:var(--muted); opacity:.7;
+  }
   .field input, .field textarea {
     width:100%; background:var(--surface2); border:1px solid var(--border);
     border-radius:10px; color:var(--bright); font-family:inherit; font-size:14px;
@@ -213,12 +217,12 @@
 
   <div class="form-card">
     <div class="field">
-      <label for="ti">Title</label>
+      <label for="ti">Title <span class="hint">— working title or final, just an idea is fine</span></label>
       <input id="ti" type="text" placeholder="e.g. What is RAG and why it matters for senior devs" autocomplete="off">
     </div>
     <div class="field">
-      <label for="sc">Script or summary</label>
-      <textarea id="sc" placeholder="Paste here the script or a paragraph summarizing the video you're planning. The more specific, the better the matches." rows="6"></textarea>
+      <label for="sc">Script, outline or rough ideas <span class="hint">— optional but the more you paste the better the matches</span></label>
+      <textarea id="sc" placeholder="Anything goes: bullet points, a paragraph, the full script… Even loose ideas help the bot understand what your video is about." rows="6"></textarea>
     </div>
     <div class="form-foot">
       <label class="toggle-wrap">
@@ -269,7 +273,7 @@ async function search() {
   const includeOwn = document.getElementById('includeOwn').checked;
 
   if (!title && !script) {
-    toast('Add a title or a script first', 'error');
+    toast('Add a title or some ideas first', 'error');
     return;
   }
 
