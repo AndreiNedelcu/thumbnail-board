@@ -146,8 +146,8 @@ ytm-rich-item-renderer:hover .tb-card-btn,
    div.ytInlinePlayerControlsTopRightControls. Mirrors YT's visual
    language so it looks like one of their controls. */
 .tb-yt-btn {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: none;
   border-radius: 50%;
   display: flex;
@@ -162,6 +162,12 @@ ytm-rich-item-renderer:hover .tb-card-btn,
   transition: background .15s, transform .15s, color .15s;
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
+}
+.tb-yt-btn svg {
+  /* Override the inline width/height on the SVG so the icon scales with
+     the button. !important needed because SVG attrs win over CSS. */
+  width: 20px !important;
+  height: 20px !important;
 }
 .tb-yt-btn:hover { background: rgba(0, 0, 0, 0.85); transform: scale(1.06); }
 .tb-yt-btn:active { transform: scale(.96); }
