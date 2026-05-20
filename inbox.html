@@ -84,10 +84,10 @@
   }
   .commit-btn:hover { box-shadow:0 6px 20px rgba(0,74,193,.35); transform:translateY(-1px); }
   .commit-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
-  .commit-btn.danger {
-    background:rgba(233,69,96,0.12); color:var(--red); border:1px solid rgba(233,69,96,0.3);
+  .commit-btn.secondary {
+    background:var(--surface2); color:var(--text); border:1px solid var(--border);
   }
-  .commit-btn.danger:hover { background:rgba(233,69,96,0.22); color:#fff; box-shadow:none; transform:none; }
+  .commit-btn.secondary:hover { background:var(--surface3); color:var(--bright); box-shadow:none; transform:none; }
 
   /* Split button — single visual unit.
      Background lives on the WRAPPER; both halves are transparent surfaces.
@@ -120,7 +120,11 @@
     display:inline-flex; align-items:center; justify-content:center;
     transition:background .15s;
   }
-  .split-caret:disabled { opacity:1; cursor:not-allowed; }
+  /* When only the caret is disabled (i.e. nothing kept but something rejected),
+     the wrapper stays blue and the caret needs to fade individually. When the
+     whole wrapper is disabled (.is-disabled), the wrapper handles the look. */
+  .split-caret:disabled { opacity:0.45; cursor:not-allowed; }
+  .split-btn-group.is-disabled .split-caret:disabled { opacity:1; }
   .split-caret.open:not(:disabled) { background:rgba(0,0,0,0.20); }
   .split-caret svg { width:11px; height:11px; transition:transform .18s; }
   .split-caret.open svg { transform:rotate(180deg); }
@@ -323,15 +327,14 @@
 
   <div class="commit-row">
     <div class="split-btn-group">
-      <button class="commit-btn" id="approvePendingBtn" onclick="approve('pending')">Approve → pending</button>
-      <button class="split-caret" id="splitCaretBtn" onclick="toggleSplitMenu(event)" title="More approve options" aria-label="More approve options">
+      <button class="commit-btn" id="processBtn" onclick="processSelection(false)">Process selection</button>
+      <button class="split-caret" id="splitCaretBtn" onclick="toggleSplitMenu(event)" title="More options" aria-label="More options">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="split-btn-menu" id="splitMenu">
-        <button id="approveBoardBtn" onclick="closeSplitMenu(); confirmBoardApprove()">Approve → board</button>
+        <button id="approveBoardBtn" onclick="closeSplitMenu(); processSelection(true)">Process · approve → board</button>
       </div>
     </div>
-    <button class="commit-btn danger" id="rejectBtn" onclick="rejectMarked()">Reject marked</button>
   </div>
 </header>
 
@@ -348,11 +351,11 @@
 
 <div class="modal-overlay" id="boardModal">
   <div class="modal">
-    <h3>Send straight to board?</h3>
-    <p>These will land in <strong>data.json</strong> with no tags. The auto-tag pipeline won't touch them — you'll need to tag them by hand (or run auto_tag.py on them later). For most items, "Approve → pending" is the right choice.</p>
+    <h3>Send approved straight to the board?</h3>
+    <p>The kept items will land in <strong>data.json</strong> with no tags — the auto-tag pipeline won't touch them. Rejected items (if any) go to the rejected list as normal. For most cases, the default <strong>Process selection</strong> (approve → pending) is the right choice.</p>
     <div class="modal-actions">
       <button class="commit-btn secondary" onclick="closeBoardModal()">Cancel</button>
-      <button class="commit-btn" onclick="closeBoardModal(); approve('board')">Yes, add to board</button>
+      <button class="commit-btn" onclick="closeBoardModal(); doProcess('board')">Yes, approve to board</button>
     </div>
   </div>
 </div>
@@ -528,34 +531,84 @@ function updateStats() {
   const undecided = shown - kept - rejected;
   document.getElementById('stats').textContent =
     `${total} pending${hcOnly ? ` · ${shown} high-conf` : ''} · ${kept} keep · ${rejected} reject`;
-  const noKept = kept === 0;
-  document.getElementById('approvePendingBtn').disabled = noKept;
-  document.getElementById('splitCaretBtn').disabled    = noKept;
-  document.getElementById('approveBoardBtn').disabled  = noKept;
-  document.querySelector('.split-btn-group')?.classList.toggle('is-disabled', noKept);
-  document.getElementById('rejectBtn').disabled = rejected === 0;
-  if (noKept) closeSplitMenu();
+  const hasAny  = kept + rejected > 0;
+  const noKept  = kept === 0;
+  const parts   = [];
+  if (kept > 0)     parts.push(`${kept} keep`);
+  if (rejected > 0) parts.push(`${rejected} reject`);
+
+  const processBtn = document.getElementById('processBtn');
+  processBtn.textContent = parts.length ? `Process · ${parts.join(' · ')}` : 'Process selection';
+  processBtn.disabled = !hasAny;
+
+  // Caret + "→ board" option require at least one kept item (nothing to approve otherwise)
+  document.getElementById('splitCaretBtn').disabled   = noKept;
+  document.getElementById('approveBoardBtn').disabled = noKept;
+
+  // The wrapper goes fully grey only when nothing is selected at all
+  document.querySelector('.split-btn-group')?.classList.toggle('is-disabled', !hasAny);
+  if (!hasAny) closeSplitMenu();
 }
 
-async function approve(destination) {
-  const ids = [...decisions.entries()].filter(([_,v]) => v==='keep').map(([k,_]) => k);
-  if (!ids.length) { toast('Nothing kept', 'error'); return; }
-  const btn = destination === 'board'
-    ? document.getElementById('approveBoardBtn')
-    : document.getElementById('approvePendingBtn');
+/**
+ * Entry point from the main split button.
+ *   processSelection(false) → approve kept → pending + reject rejected
+ *   processSelection(true)  → approve kept → board   + reject rejected
+ *
+ * The "→ board" path opens a confirm modal first (skips auto-tag). If
+ * there's nothing kept, board mode falls back to the regular flow
+ * (which just runs the reject leg).
+ */
+function processSelection(boardMode) {
+  const anyKept = [...decisions.values()].some(v => v === 'keep');
+  if (boardMode && anyKept) {
+    document.getElementById('boardModal').classList.add('show');
+    return;
+  }
+  doProcess('pending');
+}
+
+async function doProcess(destination) {
+  const entries = [...decisions.entries()];
+  const keptIds     = entries.filter(([_,v]) => v === 'keep').map(([k]) => k);
+  const rejectedIds = entries.filter(([_,v]) => v === 'reject').map(([k]) => k);
+  if (!keptIds.length && !rejectedIds.length) {
+    toast('Nothing selected', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('processBtn');
   btn.disabled = true;
   const oldLabel = btn.textContent;
-  btn.textContent = 'Approving…';
+  btn.textContent = 'Processing…';
+
+  const messages = [];
   try {
-    const r = await TBApi.fetch('/api/inbox/approve', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ids, destination }),
-    });
-    const d = await r.json();
-    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
-    toast(`Approved ${d.moved} → ${destination}${d.skipped ? ` · ${d.skipped} already there` : ''}`, 'success');
-    for (const id of ids) decisions.delete(id);
+    if (keptIds.length) {
+      const r = await TBApi.fetch('/api/inbox/approve', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ids: keptIds, destination }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d.msg || `Approve failed (HTTP ${r.status})`);
+      messages.push(`Approved ${d.moved} → ${destination}${d.skipped ? ` (${d.skipped} dup)` : ''}`);
+    }
+
+    if (rejectedIds.length) {
+      const r = await TBApi.fetch('/api/inbox/reject', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ids: rejectedIds }),
+      });
+      const d = await r.json();
+      if (!r.ok || !d.ok) throw new Error(d.msg || `Reject failed (HTTP ${r.status})`);
+      messages.push(`Rejected ${d.rejected}`);
+    }
+
+    toast(messages.join(' · '), 'success');
+    for (const id of keptIds)     decisions.delete(id);
+    for (const id of rejectedIds) decisions.delete(id);
     await load();
   } catch (e) {
     toast(e.message, 'error');
@@ -584,32 +637,6 @@ async function blockChannel(channelId, channelName) {
   }
 }
 
-async function rejectMarked() {
-  const ids = [...decisions.entries()].filter(([_,v]) => v==='reject').map(([k,_]) => k);
-  if (!ids.length) { toast('Nothing rejected', 'error'); return; }
-  const btn = document.getElementById('rejectBtn');
-  btn.disabled = true;
-  const oldLabel = btn.textContent;
-  btn.textContent = 'Rejecting…';
-  try {
-    const r = await TBApi.fetch('/api/inbox/reject', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ids }),
-    });
-    const d = await r.json();
-    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
-    toast(`Rejected ${d.rejected} — won't come back`, 'success');
-    for (const id of ids) decisions.delete(id);
-    await load();
-  } catch (e) {
-    toast(e.message, 'error');
-  } finally {
-    btn.textContent = oldLabel;
-    updateStats();
-  }
-}
-
 async function runScrape() {
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -630,11 +657,6 @@ async function runScrape() {
   }
 }
 
-function confirmBoardApprove() {
-  const ids = [...decisions.entries()].filter(([_,v]) => v==='keep').map(([k,_]) => k);
-  if (!ids.length) { toast('Nothing kept', 'error'); return; }
-  document.getElementById('boardModal').classList.add('show');
-}
 function closeBoardModal() { document.getElementById('boardModal').classList.remove('show'); }
 
 function toast(msg, type='info') {
