@@ -146,10 +146,10 @@
   .mini-shuffle {
     width:32px; height:32px; padding:0 !important; border-radius:8px;
     display:inline-flex !important; align-items:center; justify-content:center;
-    color: var(--text-bright) !important;
+    color: var(--muted) !important;
     gap: 0 !important;
   }
-  .mini-shuffle:hover { color: var(--mint) !important; }
+  .mini-shuffle:hover { color: var(--text-bright) !important; }
   .mini-shuffle svg {
     width: 14px !important; height: 14px !important;
     color: inherit; stroke: currentColor;
@@ -468,28 +468,37 @@
 
   /* Floating back-to-top button */
   #back-to-top {
-    position:fixed; bottom:24px; right:24px; z-index:80;
+    position:fixed !important;
+    bottom:24px !important;
+    right:24px !important;
+    z-index:9999 !important;
     width:44px; height:44px;
     border:1px solid var(--border);
     border-radius:50%;
     background:var(--surface);
-    color:var(--text-bright);
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; opacity:0; transform:translateY(8px);
-    pointer-events:none;
-    transition:opacity .2s, transform .2s, background .15s, color .15s;
+    color:var(--muted);
+    display:none;        /* default: hidden, JS adds .visible to show */
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background .15s, color .15s, transform .15s;
     box-shadow:0 8px 24px rgba(0,0,0,.4);
     -webkit-backdrop-filter:blur(10px);
     backdrop-filter:blur(10px);
-    padding: 0;
-    font-family: inherit;
+    padding:0;
+    font-family:inherit;
   }
-  #back-to-top.visible { opacity:1; transform:translateY(0); pointer-events:auto; }
-  #back-to-top:hover { background:var(--surface2); color:var(--mint); border-color:var(--mint); }
+  #back-to-top.visible { display:flex !important; }
+  #back-to-top:hover {
+    background:var(--surface2);
+    color:var(--mint);
+    border-color:var(--mint);
+    transform:translateY(-2px);
+  }
   #back-to-top svg {
     width:20px !important; height:20px !important;
-    color: inherit; stroke: currentColor;
-    flex-shrink: 0;
+    color:inherit; stroke:currentColor;
+    flex-shrink:0;
   }
 
   #toast {
@@ -878,16 +887,23 @@ async function init() {
 
 // Show sticky mini-header + back-to-top when scrolled past hero, persist scrollY
 let _scrollSaveTimer = null;
-window.addEventListener('scroll', () => {
+function _syncScrollUI() {
   const hero = document.querySelector('.hero');
   const scrolledPast = hero ? hero.getBoundingClientRect().bottom < 0 : window.scrollY > 100;
   const mini = document.getElementById('mini-header');
-  const top = document.getElementById('back-to-top');
-  if (mini) mini.classList.toggle('visible', scrolledPast);
-  if (top)  top.classList.toggle('visible', scrolledPast);
+  const topBtn = document.getElementById('back-to-top');
+  if (mini)   mini.classList.toggle('visible', scrolledPast);
+  if (topBtn) topBtn.classList.toggle('visible', scrolledPast);
+}
+window.addEventListener('scroll', () => {
+  _syncScrollUI();
   if (_scrollSaveTimer) clearTimeout(_scrollSaveTimer);
   _scrollSaveTimer = setTimeout(saveState, 200);
 });
+// Run once on load so the state is right if we're already scrolled
+// (e.g. URL hash jumps to a video, restored scrollY, anchor link, etc.)
+window.addEventListener('load', _syncScrollUI);
+document.addEventListener('DOMContentLoaded', _syncScrollUI);
 
 // Sync mini-search ↔ main search (both ways)
 document.addEventListener('DOMContentLoaded', () => {
