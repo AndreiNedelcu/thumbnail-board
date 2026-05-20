@@ -59,13 +59,21 @@ fi
 
 echo "[$(date '+%F %T')] tick: $NEW items need indexing" >> "$LOG"
 
-# 1) Try YouTube auto-captions for any missing transcript
-python3 extract_transcripts.py --all >> "$LOG" 2>&1 || true
+# 1) Try YouTube auto-captions for any missing transcript.
+#    Skip if another extract is currently running (e.g. from a manual run).
+if ! pgrep -f "extract_transcripts.py" > /dev/null; then
+  python3 extract_transcripts.py --all >> "$LOG" 2>&1 || true
+else
+  echo "[$(date '+%F %T')] tick: extract_transcripts.py already running, skipping" >> "$LOG"
+fi
 
 # 2) For whatever's still missing a transcript, fall back to local Whisper.
-#    Only runs if whisper-cli + model are installed.
+#    Skip if whisper is already in flight from a previous run / manual launch.
 if command -v whisper-cli >/dev/null && [ -f models/ggml-large-v3-turbo.bin ]; then
-  STILL_MISSING=$(python3 -c "
+  if pgrep -f "whisper_transcripts.py" > /dev/null; then
+    echo "[$(date '+%F %T')] tick: whisper_transcripts.py already running, skipping" >> "$LOG"
+  else
+    STILL_MISSING=$(python3 -c "
 import json
 from pathlib import Path
 ROOT = Path('.')
@@ -73,17 +81,26 @@ data = json.loads((ROOT/'data.json').read_text())
 existing = {p.stem for p in (ROOT/'transcripts').glob('*.txt')}
 print(sum(1 for v in data if v['id'] not in existing))
 ")
-  if [ "$STILL_MISSING" -gt 0 ]; then
-    echo "[$(date '+%F %T')] tick: $STILL_MISSING vids still missing transcript, trying Whisper" >> "$LOG"
-    python3 whisper_transcripts.py >> "$LOG" 2>&1 || true
+    if [ "$STILL_MISSING" -gt 0 ]; then
+      echo "[$(date '+%F %T')] tick: $STILL_MISSING vids still missing transcript, trying Whisper" >> "$LOG"
+      python3 whisper_transcripts.py >> "$LOG" 2>&1 || true
+    fi
   fi
 fi
 
-# 3) Summarize whatever's new
-python3 summarize.py >> "$LOG" 2>&1 || true
+# 3) Summarize whatever's new (skip if another summarize is in flight)
+if ! pgrep -f "summarize.py" > /dev/null; then
+  python3 summarize.py >> "$LOG" 2>&1 || true
+else
+  echo "[$(date '+%F %T')] tick: summarize.py already running, skipping" >> "$LOG"
+fi
 
 # 4) Embed whatever's new (manifest skips done IDs)
-python3 build_embeddings.py >> "$LOG" 2>&1 || true
+if ! pgrep -f "build_embeddings.py" > /dev/null; then
+  python3 build_embeddings.py >> "$LOG" 2>&1 || true
+else
+  echo "[$(date '+%F %T')] tick: build_embeddings.py already running, skipping" >> "$LOG"
+fi
 
 # 5) Commit + push the new summaries and updated manifest
 if ! git diff --quiet summaries/ embedded.json; then
