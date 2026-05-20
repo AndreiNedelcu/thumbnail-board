@@ -274,6 +274,19 @@
   #empty p { font-size:14px; line-height:1.6; }
   #empty button { margin-top:24px; }
 
+  /* Matrix rain — fires only when the user clicks "Run scraper now"
+     with an empty inbox. Fades in behind the empty-state copy. */
+  .matrix-canvas {
+    position:fixed !important;
+    inset:0;
+    z-index:0 !important;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .8s ease;
+  }
+  .matrix-canvas.active { opacity:0.55; }
+  @media (prefers-reduced-motion: reduce) { .matrix-canvas { display:none; } }
+
   #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
     background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
     font-size:13px; font-weight:600; border:1px solid var(--border);
@@ -299,6 +312,8 @@
 </style>
 </head>
 <body>
+
+<canvas id="matrixCanvas" class="matrix-canvas"></canvas>
 
 <header>
   <div class="logo">TB<span>INBOX</span></div>
@@ -642,6 +657,11 @@ async function runScrape() {
   btn.disabled = true;
   const oldLabel = btn.textContent;
   btn.textContent = 'Scraping…';
+
+  // Easter egg: matrix rain when starting from an empty inbox
+  const wasEmpty = items.length === 0;
+  if (wasEmpty) startMatrixRain();
+
   try {
     const r = await TBApi.fetch('/api/scrape/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
     const d = await r.json();
@@ -652,9 +672,75 @@ async function runScrape() {
   } catch (e) {
     toast('Scrape failed: ' + e.message, 'error');
   } finally {
+    if (wasEmpty) stopMatrixRain();
     btn.textContent = oldLabel;
     btn.disabled = false;
   }
+}
+
+// ── Matrix rain animation ────────────────────────────────────────────
+// Canvas-based, mint-coloured (board palette, not classic green) digital
+// rain. Only runs while a scrape is in flight from an empty inbox.
+let _matrixCleanup = null;
+function startMatrixRain() {
+  if (_matrixCleanup) return;  // already running
+  const canvas = document.getElementById('matrixCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const resize = () => {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+  };
+  resize();
+  window.addEventListener('resize', resize);
+  canvas.classList.add('active');
+
+  const fontSize = 16;
+  const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789▶◀●○';
+  let cols  = Math.ceil(canvas.width / fontSize);
+  let drops = new Array(cols).fill(0).map(() => Math.floor(Math.random() * (canvas.height / fontSize)));
+
+  let raf;
+  const draw = () => {
+    // Translucent backdrop matching --bg, leaves a fading trail behind each char
+    ctx.fillStyle = 'rgba(13,17,23,0.08)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Re-derive columns in case the window resized mid-animation
+    const newCols = Math.ceil(canvas.width / fontSize);
+    if (newCols !== cols) {
+      drops = drops.slice(0, newCols);
+      while (drops.length < newCols) drops.push(Math.floor(Math.random() * (canvas.height / fontSize)));
+      cols = newCols;
+    }
+
+    ctx.font = `${fontSize}px monospace`;
+    ctx.fillStyle = '#3aecba';
+
+    for (let i = 0; i < cols; i++) {
+      const ch = chars[Math.floor(Math.random() * chars.length)];
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+      ctx.fillText(ch, x, y);
+
+      if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      else drops[i]++;
+    }
+    raf = requestAnimationFrame(draw);
+  };
+  draw();
+
+  _matrixCleanup = () => {
+    cancelAnimationFrame(raf);
+    window.removeEventListener('resize', resize);
+    canvas.classList.remove('active');
+    // wait for the opacity fade-out before wiping the canvas
+    setTimeout(() => ctx.clearRect(0, 0, canvas.width, canvas.height), 850);
+  };
+}
+function stopMatrixRain() {
+  if (_matrixCleanup) { _matrixCleanup(); _matrixCleanup = null; }
 }
 
 function closeBoardModal() { document.getElementById('boardModal').classList.remove('show'); }
