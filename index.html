@@ -332,10 +332,15 @@
   .lb-btn-copy:hover { background:var(--surface3); color:var(--text-bright); }
   .lb-btn-copy.copied { background:rgba(58,236,186,0.12); color:var(--mint); border-color:var(--mint); }
   .lb-btn-tagger {
-    background:var(--brand-grad);
-    color:#0d1117; border:none; font-weight:700;
+    background:var(--surface2);
+    color:var(--text);
+    border:1px solid var(--border);
   }
-  .lb-btn-tagger:hover { box-shadow:0 6px 20px rgba(58,236,186,0.25); transform:translateY(-1px); }
+  .lb-btn-tagger:hover {
+    background:var(--surface3);
+    color:var(--text-bright);
+    border-color:var(--border-hover);
+  }
   .lb-btn-delete { background:transparent; color:var(--muted); border:1px solid var(--border); margin-left:auto; }
   .lb-btn-delete:hover { background:rgba(233,69,96,0.08); color:#e94560; border-color:rgba(233,69,96,0.3); }
 
@@ -668,11 +673,6 @@
       <div class="lb-tags-section">
         <div class="lb-tags-header">
           <h4>Tags</h4>
-          <button class="lb-add-tag-btn" onclick="toggleTagSearch()">+ add tag</button>
-        </div>
-        <div class="lb-tag-search-wrap" id="lb-tag-search-wrap">
-          <input class="lb-tag-search" id="lb-tag-search" placeholder="Search tags… e.g. colorful" autocomplete="off">
-          <div class="lb-tag-suggestions" id="lb-tag-suggestions"></div>
         </div>
         <div class="lb-tags" id="lb-tags"></div>
       </div>
@@ -1248,9 +1248,6 @@ function renderLightbox() {
   document.getElementById('lb-prev').style.display = currentIndex > 0 ? '' : 'none';
   document.getElementById('lb-next').style.display = currentIndex < visibleVideos.length - 1 ? '' : 'none';
 
-  // Tags — close search if open
-  document.getElementById('lb-tag-search-wrap').classList.remove('open');
-  document.getElementById('lb-tag-search').value = '';
   renderLbTags(v);
 
   // Related — sorted by shared tags count
@@ -1400,32 +1397,9 @@ function renderLbTags(v) {
   }).join('');
 }
 
-function toggleTagSearch() {
-  const wrap = document.getElementById('lb-tag-search-wrap');
-  const inp = document.getElementById('lb-tag-search');
-  const open = wrap.classList.toggle('open');
-  if (open) { inp.focus(); updateTagSuggestions(''); }
-}
-
-function updateTagSuggestions(query) {
-  const v = videos[currentIndex];
-  const existing = new Set(v.tags||[]);
-  const q = query.toLowerCase();
-  const matches = ALL_TAGS.filter(t => !existing.has(t) && (!q || t.includes(q))).slice(0, 20);
-  // also allow custom tag if typed something not in list
-  const sugs = document.getElementById('lb-tag-suggestions');
-  sugs.innerHTML = matches.map(t => {
-    const c = tagStyle(t);
-    return `<span class="lb-tag-sug" onclick="addLbTag('${t}')" style="border-color:${c.color}44;color:${c.color}">${t}</span>`;
-  }).join('') + (q && !ALL_TAGS.includes(q) && !existing.has(q)
-    ? `<span class="lb-tag-sug" onclick="addLbTag('${q}')" style="border-color:#7c4dff44;color:#7c4dff">+ "${q}"</span>`
-    : '');
-}
-
-document.getElementById('lb-tag-search').addEventListener('input', e => updateTagSuggestions(e.target.value));
-document.getElementById('lb-tag-search').addEventListener('keydown', e => {
-  if (e.key === 'Escape') document.getElementById('lb-tag-search-wrap').classList.remove('open');
-});
+// Old in-lightbox tag search (toggleTagSearch / updateTagSuggestions) was
+// replaced by the slide-in Edit Tags panel. The legacy DOM elements
+// (lb-tag-search, lb-tag-suggestions) have been removed too.
 
 async function addLbTag(tag) {
   const v = videos[currentIndex];
