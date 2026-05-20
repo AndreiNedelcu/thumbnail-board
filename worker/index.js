@@ -414,17 +414,40 @@ async function runScrapeAndPersist(env) {
   // 3) Run the scrape
   const { candidates, stats } = await runScrape(env, sources, excludeIds);
 
-  // 4) Append new candidates to the inbox in one commit
-  if (candidates.length) {
+  // 4) Append new candidates to the inbox, honouring max_inbox_size.
+  //    The cap stops the cron from drowning the user — when the inbox
+  //    reaches the limit, new scrapes silently keep nothing until the
+  //    user curates some out. Already-discovered IDs that get dropped
+  //    here will simply reappear in a future scrape (they aren't yet
+  //    in scrape_rejected.json).
+  const maxInboxSize = Number.isFinite(sources?.thresholds?.max_inbox_size)
+    ? sources.thresholds.max_inbox_size
+    : Infinity;
+
+  const currentInbox = inboxR.text ? JSON.parse(inboxR.text) : [];
+  const existingInboxIds = new Set(currentInbox.map(it => it.id));
+  const newOnes = candidates.filter(c => !existingInboxIds.has(c.id));
+  const slotsLeft = Math.max(0, maxInboxSize - currentInbox.length);
+  const willAdd = newOnes.slice(0, slotsLeft);   // candidates are already sorted by score desc
+  const cappedOut = newOnes.length - willAdd.length;
+
+  if (willAdd.length) {
     await mutate(env, (current) => {
+      // Re-check inside the transaction in case the inbox changed
+      // between our read above and this mutate.
       const existing = new Set(current.map(it => it.id));
-      const additions = candidates.filter(c => !existing.has(c.id));
-      if (!additions.length) return null;
-      return [...current, ...additions];
-    }, `inbox: +${candidates.length} from scrape (top score x${candidates[0].outlierScore})`, INBOX_PATH);
+      const additions = willAdd.filter(c => !existing.has(c.id));
+      const finalSlots = Math.max(0, maxInboxSize - current.length);
+      const finalAdditions = additions.slice(0, finalSlots);
+      if (!finalAdditions.length) return null;
+      return [...current, ...finalAdditions];
+    }, `inbox: +${willAdd.length} from scrape (top x${willAdd[0].outlierScore})`, INBOX_PATH);
   }
 
-  return { ok: true, added: candidates.length, stats };
+  stats.inbox_size_before = currentInbox.length;
+  stats.inbox_capped_out  = cappedOut;
+  stats.max_inbox_size    = maxInboxSize;
+  return { ok: true, added: willAdd.length, capped: cappedOut, stats };
 }
 
 async function handleScrapeRun(env) {
