@@ -5,5 +5,9 @@ pending_review.json
 pending_rejected.json
 auto_tag_feedback.json
 auto_tag_skip.json
+auto_published_log.json
+youtube_candidates.json
+youtube_discarded.json
+eagle-no-youtube.json
 patch_tags.py
 sync.py.disabled
