@@ -700,35 +700,50 @@ function startMatrixRain() {
   canvas.classList.add('active');
 
   const fontSize = 14;
-  const chars = '01';
-  let cols  = Math.ceil(canvas.width / fontSize);
-  let drops = new Array(cols).fill(0).map(() => Math.floor(Math.random() * (canvas.height / fontSize)));
+  // Sparse streams instead of one-per-column: only ~20% of columns get a
+  // stream, capped at 20 total. Each stream has its own slow cadence
+  // (2-6 frames between character drops) so the rain feels organic.
+  let streams = [];
+  const setupStreams = () => {
+    const cols = Math.ceil(canvas.width / fontSize);
+    const target = Math.max(6, Math.min(20, Math.floor(cols * 0.20)));
+    const picked = new Set();
+    while (picked.size < target) picked.add(Math.floor(Math.random() * cols));
+    streams = [...picked].map(col => ({
+      col,
+      y:       Math.floor(Math.random() * (canvas.height / fontSize)),
+      speed:   2 + Math.floor(Math.random() * 5),   // frames per step
+      counter: Math.floor(Math.random() * 5),       // stagger initial offset
+    }));
+  };
+  setupStreams();
+
+  // Re-pick streams on resize so the density stays consistent
+  const onResize = () => { resize(); setupStreams(); };
+  window.removeEventListener('resize', resize);
+  window.addEventListener('resize', onResize);
 
   let raf;
   const draw = () => {
-    // Translucent backdrop matching --bg, leaves a fading trail behind each char
-    ctx.fillStyle = 'rgba(13,17,23,0.08)';
+    // Lighter bg fade than before — trails persist longer = smoother motion
+    ctx.fillStyle = 'rgba(13,17,23,0.05)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Re-derive columns in case the window resized mid-animation
-    const newCols = Math.ceil(canvas.width / fontSize);
-    if (newCols !== cols) {
-      drops = drops.slice(0, newCols);
-      while (drops.length < newCols) drops.push(Math.floor(Math.random() * (canvas.height / fontSize)));
-      cols = newCols;
-    }
-
     ctx.font = `${fontSize}px monospace`;
-    ctx.fillStyle = 'rgba(58,236,186,0.62)';
+    ctx.fillStyle = 'rgba(58,236,186,0.55)';
 
-    for (let i = 0; i < cols; i++) {
-      const ch = chars[Math.floor(Math.random() * chars.length)];
-      const x = i * fontSize;
-      const y = drops[i] * fontSize;
+    for (const s of streams) {
+      s.counter++;
+      if (s.counter < s.speed) continue;
+      s.counter = 0;
+
+      const ch = Math.random() < 0.5 ? '0' : '1';
+      const x = s.col * fontSize;
+      const y = s.y * fontSize;
       ctx.fillText(ch, x, y);
 
-      if (y > canvas.height && Math.random() > 0.975) drops[i] = 0;
-      else drops[i]++;
+      if (y > canvas.height && Math.random() > 0.975) s.y = 0;
+      else s.y++;
     }
     raf = requestAnimationFrame(draw);
   };
@@ -736,7 +751,7 @@ function startMatrixRain() {
 
   _matrixCleanup = () => {
     cancelAnimationFrame(raf);
-    window.removeEventListener('resize', resize);
+    window.removeEventListener('resize', onResize);
     canvas.classList.remove('active');
     // wait for the opacity fade-out before wiping the canvas
     setTimeout(() => ctx.clearRect(0, 0, canvas.width, canvas.height), 850);
