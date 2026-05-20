@@ -98,42 +98,69 @@
   #grid {
     display:grid;
     grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));
-    gap:16px;
+    gap:20px 16px;
   }
   .card {
-    position:relative; aspect-ratio:16/9;
-    background:var(--surface); border-radius:12px; overflow:hidden;
-    cursor:pointer; transition:transform .15s, box-shadow .15s, outline-color .15s;
-    outline:2px solid transparent; outline-offset:-2px;
+    background:transparent; border-radius:12px;
+    cursor:pointer; transition:transform .15s;
+    display:flex; flex-direction:column;
+    outline:2px solid transparent; outline-offset:3px; border-radius:14px;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 14px 30px rgba(0,0,0,.5); }
-  .card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .card:hover { transform:translateY(-2px); }
   .card.kept { outline-color:var(--mint); }
   .card.rejected { outline-color:rgba(233,69,96,.6); }
-  .card.rejected img { filter:grayscale(.8) brightness(.5); }
-  .card.low-confidence img { opacity:.78; }
 
-  /* Outlier badge */
-  .score-badge {
-    position:absolute; top:8px; right:8px;
-    padding:4px 9px; border-radius:8px;
-    background:rgba(0,0,0,.78); border:1px solid rgba(255,255,255,.15);
-    color:#fff; font-size:12px; font-weight:800; letter-spacing:.3px;
-    display:inline-flex; align-items:center; gap:3px;
-    backdrop-filter:blur(4px);
+  /* Thumbnail (16:9 image with small overlay controls) */
+  .thumb {
+    position:relative; aspect-ratio:16/9;
+    background:var(--surface); border-radius:12px; overflow:hidden;
+    transition:box-shadow .15s;
   }
-  .score-badge.score-hot   { background:rgba(58,236,186,0.92); color:#0d1117; border-color:rgba(58,236,186,0.3); }
-  .score-badge.score-warm  { background:rgba(245,165,36,0.92); color:#0d1117; border-color:rgba(245,165,36,0.3); }
-  .score-badge.score-tepid { background:rgba(0,0,0,0.78); color:#fff; }
-  .score-badge.low-confidence { opacity:.55; font-style:italic; }
+  .card:hover .thumb { box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:filter .15s, opacity .15s; }
+  .card.rejected .thumb img { filter:grayscale(.8) brightness(.5); }
+  .card.low-confidence .thumb img { opacity:.82; }
+
+  /* Info row under the thumbnail — YouTube-style: title, then channel · views · age, with score on the right */
+  .info {
+    display:flex; gap:10px; align-items:flex-start;
+    padding:10px 4px 2px;
+  }
+  .info-left { flex:1; min-width:0; }
+  .card .title {
+    color:var(--bright); font-size:13px; font-weight:600; line-height:1.4;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    margin-bottom:5px;
+    word-break:break-word;
+  }
+  .card .sub {
+    color:var(--muted); font-size:12px; font-weight:500; line-height:1.35;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .card .sub .dot { opacity:.45; margin:0 5px; }
+
+  /* Outlier badge — now sits in the info row, beside the title block */
+  .score-badge {
+    flex-shrink:0;
+    padding:4px 9px; border-radius:8px;
+    background:var(--surface3); color:var(--text);
+    font-size:12px; font-weight:800; letter-spacing:.3px;
+    display:inline-flex; align-items:center; gap:3px;
+    line-height:1;
+  }
+  .score-badge.score-hot   { background:rgba(58,236,186,0.92); color:#0d1117; }
+  .score-badge.score-warm  { background:rgba(245,165,36,0.92); color:#0d1117; }
+  .score-badge.score-tepid { background:var(--surface3); color:var(--muted); }
+  .score-badge.low-confidence { opacity:.6; font-style:italic; }
   .score-badge .x { font-size:9px; opacity:.7; font-weight:700; }
 
-  /* Keep checkmark — appears bottom-right when kept */
+  /* Keep checkmark — appears bottom-right of the thumb when kept */
   .keep-tick {
     position:absolute; bottom:8px; right:8px;
     width:28px; height:28px; border-radius:50%;
     background:var(--mint); border:2px solid var(--mint);
     display:none; align-items:center; justify-content:center;
+    z-index:2;
   }
   .keep-tick::after {
     content:''; width:14px; height:14px;
@@ -147,7 +174,7 @@
     width:26px; height:26px; border-radius:50%;
     background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
     display:flex; align-items:center; justify-content:center;
-    cursor:pointer; opacity:0; transition:all .15s;
+    cursor:pointer; opacity:0; transition:all .15s; z-index:2;
   }
   .card:hover .reject-btn { opacity:1; }
   .reject-btn:hover { background:var(--red); border-color:var(--red); }
@@ -160,25 +187,11 @@
     width:26px; height:26px; border-radius:50%;
     background:rgba(0,0,0,.75); border:2px solid rgba(255,255,255,.5);
     display:flex; align-items:center; justify-content:center;
-    opacity:0; transition:all .15s;
+    opacity:0; transition:all .15s; z-index:2;
   }
   .card:hover .yt-link { opacity:1; }
   .yt-link:hover { background:#ff0000; border-color:#ff0000; }
   .yt-link svg { color:#fff; width:13px; height:13px; }
-
-  /* Meta strip on hover */
-  .card .meta {
-    position:absolute; inset:auto 0 0 0;
-    background:linear-gradient(to top,rgba(0,0,0,.92) 0%,transparent 100%);
-    padding:32px 12px 44px;
-    opacity:0; transition:opacity .15s;
-    pointer-events:none;
-  }
-  .card:hover .meta { opacity:1; }
-  .card .title { font-size:12px; font-weight:600; color:#fff; line-height:1.35;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  .card .sub { font-size:10px; color:rgba(255,255,255,.7); margin-top:3px; display:flex; gap:6px; flex-wrap:wrap; }
-  .card .sub .dot { opacity:.5; }
 
   #empty {
     text-align:center; padding:120px 24px; color:var(--muted);
@@ -340,23 +353,25 @@ function render() {
     ].filter(Boolean);
     return `
       <div class="card ${cls} ${lc}" data-id="${esc(it.id)}" onclick="toggle('${esc(it.id)}')">
-        <img loading="lazy"
-             src="https://i.ytimg.com/vi/${esc(it.id)}/maxresdefault.jpg"
-             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(it.id)}/hqdefault.jpg'">
-        <div class="score-badge ${scoreClass(it)} ${lc}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
-          ${scoreLabel}
+        <div class="thumb">
+          <img loading="lazy"
+               src="https://i.ytimg.com/vi/${esc(it.id)}/maxresdefault.jpg"
+               onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(it.id)}/hqdefault.jpg'">
+          <div class="keep-tick"></div>
+          <div class="reject-btn" onclick="event.stopPropagation(); rejectCard('${esc(it.id)}')" title="Mark reject">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </div>
+          <a class="yt-link" href="https://www.youtube.com/watch?v=${esc(it.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open on YouTube">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </a>
         </div>
-        <div class="keep-tick"></div>
-        <div class="reject-btn" onclick="event.stopPropagation(); rejectCard('${esc(it.id)}')" title="Mark reject">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </div>
-        <a class="yt-link" href="https://www.youtube.com/watch?v=${esc(it.id)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open on YouTube">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        </a>
-        <div class="meta">
-          <div class="title">${esc(it.title)}</div>
-          <div class="sub">
-            ${subParts.map(p => `<span>${p}</span>`).join('<span class="dot">·</span>')}
+        <div class="info">
+          <div class="info-left">
+            <div class="title">${esc(it.title)}</div>
+            <div class="sub">${subParts.map(p => esc(p)).join('<span class="dot">·</span>')}</div>
+          </div>
+          <div class="score-badge ${scoreClass(it)} ${lc}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
+            ${scoreLabel}
           </div>
         </div>
       </div>
