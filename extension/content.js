@@ -76,39 +76,72 @@ function getWatchPageInfo() {
     || document.querySelector('link[itemprop="name"]')?.getAttribute('content')
     || '';
 
+  // Views — try the most reliable source first (ytInitialPlayerResponse),
+  // then ytInitialData patterns, then DOM selectors.
   let views = '';
+  function fmtN(n) {
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n >= 1_000_000) return (n/1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    if (n >= 1_000)     return (n/1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+    return String(n);
+  }
   try {
-    for (const script of document.querySelectorAll('script:not([src])')) {
-      const t = script.textContent;
-      if (!t.includes('viewCount')) continue;
-      // Try multiple shapes YT uses in ytInitialData / ytInitialPlayerResponse
-      const patterns = [
-        /"viewCount"\s*:\s*"(\d+)"/,                                           // statistics.viewCount
-        /"viewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)\s*views?"/i,         // primary info renderer
-        /"shortViewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)\s*views?"/i,    // shortened "1.2M views"
-      ];
-      for (const re of patterns) {
-        const m = t.match(re);
-        if (!m) continue;
-        const raw = m[1].replace(/[,\s]/g, '');
-        if (/^[\d.]+[KMB]$/i.test(raw)) {
-          // Already-formatted shortViewCount like "1.2M"
-          views = raw.toUpperCase().replace(/B$/i, 'B');
-          break;
-        }
-        const n = parseInt(raw.replace(/[^\d]/g, ''), 10);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        if (n >= 1_000_000) views = (n/1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-        else if (n >= 1_000) views = (n/1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-        else views = String(n);
-        break;
+    // 1) ytInitialPlayerResponse.videoDetails.viewCount — exact, always present
+    const html = document.documentElement.innerHTML;
+    const m = html.match(/ytInitialPlayerResponse\s*=\s*(\{.+?\});(?=\s*var)/s)
+           || html.match(/"videoDetails"\s*:\s*\{[^}]*?"viewCount"\s*:\s*"(\d+)"/);
+    if (m) {
+      // If the second pattern matched, m[1] is the count directly
+      if (/^\d+$/.test(m[1])) {
+        views = fmtN(parseInt(m[1], 10));
+      } else {
+        try {
+          const data = JSON.parse(m[1]);
+          const vc = parseInt(data?.videoDetails?.viewCount || '0', 10);
+          views = fmtN(vc);
+        } catch {}
       }
-      if (views) break;
     }
   } catch {}
   if (!views) {
-    const el = document.querySelector('ytd-video-view-count-renderer span, #info span.view-count, .view-count');
-    if (el) views = el.textContent.trim().replace(/\s*views?/i,'').trim();
+    try {
+      // 2) Multi-pattern fallback on any inline script
+      for (const script of document.querySelectorAll('script:not([src])')) {
+        const t = script.textContent;
+        if (!t.includes('viewCount')) continue;
+        const patterns = [
+          /"viewCount"\s*:\s*"(\d+)"/,
+          /"viewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([\d,. ]+)\s*views?"/i,
+          /"shortViewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([\d.]+[KMB]?)\s*views?"/i,
+        ];
+        for (const re of patterns) {
+          const mm = t.match(re);
+          if (!mm) continue;
+          const raw = mm[1].replace(/[,\s]/g, '');
+          if (/^[\d.]+[KMB]$/i.test(raw)) { views = raw.toUpperCase(); break; }
+          const n = parseInt(raw.replace(/\D/g, ''), 10);
+          if (Number.isFinite(n) && n > 0) { views = fmtN(n); break; }
+        }
+        if (views) break;
+      }
+    } catch {}
+  }
+  if (!views) {
+    // 3) DOM selectors as last resort
+    const el = document.querySelector(
+      'ytd-video-view-count-renderer span, #info span.view-count, .view-count, ' +
+      'ytd-watch-info-text yt-formatted-string, #info-text yt-formatted-string'
+    );
+    if (el) {
+      const t = el.textContent.trim();
+      const numMatch = t.match(/^([\d,. ]+)\s*views?$/i);
+      if (numMatch) {
+        const n = parseInt(numMatch[1].replace(/\D/g, ''), 10);
+        if (Number.isFinite(n) && n > 0) views = fmtN(n);
+      } else {
+        views = t.replace(/\s*views?/i,'').trim();
+      }
+    }
   }
   return { id, title, channel, views };
 }
