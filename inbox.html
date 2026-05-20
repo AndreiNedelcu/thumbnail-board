@@ -78,20 +78,53 @@
   }
   .commit-btn {
     padding:8px 16px; border-radius:9px;
-    background:var(--purple); color:#fff; border:none;
+    background:#004ac1; color:#fff; border:none;
     font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
     transition:all .15s;
   }
-  .commit-btn:hover { box-shadow:0 6px 20px rgba(82,74,221,.35); transform:translateY(-1px); }
+  .commit-btn:hover { box-shadow:0 6px 20px rgba(0,74,193,.35); transform:translateY(-1px); }
   .commit-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
-  .commit-btn.secondary {
-    background:var(--surface2); color:var(--text); border:1px solid var(--border);
-  }
-  .commit-btn.secondary:hover { color:var(--bright); border-color:var(--border-h); background:var(--surface3); box-shadow:none; transform:none; }
   .commit-btn.danger {
     background:rgba(233,69,96,0.12); color:var(--red); border:1px solid rgba(233,69,96,0.3);
   }
   .commit-btn.danger:hover { background:rgba(233,69,96,0.22); color:#fff; box-shadow:none; transform:none; }
+
+  /* Split button — main approve + dropdown caret for the secondary option */
+  .split-btn-group { display:inline-flex; position:relative; }
+  .split-btn-group .commit-btn {
+    border-radius:9px 0 0 9px;
+    border-right:1px solid rgba(255,255,255,0.18);
+  }
+  .split-btn-group .commit-btn:hover { transform:none; box-shadow:none; background:#0058e5; }
+  .split-caret {
+    padding:8px 10px;
+    border-radius:0 9px 9px 0;
+    background:#004ac1; color:#fff; border:none;
+    cursor:pointer; transition:background .15s;
+    display:inline-flex; align-items:center;
+  }
+  .split-caret:hover { background:#0058e5; }
+  .split-caret:disabled { opacity:.4; cursor:not-allowed; }
+  .split-caret svg { width:11px; height:11px; }
+
+  .split-btn-menu {
+    position:absolute; top:calc(100% + 6px); right:0;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:5px; min-width:200px;
+    box-shadow:0 12px 32px rgba(0,0,0,.4);
+    z-index:120;
+    display:none;
+  }
+  .split-btn-menu.show { display:block; }
+  .split-btn-menu button {
+    display:block; width:100%; text-align:left;
+    background:transparent; border:none;
+    color:var(--text); font-family:inherit; font-size:12px; font-weight:600;
+    padding:9px 12px; border-radius:7px; cursor:pointer;
+    transition:background .12s, color .12s;
+  }
+  .split-btn-menu button:hover { background:var(--surface3); color:var(--bright); }
+  .split-btn-menu button:disabled { opacity:.4; cursor:not-allowed; }
 
   main { max-width:1600px; margin:0 auto; padding:24px clamp(20px, 4vw, 48px) 100px; }
 
@@ -255,9 +288,16 @@
   </div>
 
   <div class="commit-row">
-    <button class="commit-btn"        id="approvePendingBtn" onclick="approve('pending')">Approve → pending</button>
-    <button class="commit-btn secondary" id="approveBoardBtn"   onclick="confirmBoardApprove()">Approve → board</button>
-    <button class="commit-btn danger"  id="rejectBtn"         onclick="rejectMarked()">Reject marked</button>
+    <div class="split-btn-group">
+      <button class="commit-btn" id="approvePendingBtn" onclick="approve('pending')">Approve → pending</button>
+      <button class="split-caret" id="splitCaretBtn" onclick="toggleSplitMenu(event)" title="More approve options" aria-label="More approve options">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="split-btn-menu" id="splitMenu">
+        <button id="approveBoardBtn" onclick="closeSplitMenu(); confirmBoardApprove()">Approve → board</button>
+      </div>
+    </div>
+    <button class="commit-btn danger" id="rejectBtn" onclick="rejectMarked()">Reject marked</button>
   </div>
 </header>
 
@@ -406,6 +446,15 @@ function rightClickReject(e, id) {
   rejectCard(id);
   return false;
 }
+
+function toggleSplitMenu(e) {
+  e.stopPropagation();
+  document.getElementById('splitMenu').classList.toggle('show');
+}
+function closeSplitMenu() {
+  document.getElementById('splitMenu').classList.remove('show');
+}
+document.addEventListener('click', closeSplitMenu);
 function refreshCard(id) {
   const card = document.querySelector(`.card[data-id="${id}"]`);
   if (!card) return;
