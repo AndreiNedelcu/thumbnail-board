@@ -868,10 +868,17 @@ function scanCards() {
   //    These don't get inline-preview controls, so we drop an
   //    absolute-positioned button into the thumbnail container instead.
   for (const card of document.querySelectorAll(CARD_SELECTORS)) {
-    // If this card already has any of our buttons, skip
-    if (card.querySelector('.tb-yt-btn, .tb-card-btn')) continue;
     const watchLink = card.querySelector('a[href*="/watch?v="]');
     if (!watchLink) continue;
+    const m = watchLink.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+    if (!m) continue;
+    const vid = m[1];
+
+    // Skip if ANY button (card-style or yt-controls-style) already exists
+    // for this vid anywhere in the document. Container ancestors can
+    // diverge between branches, so document-wide is the only reliable check.
+    if (document.querySelector(`.tb-card-btn[data-vid="${vid}"], .tb-yt-btn[data-vid="${vid}"]`)) continue;
+
     const thumbContainer =
          card.querySelector('a#thumbnail')
       || card.querySelector('ytd-thumbnail')
