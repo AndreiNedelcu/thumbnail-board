@@ -7,6 +7,15 @@ GITHUB_REPO = "AndreiNedelcu/thumbnail-board"
 DATA_PATH   = "data.json"
 BRANCH      = "main"
 
+# Vector DB for the ideas-page (semantic search across past videos)
+[[vectorize]]
+binding    = "VECTORIZE"
+index_name = "thumbnail-board"
+
+# Cloudflare Workers AI for embeddings (bge-m3 multilingual, 1024 dims)
+[ai]
+binding = "AI"
+
 # Secrets (set with: wrangler secret put NAME)
 #   GITHUB_TOKEN     — fine-grained PAT with Contents:write on this repo
 #   AUTH_TOKEN       — random string, shared with frontend/extension

@@ -11,3 +11,6 @@ youtube_discarded.json
 eagle-no-youtube.json
 patch_tags.py
 sync.py.disabled
+# Ideas pipeline: transcripts are big (~30KB each), gitignored. Summaries
+# are small (~1.5KB) and committed. embedded.json is a manifest of indexed IDs.
+transcripts/

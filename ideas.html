@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ideas · Thumbnail Board</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="api-client.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
+    --border:rgba(204,218,231,0.08); --border-h:rgba(204,218,231,0.18);
+    --text:#ccdae7; --bright:#fff; --muted:#6e7d8c;
+    --mint:#3aecba; --purple:#524add; --red:#e94560; --blue:#004ac1;
+    --grad:linear-gradient(135deg,#3aecba 0%,#524add 100%);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:'Inter',sans-serif; background:var(--bg); color:var(--text);
+    min-height:100vh; -webkit-font-smoothing:antialiased; position:relative;
+  }
+  ::-webkit-scrollbar { width:10px; height:10px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:rgba(204,218,231,0.12); border-radius:5px; }
+  ::-webkit-scrollbar-thumb:hover { background:rgba(204,218,231,0.22); }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% -5%, rgba(58,236,186,0.12), transparent 55%),
+      radial-gradient(ellipse 900px 600px at 85% 8%, rgba(82,74,221,0.14), transparent 55%);
+  }
+  body > * { position:relative; z-index:1; }
+  a { color:inherit; text-decoration:none; }
+
+  header {
+    position:sticky; top:0; z-index:50;
+    background:rgba(13,17,23,0.92); backdrop-filter:blur(16px);
+    border-bottom:1px solid var(--border);
+    padding:16px 28px; display:flex; align-items:center; gap:14px;
+  }
+  .logo { font-weight:800; font-size:14px; letter-spacing:1.8px; color:var(--bright); }
+  .logo span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .back-link {
+    font-size:12px; color:var(--muted); font-weight:600; letter-spacing:.5px;
+    text-transform:uppercase; padding:6px 10px; border-radius:8px;
+    transition:color .15s, background .15s;
+  }
+  .back-link:hover { color:var(--text); background:var(--surface2); }
+  .stats { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.5px; text-transform:uppercase; }
+  .spacer { flex:1; }
+
+  main { max-width:1400px; margin:0 auto; padding:32px clamp(20px, 4vw, 48px) 100px; }
+
+  .pitch {
+    text-align:center; margin-bottom:32px;
+  }
+  .pitch h1 {
+    font-size:clamp(28px, 4vw, 40px); font-weight:900;
+    letter-spacing:-0.5px; color:var(--bright); margin-bottom:8px;
+  }
+  .pitch h1 span { background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .pitch p {
+    font-size:14px; color:var(--muted); line-height:1.6; max-width:540px; margin:0 auto;
+  }
+
+  /* Form card */
+  .form-card {
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:24px; max-width:760px; margin:0 auto 32px;
+  }
+  .field { margin-bottom:16px; }
+  .field label {
+    display:block; font-size:11px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.6px; margin-bottom:6px;
+  }
+  .field input, .field textarea {
+    width:100%; background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; color:var(--bright); font-family:inherit; font-size:14px;
+    padding:12px 14px; outline:none;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .field input:focus, .field textarea:focus {
+    border-color:var(--blue); box-shadow:0 0 0 3px rgba(0,74,193,0.18);
+  }
+  .field textarea { resize:vertical; min-height:140px; line-height:1.5; }
+
+  .form-foot {
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .form-foot .toggle-wrap {
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:13px; color:var(--text); cursor:pointer;
+    user-select:none;
+  }
+  .form-foot input[type="checkbox"] {
+    width:14px; height:14px; accent-color:var(--blue);
+    margin:0; cursor:pointer;
+  }
+  .form-foot .spacer { flex:1; }
+  .find-btn {
+    padding:11px 22px; border-radius:10px;
+    background:#004ac1; color:#fff; border:none;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+    transition:background .15s, box-shadow .15s, transform .15s;
+  }
+  .find-btn:hover { background:#0058e5; box-shadow:0 6px 20px rgba(0,74,193,.35); transform:translateY(-1px); }
+  .find-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
+
+  /* Results */
+  .results-meta {
+    text-align:center; font-size:12px; color:var(--muted);
+    margin-bottom:16px;
+  }
+
+  #grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));
+    gap:20px 16px;
+  }
+  .card {
+    cursor:pointer; transition:transform .15s;
+    display:flex; flex-direction:column;
+  }
+  .card:hover { transform:translateY(-2px); }
+
+  .thumb {
+    position:relative; aspect-ratio:16/9;
+    background:var(--surface); border-radius:12px; overflow:hidden;
+    transition:box-shadow .15s;
+  }
+  .card:hover .thumb { box-shadow:0 14px 30px rgba(0,0,0,.5); }
+  .thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+  .score-badge {
+    position:absolute; top:8px; right:8px;
+    padding:4px 9px; border-radius:8px;
+    font-size:12px; font-weight:800; letter-spacing:.3px;
+    color:#fff; line-height:1;
+    background:#004ac1;
+  }
+  .score-badge.score-hot   { background:#a20039; }    /* >= 80% */
+  .score-badge.score-warm  { background:#5b3dec; }    /* 60-80% */
+  .score-badge.score-tepid { background:#004ac1; }    /* < 60% */
+  .score-badge .pct { opacity:.9; font-size:10px; font-weight:700; margin-left:1px; }
+
+  .own-badge {
+    position:absolute; top:8px; left:8px;
+    padding:3px 7px; border-radius:6px;
+    background:rgba(58,236,186,0.9); color:#0d1117;
+    font-size:10px; font-weight:800; letter-spacing:.4px;
+    text-transform:uppercase;
+  }
+
+  .info { padding:10px 4px 2px; }
+  .card .title {
+    color:var(--bright); font-size:13px; font-weight:600; line-height:1.4;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    margin-bottom:4px; word-break:break-word;
+  }
+  .card .sub {
+    color:var(--muted); font-size:12px; font-weight:500;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+
+  #empty {
+    text-align:center; padding:60px 24px; color:var(--muted);
+  }
+  #empty h2 { font-size:18px; color:var(--bright); margin-bottom:8px; font-weight:700; }
+  #empty p { font-size:13px; line-height:1.6; max-width:420px; margin:0 auto; }
+
+  .loading {
+    text-align:center; padding:60px 24px; color:var(--muted); font-size:13px;
+  }
+  .loading .dot {
+    display:inline-block; width:7px; height:7px; border-radius:50%;
+    background:var(--blue); margin:0 3px;
+    animation:bounce 1.4s infinite ease-in-out both;
+  }
+  .loading .dot:nth-child(2) { animation-delay:.16s; }
+  .loading .dot:nth-child(3) { animation-delay:.32s; }
+  @keyframes bounce {
+    0%, 80%, 100% { transform:scale(0); opacity:.4; }
+    40% { transform:scale(1); opacity:1; }
+  }
+
+  #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
+    background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
+    font-size:13px; font-weight:600; border:1px solid var(--border);
+    opacity:0; transition:all .25s; pointer-events:none;
+    box-shadow:0 12px 32px rgba(0,0,0,.4); z-index:200; max-width:540px;
+  }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TB<span>IDEAS</span></div>
+  <a class="back-link" href="index.html">← Board</a>
+  <div class="stats" id="stats"></div>
+  <div class="spacer"></div>
+</header>
+
+<main>
+  <div class="pitch">
+    <h1>Find <span>references</span> for your next video</h1>
+    <p>Paste your title and script (or summary) below. The bot will search the board for the thumbnails of past videos most semantically similar to what you're planning.</p>
+  </div>
+
+  <div class="form-card">
+    <div class="field">
+      <label for="ti">Title</label>
+      <input id="ti" type="text" placeholder="e.g. What is RAG and why it matters for senior devs" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="sc">Script or summary</label>
+      <textarea id="sc" placeholder="Paste here the script or a paragraph summarizing the video you're planning. The more specific, the better the matches." rows="6"></textarea>
+    </div>
+    <div class="form-foot">
+      <label class="toggle-wrap">
+        <input type="checkbox" id="includeOwn">
+        <span>Include thumbnails from my own channels</span>
+      </label>
+      <div class="spacer"></div>
+      <button class="find-btn" id="findBtn" onclick="search()">Find references</button>
+    </div>
+  </div>
+
+  <div id="results-meta" class="results-meta" style="display:none"></div>
+  <div id="grid"></div>
+
+  <div id="empty">
+    <h2>Ready when you are</h2>
+    <p>Fill in the title (mandatory) and script (optional but recommended) and click Find references.</p>
+  </div>
+
+  <div id="loading" class="loading" style="display:none">
+    Searching the board
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+function esc(s) {
+  return String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
+}
+
+function scoreClass(s) {
+  // Vectorize cosine similarity for normalized embeddings is in [-1, 1]
+  // In practice for our content it sits around 0.4-0.9. Buckets:
+  if (s >= 0.75) return 'score-hot';
+  if (s >= 0.60) return 'score-warm';
+  return 'score-tepid';
+}
+
+function scorePct(s) {
+  return Math.max(0, Math.min(100, Math.round(s * 100)));
+}
+
+async function search() {
+  const title  = document.getElementById('ti').value.trim();
+  const script = document.getElementById('sc').value.trim();
+  const includeOwn = document.getElementById('includeOwn').checked;
+
+  if (!title && !script) {
+    toast('Add a title or a script first', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('findBtn');
+  btn.disabled = true;
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('results-meta').style.display = 'none';
+
+  try {
+    const r = await TBApi.fetch('/api/ideas/search', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ title, script, includeOwnChannels: includeOwn, topK: 12 }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    render(d.results);
+  } catch (e) {
+    toast('Search failed: ' + e.message, 'error');
+    document.getElementById('empty').style.display = 'block';
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+    btn.disabled = false;
+  }
+}
+
+function render(results) {
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  const meta = document.getElementById('results-meta');
+
+  if (!results || !results.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    empty.innerHTML = '<h2>No matches yet</h2><p>The Vectorize index might still be empty, or your query is too far from the indexed content. Try a more specific script.</p>';
+    return;
+  }
+
+  empty.style.display = 'none';
+  meta.style.display = 'block';
+  meta.textContent = `${results.length} matches · sorted by similarity`;
+
+  grid.innerHTML = results.map(r => `
+    <a class="card" href="https://www.youtube.com/watch?v=${esc(r.id)}" target="_blank" rel="noopener" title="Open ${esc(r.title)} on YouTube">
+      <div class="thumb">
+        <img loading="lazy"
+             src="https://i.ytimg.com/vi/${esc(r.id)}/maxresdefault.jpg"
+             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(r.id)}/hqdefault.jpg'">
+        <div class="score-badge ${scoreClass(r.score)}">${scorePct(r.score)}<span class="pct">%</span></div>
+        ${r.is_own ? '<div class="own-badge">Mine</div>' : ''}
+      </div>
+      <div class="info">
+        <div class="title">${esc(r.title)}</div>
+        <div class="sub">${esc(r.channel || '')}</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+function toast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.color = type==='error' ? '#e94560' : type==='success' ? '#3aecba' : '#fff';
+  t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+
+// Submit with Cmd/Ctrl+Enter from the textarea
+document.getElementById('sc').addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    search();
+  }
+});
+</script>
+</body>
+</html>

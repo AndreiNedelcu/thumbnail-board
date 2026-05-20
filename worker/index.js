@@ -431,6 +431,77 @@ async function handleInboxReject(body, env) {
   return json({ ok: true, rejected: addedRejected, removedFromInbox });
 }
 
+// ── Ideas page: semantic search across the board ────────────────────
+// Uses CF Workers AI (bge-m3 multilingual, 1024-dim embeddings) +
+// CF Vectorize (binding VECTORIZE) for kNN search.
+const EMBED_MODEL = '@cf/baai/bge-m3';
+
+async function embedText(env, text) {
+  const trimmed = (text || '').slice(0, 30000);  // bge-m3 max ~8192 tokens; chars cap as safety
+  const resp = await env.AI.run(EMBED_MODEL, { text: [trimmed] });
+  const v = resp?.data?.[0];
+  if (!Array.isArray(v) || v.length !== 1024) {
+    throw new Error(`Bad embedding (got length ${v?.length})`);
+  }
+  return v;
+}
+
+async function handleIdeasEmbed(body, env) {
+  const id   = String(body.id || '').trim();
+  const text = String(body.text || '').trim();
+  if (!id || !text) return json({ ok: false, msg: 'Need id and text' }, 400);
+
+  const meta = {
+    title:   String(body.title   || '').slice(0, 240),
+    channel: String(body.channel || '').slice(0, 120),
+    is_own:  !!body.is_own,
+  };
+
+  try {
+    const vec = await embedText(env, text);
+    await env.VECTORIZE.upsert([{ id, values: vec, metadata: meta }]);
+    return json({ ok: true, id, dim: vec.length });
+  } catch (e) {
+    return json({ ok: false, msg: e.message }, 500);
+  }
+}
+
+async function handleIdeasSearch(body, env) {
+  const title  = String(body.title  || '').trim();
+  const script = String(body.script || '').trim();
+  if (!title && !script) return json({ ok: false, msg: 'Need title or script' }, 400);
+
+  const includeOwn = body.includeOwnChannels !== false; // default true
+  const topK       = Math.max(1, Math.min(50, body.topK || 12));
+  const text       = [title, script].filter(Boolean).join('\n\n');
+
+  try {
+    const vec = await embedText(env, text);
+    // Over-fetch when excluding own channels so we have room after filter
+    const fetchK = includeOwn ? topK : Math.min(topK * 2, 50);
+    const res = await env.VECTORIZE.query(vec, { topK: fetchK, returnMetadata: true });
+    let matches = res.matches || [];
+    if (!includeOwn) {
+      matches = matches.filter(m => !m.metadata?.is_own).slice(0, topK);
+    } else {
+      matches = matches.slice(0, topK);
+    }
+    return json({
+      ok: true,
+      query: { title_chars: title.length, script_chars: script.length },
+      results: matches.map(m => ({
+        id:      m.id,
+        score:   +(m.score || 0).toFixed(3),
+        title:   m.metadata?.title   || '',
+        channel: m.metadata?.channel || '',
+        is_own:  !!m.metadata?.is_own,
+      })),
+    });
+  } catch (e) {
+    return json({ ok: false, msg: e.message }, 500);
+  }
+}
+
 // ── Scrape (manual + scheduled) ─────────────────────────────────────
 async function runScrapeAndPersist(env) {
   // 1) Load sources
@@ -550,6 +621,8 @@ export default {
         if (path === '/api/inbox/reject')         return await handleInboxReject(body, env);
         if (path === '/api/inbox/block-channel')  return await handleBlockChannel(body, env);
         if (path === '/api/scrape/run')           return await handleScrapeRun(env);
+        if (path === '/api/ideas/embed')          return await handleIdeasEmbed(body, env);
+        if (path === '/api/ideas/search')         return await handleIdeasSearch(body, env);
       } catch (e) {
         return json({ ok: false, msg: e.message }, 500);
       }
