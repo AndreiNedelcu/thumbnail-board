@@ -466,6 +466,36 @@ async function handleIdeasEmbed(body, env) {
   }
 }
 
+async function handleIdeasRelated(body, env) {
+  const id = String(body.id || '').trim();
+  if (!id) return json({ ok: false, msg: 'Need id' }, 400);
+  const topK = Math.max(1, Math.min(24, body.topK || 8));
+
+  try {
+    const fetched = await env.VECTORIZE.getByIds([id]);
+    if (!fetched || !fetched.length) {
+      return json({ ok: false, msg: `id ${id} not found in index` }, 404);
+    }
+    const vec = fetched[0].values;
+    // Over-fetch by 1 so we can drop self from results
+    const res = await env.VECTORIZE.query(vec, { topK: topK + 1, returnMetadata: true });
+    const matches = (res.matches || []).filter(m => m.id !== id).slice(0, topK);
+    return json({
+      ok: true,
+      seed: { id, title: fetched[0].metadata?.title || '' },
+      results: matches.map(m => ({
+        id:      m.id,
+        score:   +(m.score || 0).toFixed(3),
+        title:   m.metadata?.title   || '',
+        channel: m.metadata?.channel || '',
+        is_own:  !!m.metadata?.is_own,
+      })),
+    });
+  } catch (e) {
+    return json({ ok: false, msg: e.message }, 500);
+  }
+}
+
 async function handleIdeasSearch(body, env) {
   const title  = String(body.title  || '').trim();
   const script = String(body.script || '').trim();
@@ -623,6 +653,7 @@ export default {
         if (path === '/api/scrape/run')           return await handleScrapeRun(env);
         if (path === '/api/ideas/embed')          return await handleIdeasEmbed(body, env);
         if (path === '/api/ideas/search')         return await handleIdeasSearch(body, env);
+        if (path === '/api/ideas/related')        return await handleIdeasRelated(body, env);
       } catch (e) {
         return json({ ok: false, msg: e.message }, 500);
       }

@@ -191,6 +191,138 @@
     40% { transform:scale(1); opacity:1; }
   }
 
+  /* ── LIGHTBOX ───────────────────────────────────────────── */
+  .lb-overlay {
+    position:fixed; inset:0; z-index:200;
+    background:rgba(0,0,0,0.92); backdrop-filter:blur(12px);
+    display:none; overflow-y:auto;
+    padding:32px 20px;
+    scrollbar-color:rgba(255,255,255,0.18) transparent;
+    scrollbar-width:thin;
+  }
+  .lb-overlay::-webkit-scrollbar { width:10px; }
+  .lb-overlay::-webkit-scrollbar-track { background:transparent; }
+  .lb-overlay::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:5px; }
+  .lb-overlay.open { display:block; }
+
+  .lb-container {
+    background:var(--surface); border-radius:18px;
+    max-width:1000px; width:100%; margin:0 auto;
+    box-shadow:0 40px 100px rgba(0,0,0,0.9);
+    overflow:hidden;
+    position:relative;
+  }
+  .lb-close {
+    position:absolute; top:12px; right:12px; z-index:10;
+    width:36px; height:36px; border-radius:50%;
+    background:rgba(0,0,0,0.6); border:none;
+    color:#fff; font-size:18px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s;
+  }
+  .lb-close:hover { background:rgba(255,255,255,0.2); }
+
+  .lb-thumb {
+    width:100%; aspect-ratio:16/9; background:#000;
+    position:relative; overflow:hidden;
+  }
+  .lb-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+
+  .lb-score-corner {
+    position:absolute; top:14px; left:14px;
+    padding:6px 12px; border-radius:10px;
+    font-size:14px; font-weight:800; letter-spacing:.3px;
+    color:#fff; line-height:1;
+    background:#004ac1;
+  }
+  .lb-score-corner.score-hot   { background:#a20039; }
+  .lb-score-corner.score-warm  { background:#5b3dec; }
+  .lb-score-corner.score-tepid { background:#004ac1; }
+  .lb-score-corner small { opacity:.85; font-size:11px; font-weight:600; margin-left:3px; letter-spacing:0; }
+
+  .lb-body { padding:24px 28px 28px; }
+  .lb-title {
+    color:var(--bright); font-size:22px; font-weight:800;
+    line-height:1.3; letter-spacing:-0.3px;
+    margin-bottom:10px;
+  }
+  .lb-meta {
+    color:var(--muted); font-size:13px; font-weight:500;
+    margin-bottom:18px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;
+  }
+  .lb-meta .dot { opacity:.5; }
+
+  .lb-tags {
+    display:flex; flex-wrap:wrap; gap:6px; margin-bottom:20px;
+  }
+  .lb-tag {
+    padding:4px 10px; border-radius:7px;
+    background:var(--surface2); color:var(--text);
+    font-size:11px; font-weight:600; letter-spacing:.2px;
+  }
+
+  .lb-actions {
+    display:flex; gap:10px; flex-wrap:wrap;
+    padding-bottom:24px; border-bottom:1px solid var(--border);
+  }
+  .lb-btn {
+    padding:10px 16px; border-radius:10px;
+    font-family:inherit; font-size:13px; font-weight:700;
+    text-decoration:none; cursor:pointer; border:none;
+    display:inline-flex; align-items:center; gap:8px;
+    transition:all .15s;
+  }
+  .lb-btn.primary { background:#ff0000; color:#fff; }
+  .lb-btn.primary:hover { background:#cc0000; transform:translateY(-1px); }
+  .lb-btn.secondary { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .lb-btn.secondary:hover { background:var(--surface3); color:var(--bright); border-color:var(--border-h); }
+  .lb-btn svg { width:14px; height:14px; }
+
+  .lb-related-section {
+    padding-top:22px;
+  }
+  .lb-related-section h4 {
+    color:var(--bright); font-size:13px; font-weight:800;
+    text-transform:uppercase; letter-spacing:1px;
+    margin-bottom:14px;
+  }
+  .lb-related-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(170px, 1fr));
+    gap:14px 12px;
+  }
+  .lb-related-card {
+    cursor:pointer; transition:transform .15s;
+    display:flex; flex-direction:column;
+  }
+  .lb-related-card:hover { transform:translateY(-2px); }
+  .lb-related-thumb {
+    aspect-ratio:16/9; background:var(--surface2); border-radius:10px; overflow:hidden;
+    transition:box-shadow .15s;
+  }
+  .lb-related-card:hover .lb-related-thumb { box-shadow:0 10px 24px rgba(0,0,0,.45); }
+  .lb-related-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .lb-related-card .t {
+    color:var(--bright); font-size:12px; font-weight:600; line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+    margin-top:8px; word-break:break-word;
+  }
+  .lb-related-card .c {
+    color:var(--muted); font-size:11px; margin-top:3px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .lb-related-loading {
+    color:var(--muted); font-size:12px; padding:20px 0;
+    display:flex; align-items:center; gap:6px;
+  }
+  .lb-related-loading .dot {
+    display:inline-block; width:5px; height:5px; border-radius:50%;
+    background:var(--blue); animation:bounce 1.4s infinite ease-in-out both;
+  }
+  .lb-related-loading .dot:nth-child(2) { animation-delay:.16s; }
+  .lb-related-loading .dot:nth-child(3) { animation-delay:.32s; }
+  .lb-related-empty { color:var(--muted); font-size:12px; padding:14px 0; }
+
   #toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(12px);
     background:var(--surface); color:var(--bright); padding:11px 20px; border-radius:10px;
     font-size:13px; font-weight:600; border:1px solid var(--border);
@@ -250,6 +382,38 @@
 
 <div id="toast"></div>
 
+<!-- Lightbox -->
+<div class="lb-overlay" id="lb" onclick="if(event.target===this) closeLightbox()">
+  <div class="lb-container">
+    <button class="lb-close" onclick="closeLightbox()" title="Close (Esc)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+    </button>
+    <div class="lb-thumb">
+      <img id="lb-img" src="" alt="">
+      <div class="lb-score-corner" id="lb-score" style="display:none"></div>
+    </div>
+    <div class="lb-body">
+      <div class="lb-title" id="lb-title"></div>
+      <div class="lb-meta" id="lb-meta"></div>
+      <div class="lb-tags" id="lb-tags"></div>
+      <div class="lb-actions">
+        <a class="lb-btn primary" id="lb-yt" href="" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Open on YouTube
+        </a>
+        <a class="lb-btn secondary" id="lb-board" href="" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          Open on Board
+        </a>
+      </div>
+      <div class="lb-related-section">
+        <h4>Related thumbnails from the board</h4>
+        <div id="lb-related"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function esc(s) {
   return String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
@@ -302,10 +466,16 @@ async function search() {
   }
 }
 
+// Keep the last results around so the lightbox can look up metadata
+// without re-querying the Worker.
+let lastResults = [];
+
 function render(results) {
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
   const meta = document.getElementById('results-meta');
+
+  lastResults = results || [];
 
   if (!results || !results.length) {
     grid.innerHTML = '';
@@ -318,8 +488,8 @@ function render(results) {
   meta.style.display = 'block';
   meta.textContent = `${results.length} matches · sorted by similarity`;
 
-  grid.innerHTML = results.map(r => `
-    <a class="card" href="https://www.youtube.com/watch?v=${esc(r.id)}" target="_blank" rel="noopener" title="Open ${esc(r.title)} on YouTube">
+  grid.innerHTML = results.map((r, i) => `
+    <div class="card" onclick="openLightbox(${i})" title="Click to preview · double-click area on bottom-right for actions">
       <div class="thumb">
         <img loading="lazy"
              src="https://i.ytimg.com/vi/${esc(r.id)}/maxresdefault.jpg"
@@ -331,9 +501,107 @@ function render(results) {
         <div class="title">${esc(r.title)}</div>
         <div class="sub">${esc(r.channel || '')}</div>
       </div>
-    </a>
+    </div>
   `).join('');
 }
+
+// ── Lightbox ──────────────────────────────────────────────────────
+let lightboxStack = [];   // history so back-arrow could be added later
+
+function openLightbox(indexOrItem) {
+  const item = typeof indexOrItem === 'number' ? lastResults[indexOrItem] : indexOrItem;
+  if (!item) return;
+  lightboxStack.push(item);
+
+  // Image
+  document.getElementById('lb-img').src = `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`;
+  document.getElementById('lb-img').onerror = function() {
+    this.onerror = null;
+    this.src = `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`;
+  };
+
+  // Score (only show if it came from a search, not from related click)
+  const scoreEl = document.getElementById('lb-score');
+  if (typeof item.score === 'number') {
+    scoreEl.style.display = 'inline-flex';
+    scoreEl.className = `lb-score-corner ${scoreClass(item.score)}`;
+    scoreEl.innerHTML = `${scorePct(item.score)}<small>% match</small>`;
+  } else {
+    scoreEl.style.display = 'none';
+  }
+
+  // Title
+  document.getElementById('lb-title').textContent = item.title || '(no title)';
+
+  // Meta
+  const metaParts = [];
+  if (item.channel)        metaParts.push(esc(item.channel));
+  if (item.views)          metaParts.push(esc(item.views) + ' views');
+  if (item.is_own)         metaParts.push('<span style="color:var(--mint);font-weight:700">Mine</span>');
+  document.getElementById('lb-meta').innerHTML = metaParts.join('<span class="dot">·</span>');
+
+  // Tags (we don't have tags in the search payload yet — enrich from /api/data if needed)
+  // For now leave empty; future improvement: include tags in search results.
+  document.getElementById('lb-tags').innerHTML = (item.tags || [])
+    .map(t => `<span class="lb-tag">${esc(t)}</span>`).join('');
+
+  // Buttons
+  document.getElementById('lb-yt').href    = `https://www.youtube.com/watch?v=${item.id}`;
+  document.getElementById('lb-board').href = `index.html#v=${item.id}`;
+
+  // Related
+  loadRelated(item.id);
+
+  // Show + lock scroll
+  document.getElementById('lb').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeLightbox() {
+  document.getElementById('lb').classList.remove('open');
+  document.body.style.overflow = '';
+  lightboxStack = [];
+}
+
+async function loadRelated(id) {
+  const root = document.getElementById('lb-related');
+  root.innerHTML = `<div class="lb-related-loading">Finding related <span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
+  try {
+    const r = await TBApi.fetch('/api/ideas/related', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id, topK: 8 }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    if (!d.results.length) {
+      root.innerHTML = `<div class="lb-related-empty">No related videos found.</div>`;
+      return;
+    }
+    root.innerHTML = `<div class="lb-related-grid">${d.results.map(rel => `
+      <div class="lb-related-card" onclick='openLightbox(${JSON.stringify({
+        id: rel.id, title: rel.title, channel: rel.channel, is_own: rel.is_own
+      }).replace(/'/g, "&#39;")})' title="${esc(rel.title)}">
+        <div class="lb-related-thumb">
+          <img loading="lazy"
+               src="https://i.ytimg.com/vi/${esc(rel.id)}/mqdefault.jpg"
+               onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(rel.id)}/hqdefault.jpg'">
+        </div>
+        <div class="t">${esc(rel.title)}</div>
+        <div class="c">${esc(rel.channel || '')}</div>
+      </div>
+    `).join('')}</div>`;
+  } catch (e) {
+    root.innerHTML = `<div class="lb-related-empty">Couldn't load related: ${esc(e.message)}</div>`;
+  }
+}
+
+// ESC closes lightbox
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('lb').classList.contains('open')) {
+    closeLightbox();
+  }
+});
 
 function toast(msg, type='info') {
   const t = document.getElementById('toast');
