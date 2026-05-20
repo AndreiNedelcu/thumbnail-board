@@ -28,6 +28,18 @@ fi
 # Ensure token is set
 : "${TB_AUTH_TOKEN:?Set TB_AUTH_TOKEN env var first}"
 
+# Pull latest before reading eagle-pending.json. The Worker mutates
+# this file remotely (via /api/inbox/approve), so the local copy can
+# go stale between approves — auto_tag.py would see "Total pending: 0"
+# and exit immediately. Pull silently; on conflict, abort so the user
+# can resolve manually rather than running on stale data.
+echo "🔄 git pull --rebase --autostash"
+if ! git pull --rebase --autostash --quiet; then
+  echo "❌ git pull failed — refusing to run auto_tag on stale eagle-pending.json"
+  echo "   Resolve the git state, then re-run ./run_all.sh"
+  exit 1
+fi
+
 # Sanity filter
 MIN=3
 MAX=10
