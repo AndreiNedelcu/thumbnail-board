@@ -38,6 +38,7 @@ import { runScrape } from './scrape.js';
 const INBOX_PATH    = 'scrape_inbox.json';
 const REJECTED_PATH = 'scrape_rejected.json';
 const SOURCES_PATH  = 'scrape_sources.json';
+const BLOCKLIST_PATH = 'scrape_channel_blocklist.json';
 const PENDING_PATH  = 'eagle-pending.json';
 
 const CORS_HEADERS = {
@@ -360,6 +361,49 @@ async function handleInboxApprove(body, env) {
   });
 }
 
+async function handleBlockChannel(body, env) {
+  const channelId   = String(body.channelId   || '').trim();
+  const channelName = String(body.channelName || '').trim();
+  if (!channelId) return json({ ok: false, msg: 'No channelId' }, 400);
+
+  // 1) Append to channel blocklist (idempotent)
+  let added = false;
+  await mutate(env, (current) => {
+    const blocked = Array.isArray(current) ? current : [];
+    if (blocked.some(b => b?.channelId === channelId)) return null;
+    added = true;
+    return [...blocked, {
+      channelId,
+      channelName: channelName || '(unknown)',
+      blockedAt:   new Date().toISOString(),
+    }];
+  }, `blocklist: +${channelName || channelId}`, BLOCKLIST_PATH);
+
+  // 2) Drop any items currently in the inbox from that channel.
+  //    Their video IDs go to scrape_rejected.json so they don't sneak
+  //    back via search/trending discovery.
+  const { text: inboxText, missing } = await ghGet(env, INBOX_PATH);
+  const inbox = missing ? [] : JSON.parse(inboxText);
+  const removedIds = inbox.filter(it => it.channelId === channelId).map(it => it.id);
+
+  if (removedIds.length) {
+    await mutate(env, (rejected) => {
+      const existing = new Set(rejected);
+      const newOnes = removedIds.filter(id => !existing.has(id));
+      if (!newOnes.length) return null;
+      return [...rejected, ...newOnes];
+    }, `rejected: +${removedIds.length} from blocked channel`, REJECTED_PATH);
+
+    await mutate(env, (current) => {
+      const remaining = current.filter(it => it.channelId !== channelId);
+      if (remaining.length === current.length) return null;
+      return remaining;
+    }, `inbox: drop ${removedIds.length} from blocked ${channelName || channelId}`, INBOX_PATH);
+  }
+
+  return json({ ok: true, channelId, channelName, added, removed: removedIds.length });
+}
+
 async function handleInboxReject(body, env) {
   const ids = Array.isArray(body.ids) ? body.ids : [];
   if (!ids.length) return json({ ok: false, msg: 'No ids' }, 400);
@@ -399,11 +443,13 @@ async function runScrapeAndPersist(env) {
   catch (e) { return { ok: false, msg: `Bad ${SOURCES_PATH}: ${e.message}`, stats: null }; }
 
   // 2) Build excludeIds from data.json + eagle-pending.json + inbox + rejected
-  const [dataR, pendingR, inboxR, rejectedR] = await Promise.all([
+  //    and blockedChannelIds from the channel blocklist
+  const [dataR, pendingR, inboxR, rejectedR, blocklistR] = await Promise.all([
     ghGet(env, env.DATA_PATH),
     ghGet(env, PENDING_PATH),
     ghGet(env, INBOX_PATH),
     ghGet(env, REJECTED_PATH),
+    ghGet(env, BLOCKLIST_PATH),
   ]);
   const excludeIds = new Set();
   if (dataR.text)     for (const v of JSON.parse(dataR.text))     excludeIds.add(v.id);
@@ -411,8 +457,15 @@ async function runScrapeAndPersist(env) {
   if (inboxR.text)    for (const v of JSON.parse(inboxR.text))    excludeIds.add(v.id);
   if (rejectedR.text) for (const id of JSON.parse(rejectedR.text)) excludeIds.add(id);
 
+  const blockedChannelIds = new Set();
+  if (blocklistR.text) {
+    for (const entry of JSON.parse(blocklistR.text)) {
+      if (entry?.channelId) blockedChannelIds.add(entry.channelId);
+    }
+  }
+
   // 3) Run the scrape
-  const { candidates, stats } = await runScrape(env, sources, excludeIds);
+  const { candidates, stats } = await runScrape(env, sources, excludeIds, blockedChannelIds);
 
   // 4) Append new candidates to the inbox, honouring max_inbox_size.
   //    The cap stops the cron from drowning the user — when the inbox
@@ -493,9 +546,10 @@ export default {
         if (path === '/api/update-batch')    return await handleUpdateBatch(body, env);
         if (path === '/api/update' || path === '/api/eagle/update')
                                              return await handleUpdate(body, env);
-        if (path === '/api/inbox/approve')   return await handleInboxApprove(body, env);
-        if (path === '/api/inbox/reject')    return await handleInboxReject(body, env);
-        if (path === '/api/scrape/run')      return await handleScrapeRun(env);
+        if (path === '/api/inbox/approve')        return await handleInboxApprove(body, env);
+        if (path === '/api/inbox/reject')         return await handleInboxReject(body, env);
+        if (path === '/api/inbox/block-channel')  return await handleBlockChannel(body, env);
+        if (path === '/api/scrape/run')           return await handleScrapeRun(env);
       } catch (e) {
         return json({ ok: false, msg: e.message }, 500);
       }

@@ -176,8 +176,23 @@
   .card .sub {
     color:var(--muted); font-size:12px; font-weight:500; line-height:1.35;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    display:flex; align-items:center; gap:5px; min-width:0;
   }
-  .card .sub .dot { opacity:.45; margin:0 5px; }
+  .card .sub > * { flex-shrink:0; }
+  .card .sub .channel-name { overflow:hidden; text-overflow:ellipsis; min-width:0; flex-shrink:1; }
+  .card .sub .dot { opacity:.45; }
+
+  /* Block-channel button — inline next to the channel name, appears on card hover */
+  .block-channel-btn {
+    display:inline-flex; align-items:center; justify-content:center;
+    background:transparent; border:none; padding:2px;
+    color:var(--muted); cursor:pointer;
+    opacity:0; transition:opacity .15s, color .15s, background .15s;
+    border-radius:5px;
+  }
+  .card:hover .block-channel-btn { opacity:.55; }
+  .block-channel-btn:hover { opacity:1 !important; color:var(--red); background:rgba(233,69,96,0.10); }
+  .block-channel-btn svg { width:13px; height:13px; }
 
   /* Outlier badge — VidIQ palette, 3 tiers.
      score-1 = 1.5-5   moderate    (blue)
@@ -396,11 +411,10 @@ function render() {
     const state = decisions.get(it.id) || '';
     const cls = state === 'keep' ? 'kept' : state === 'reject' ? 'rejected' : '';
     const scoreLabel = it.outlierScore ? `<span class="x">x</span>${it.outlierScore}` : '—';
-    const subParts = [
-      esc(it.channel || ''),
-      it.views ? esc(it.views) + ' views' : '',
-      ageLabel(it.ageDays),
-    ].filter(Boolean);
+    const channel = esc(it.channel || '');
+    const channelId = esc(it.channelId || '');
+    const views = it.views ? esc(it.views) + ' views' : '';
+    const age = ageLabel(it.ageDays);
     return `
       <div class="card ${cls}" data-id="${esc(it.id)}"
            onclick="toggle('${esc(it.id)}')"
@@ -422,7 +436,14 @@ function render() {
         <div class="info">
           <div class="info-left">
             <div class="title">${esc(it.title)}</div>
-            <div class="sub">${subParts.map(p => esc(p)).join('<span class="dot">·</span>')}</div>
+            <div class="sub">
+              <span class="channel-name">${channel}</span>
+              ${channelId ? `<button class="block-channel-btn" onclick="event.stopPropagation(); blockChannel('${channelId}', '${channel.replace(/'/g, "\\'")}')" oncontextmenu="event.stopPropagation()" title="Block all videos from ${channel}" aria-label="Block channel">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
+              </button>` : ''}
+              ${views ? `<span class="dot">·</span><span>${views}</span>` : ''}
+              ${age   ? `<span class="dot">·</span><span>${age}</span>` : ''}
+            </div>
           </div>
           <div class="score-badge ${scoreClass(it)}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
             ${scoreLabel}
@@ -529,6 +550,25 @@ async function approve(destination) {
   } finally {
     btn.textContent = oldLabel;
     updateStats();
+  }
+}
+
+async function blockChannel(channelId, channelName) {
+  if (!channelId) { toast('Sin channelId, no se puede bloquear', 'error'); return; }
+  const niceName = channelName || channelId;
+  if (!confirm(`Bloquear "${niceName}"?\n\nNo volverá a aparecer en el inbox y los items actuales de ese canal se descartan.`)) return;
+  try {
+    const r = await TBApi.fetch('/api/inbox/block-channel', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ channelId, channelName: niceName }),
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
+    toast(`Bloqueado ${niceName}${d.removed ? ` · ${d.removed} items quitados del inbox` : ''}`, 'success');
+    await load();
+  } catch (e) {
+    toast('No pude bloquear: ' + e.message, 'error');
   }
 }
 

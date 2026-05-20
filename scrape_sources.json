@@ -10,7 +10,15 @@
     "@mreflow",
     "@LexFridman",
     "@theseniordev",
-    "@therealseniordev"
+    "@therealseniordev",
+    "@Moon-Real",
+    "@MarkRober",
+    "@SmarterEveryDay",
+    "@KurzgesagtInaNutshell",
+    "@JohnnyHarris",
+    "@CleoAbram",
+    "@MrBallen",
+    "@PaddyGalloway"
   ],
   "queries": [
     "software engineering best practices",
@@ -29,7 +37,7 @@
     "min_views": 50000,
     "max_age_days": 730,
     "min_duration_seconds": 90,
-    "min_outlier_score": 1.5,
+    "min_outlier_score": 2.0,
     "cap_per_run": 30,
     "max_inbox_size": 100
   }

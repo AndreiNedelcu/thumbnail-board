@@ -17,9 +17,10 @@
 const YT_API = 'https://www.googleapis.com/youtube/v3';
 
 // Allowed YouTube category IDs (snippet.categoryId):
-//   22 People & Blogs, 24 Entertainment, 26 Howto & Style,
-//   27 Education,      28 Science & Tech
-const ALLOWED_CATEGORY_IDS = new Set(['22', '24', '26', '27', '28']);
+//   1  Film & Animation,  17 Sports,         22 People & Blogs,
+//   23 Comedy,            24 Entertainment,  26 Howto & Style,
+//   27 Education,         28 Science & Tech
+const ALLOWED_CATEGORY_IDS = new Set(['1', '17', '22', '23', '24', '26', '27', '28']);
 
 // Hard blocklist applied to title, channel name and (truncated) description.
 const BLOCKLIST_REGEX = /\b(reaction|prank|asmr|mukbang|gameplay|let'?s play|fortnite|roblox|minecraft|cocomelon|peppa|toy review|nursery rhyme|family friendly gaming|unboxing haul)\b/i;
@@ -270,9 +271,10 @@ function calculateOutlierScore(video, baseline) {
  * @param {object} env Worker env (YOUTUBE_API_KEY, ...)
  * @param {object} sources { channels, queries|search_queries, thresholds }
  * @param {Set<string>} excludeIds video IDs already in board/pending/rejected/inbox
+ * @param {Set<string>} blockedChannelIds channelIds the user blocked from the inbox UI
  * @returns {Promise<{candidates: Array, stats: object}>}
  */
-export async function runScrape(env, sources, excludeIds) {
+export async function runScrape(env, sources, excludeIds, blockedChannelIds = new Set()) {
   const thresholds = { ...DEFAULT_THRESHOLDS, ...(sources.thresholds || {}) };
   const stats = {
     discovered:     0,
@@ -308,8 +310,8 @@ export async function runScrape(env, sources, excludeIds) {
     }
   }
 
-  // 3) Trending: Education + Science & Tech
-  for (const cat of ['27', '28']) {
+  // 3) Trending: Film & Animation, Sports, Entertainment, Education, Sci & Tech
+  for (const cat of ['1', '17', '24', '27', '28']) {
     try {
       const ids = await trendingVideoIds(env, cat, 'US', 25);
       for (const id of ids) collected.add(id);
@@ -330,8 +332,12 @@ export async function runScrape(env, sources, excludeIds) {
     return [];
   });
 
+  // 5a) Drop videos from user-blocked channels first (no point scoring them)
+  const notBlocked = allVideos.filter(v => !blockedChannelIds.has(v.snippet?.channelId));
+  stats.blocked_channel_drops = allVideos.length - notBlocked.length;
+
   // 5) Niche filter
-  const niched = allVideos.filter(v => passesNicheFilter(v, thresholds));
+  const niched = notBlocked.filter(v => passesNicheFilter(v, thresholds));
   stats.after_filters = niched.length;
 
   // 5b) Shorts detection — only for the gray zone (≤ 200s). Longer videos
