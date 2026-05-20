@@ -81,36 +81,90 @@ function getWatchPageInfo() {
     for (const script of document.querySelectorAll('script:not([src])')) {
       const t = script.textContent;
       if (!t.includes('viewCount')) continue;
-      const m = t.match(/"viewCount"\s*:\s*"(\d+)"/);
-      if (m) {
-        const n = parseInt(m[1], 10);
+      // Try multiple shapes YT uses in ytInitialData / ytInitialPlayerResponse
+      const patterns = [
+        /"viewCount"\s*:\s*"(\d+)"/,                                           // statistics.viewCount
+        /"viewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)\s*views?"/i,         // primary info renderer
+        /"shortViewCount"\s*:\s*\{\s*"simpleText"\s*:\s*"([^"]+)\s*views?"/i,    // shortened "1.2M views"
+      ];
+      for (const re of patterns) {
+        const m = t.match(re);
+        if (!m) continue;
+        const raw = m[1].replace(/[,\s]/g, '');
+        if (/^[\d.]+[KMB]$/i.test(raw)) {
+          // Already-formatted shortViewCount like "1.2M"
+          views = raw.toUpperCase().replace(/B$/i, 'B');
+          break;
+        }
+        const n = parseInt(raw.replace(/[^\d]/g, ''), 10);
+        if (!Number.isFinite(n) || n <= 0) continue;
         if (n >= 1_000_000) views = (n/1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
         else if (n >= 1_000) views = (n/1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-        else views = n.toString();
+        else views = String(n);
         break;
       }
+      if (views) break;
     }
   } catch {}
   if (!views) {
-    const el = document.querySelector('ytd-video-view-count-renderer span, #info span.view-count');
+    const el = document.querySelector('ytd-video-view-count-renderer span, #info span.view-count, .view-count');
     if (el) views = el.textContent.trim().replace(/\s*views?/i,'').trim();
   }
   return { id, title, channel, views };
 }
 
 /**
+ * Public oEmbed fallback — when DOM scraping returns empty title or channel,
+ * we ask YT's public oEmbed endpoint. No auth, no quota, returns title +
+ * author_name. (Doesn't return view count, sadly.)
+ */
+async function fetchOEmbed(vid) {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${vid}&format=json`);
+    if (!r.ok) return null;
+    const j = await r.json();
+    return { title: j.title || '', channel: j.author_name || '' };
+  } catch { return null; }
+}
+
+/**
  * Try getWatchPageInfo up to N times with a small delay between attempts —
  * the watch page populates the title bit-by-bit as YT's SPA renders, so a
  * one-shot scrape catches a half-empty DOM if you click "Save" right after
- * arriving on the page. We retry until we have a non-empty title.
+ * arriving on the page. We retry until we have a non-empty title, then fall
+ * back to the public oEmbed API for any field that's still missing.
  */
 async function getWatchPageInfoReady() {
+  let info = null;
   for (let attempt = 0; attempt < 6; attempt++) {
-    const info = getWatchPageInfo();
-    if (info && info.title && info.title.length > 0) return info;
+    info = getWatchPageInfo();
+    if (info && info.title && info.channel && info.views) return info;
+    if (info && info.title && info.title.length > 0) {
+      // Got at least the title; one more attempt for channel/views
+      await new Promise(r => setTimeout(r, 250));
+      info = getWatchPageInfo() || info;
+      break;
+    }
     await new Promise(r => setTimeout(r, 350));
   }
-  return getWatchPageInfo(); // last try, possibly still incomplete
+  if (!info) info = { id: getVideoIdFromWatchPage(), title:'', channel:'', views:'' };
+
+  // oEmbed fallback for whatever's still missing (title or channel only).
+  if (info.id && (!info.title || !info.channel)) {
+    const oe = await fetchOEmbed(info.id);
+    if (oe) {
+      if (!info.title)   info.title   = oe.title   || info.title;
+      if (!info.channel) info.channel = oe.channel || info.channel;
+    }
+  }
+  if (!info.title || !info.channel || !info.views) {
+    console.warn('[ThumbnailBoard] partial metadata for watch', info.id, {
+      title: info.title || '(empty)',
+      channel: info.channel || '(empty)',
+      views: info.views || '(empty)',
+    });
+  }
+  return info;
 }
 
 /** Extract video info from a card element on home / search / feed. */
@@ -331,12 +385,22 @@ async function callOllama(imageB64, title) {
 async function saveVideo(info, progress = () => {}) {
   if (!info || !info.id) throw new Error('No video info');
 
-  // Bail out early if the page didn't render its title in time. The Worker
-  // has a server-side fallback (it'll re-fetch via the YouTube Data API),
-  // so we still pass through, but we warn so the user can wait + retry
-  // when they're on the watch page itself. Cards always have title text.
-  if (!info.title || !info.title.trim()) {
-    console.warn('[ThumbnailBoard] empty title for', info.id, '— server will try to fill it');
+  // Last-line-of-defense oEmbed fallback when info came from a card extractor
+  // (search / channel / sidebar) that couldn't find title or channel. Doesn't
+  // touch views — those have to come from DOM/ytInitialData.
+  if (!info.title || !info.channel) {
+    const oe = await fetchOEmbed(info.id);
+    if (oe) {
+      if (!info.title)   info.title   = oe.title   || info.title;
+      if (!info.channel) info.channel = oe.channel || info.channel;
+    }
+  }
+  if (!info.title || !info.channel || !info.views) {
+    console.warn('[ThumbnailBoard] partial metadata being saved', info.id, {
+      title: info.title || '(empty)',
+      channel: info.channel || '(empty)',
+      views: info.views || '(empty)',
+    });
   }
 
   // Duplicate check FIRST — saves the 10s Ollama call
