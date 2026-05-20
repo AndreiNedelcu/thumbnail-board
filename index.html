@@ -176,11 +176,11 @@
     display:flex; align-items:center; gap:6px;
     padding:7px 14px; border-radius:10px;
     background:var(--surface2); border:1px solid var(--border);
-    color:var(--text); font-family:inherit; font-size:12px; font-weight:600;
+    color:var(--muted); font-family:inherit; font-size:12px; font-weight:600;
     text-decoration:none; white-space:nowrap; cursor:pointer;
     transition:all .15s;
   }
-  .tagger-btn:hover { color:var(--text-bright); border-color:var(--mint); background:var(--surface3); }
+  .tagger-btn:hover { color:var(--text-bright); border-color:var(--border-hover); background:var(--surface3); }
   .tagger-btn.publish-primary {
     background:var(--brand-grad);
     border:none; color:#0d1117;
@@ -252,24 +252,23 @@
   }
   .toolbar-spacer { flex:1; }
 
-  /* Sort buttons + Shuffle + Select all share the same surface so the
-     toolbar reads as one consistent row of pills. */
+  /* Sort segmented control */
   .sort-group {
-    display:inline-flex; align-items:center; gap:6px;
+    display:inline-flex; align-items:center;
+    background:var(--surface2); border:1px solid var(--border);
+    border-radius:10px; padding:3px;
   }
   .sort-btn {
-    display:inline-flex; align-items:center; gap:6px;
-    padding:7px 14px; border-radius:10px;
-    background:var(--surface2); border:1px solid var(--border);
+    display:inline-flex; align-items:center; gap:5px;
+    padding:6px 11px; border:none; background:transparent;
     color:var(--muted); font-family:inherit; font-size:12px; font-weight:600;
-    cursor:pointer;
+    cursor:pointer; border-radius:7px;
     transition:all .15s;
   }
-  .sort-btn:hover { color:var(--text-bright); border-color:var(--border-hover); background:var(--surface3); }
+  .sort-btn:hover { color:var(--text); }
   .sort-btn.active {
-    color:var(--text-bright);
-    background:var(--surface3);
-    border-color:var(--border-hover);
+    background:var(--surface3); color:var(--text-bright);
+    box-shadow:0 1px 3px rgba(0,0,0,.25);
   }
   .sort-btn svg { width:13px; height:13px; }
 
