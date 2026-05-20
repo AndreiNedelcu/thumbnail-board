@@ -138,22 +138,21 @@
   }
   .card .sub .dot { opacity:.45; margin:0 5px; }
 
-  /* Outlier badge — 4 tiers using the brand palette.
-     score-1 = 1.5-3   normal       (muted dark)
-     score-2 = 3-7     good         (purple)
-     score-3 = 7-15    great        (mint)
-     score-4 = 15+     exceptional  (purple→mint gradient) */
+  /* Outlier badge — VidIQ palette, 3 tiers.
+     score-1 = 1.5-5   moderate    (blue)
+     score-2 = 5-10    strong      (purple)
+     score-3 = 10+     exceptional (red) */
   .score-badge {
     flex-shrink:0;
     padding:4px 9px; border-radius:8px;
     font-size:12px; font-weight:800; letter-spacing:.3px;
     display:inline-flex; align-items:center; gap:3px;
     line-height:1;
+    color:#fff;
   }
-  .score-badge.score-1 { background:var(--surface3);             color:var(--muted); }
-  .score-badge.score-2 { background:var(--purple);               color:#fff; }
-  .score-badge.score-3 { background:var(--mint);                 color:#0d1117; }
-  .score-badge.score-4 { background:linear-gradient(135deg,#524add 0%,#3aecba 100%); color:#fff; }
+  .score-badge.score-1 { background:#007dfa; }
+  .score-badge.score-2 { background:#5b3dec; }
+  .score-badge.score-3 { background:#a20039; }
   .score-badge .x { font-size:9px; opacity:.7; font-weight:700; }
 
   /* Keep checkmark — appears bottom-right of the thumb when kept */
@@ -294,9 +293,8 @@ function esc(s) {
 
 function scoreClass(it) {
   const s = it.outlierScore || 0;
-  if (s >= 15) return 'score-4';
-  if (s >= 7)  return 'score-3';
-  if (s >= 3)  return 'score-2';
+  if (s >= 10) return 'score-3';
+  if (s >= 5)  return 'score-2';
   return 'score-1';
 }
 
