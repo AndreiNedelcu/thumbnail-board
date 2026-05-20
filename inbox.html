@@ -332,6 +332,14 @@
       <option value="views">Sort: views ↓</option>
     </select>
     <button class="toggle" id="hcToggle" onclick="toggleHc()">High confidence only</button>
+    <select class="select" id="minScoreSel" title="Minimum outlier score for new candidates">
+      <option value="">Default (config)</option>
+      <option value="1.2">x ≥ 1.2 · loose</option>
+      <option value="1.5">x ≥ 1.5</option>
+      <option value="2.0">x ≥ 2.0</option>
+      <option value="3.0">x ≥ 3.0 · stricter</option>
+      <option value="5.0">x ≥ 5.0 · top viral only</option>
+    </select>
     <button class="run-btn" id="runBtn" onclick="runScrape()">Run scraper now</button>
   </div>
 
@@ -665,8 +673,15 @@ async function runScrape() {
   const wasEmpty = items.length === 0;
   if (wasEmpty) startMatrixRain();
 
+  // Optional threshold override picked from the dropdown
+  const minScore = document.getElementById('minScoreSel').value;
+  const payload = minScore ? { min_outlier_score: parseFloat(minScore) } : {};
   try {
-    const r = await TBApi.fetch('/api/scrape/run', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const r = await TBApi.fetch('/api/scrape/run', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
     const d = await r.json();
     if (!r.ok || !d.ok) throw new Error(d.msg || `HTTP ${r.status}`);
     const s = d.stats || {};

@@ -572,7 +572,7 @@ async function handleIdeasSearch(body, env) {
 }
 
 // ── Scrape (manual + scheduled) ─────────────────────────────────────
-async function runScrapeAndPersist(env) {
+async function runScrapeAndPersist(env, overrides = {}) {
   // 1) Load sources
   const { text: sourcesText, missing: sourcesMissing } = await ghGet(env, SOURCES_PATH);
   if (sourcesMissing) {
@@ -581,6 +581,12 @@ async function runScrapeAndPersist(env) {
   let sources;
   try { sources = JSON.parse(sourcesText); }
   catch (e) { return { ok: false, msg: `Bad ${SOURCES_PATH}: ${e.message}`, stats: null }; }
+
+  // Apply per-request overrides (e.g. user dialed a different min_outlier_score
+  // from the inbox UI). Falls back to whatever is in scrape_sources.json.
+  if (overrides && Object.keys(overrides).length) {
+    sources.thresholds = { ...(sources.thresholds || {}), ...overrides };
+  }
 
   // 2) Build excludeIds from data.json + eagle-pending.json + inbox + rejected
   //    and blockedChannelIds from the channel blocklist
@@ -643,9 +649,18 @@ async function runScrapeAndPersist(env) {
   return { ok: true, added: willAdd.length, capped: cappedOut, stats };
 }
 
-async function handleScrapeRun(env) {
+async function handleScrapeRun(body, env) {
   try {
-    const result = await runScrapeAndPersist(env);
+    // Whitelist of overrides accepted from the request body. Type-check
+    // each one. Anything else in the payload is ignored.
+    const overrides = {};
+    const b = body || {};
+    if (Number.isFinite(b.min_outlier_score))   overrides.min_outlier_score   = b.min_outlier_score;
+    if (Number.isFinite(b.cap_per_run))         overrides.cap_per_run         = b.cap_per_run;
+    if (Number.isFinite(b.min_views))           overrides.min_views           = b.min_views;
+    if (Number.isFinite(b.max_age_days))        overrides.max_age_days        = b.max_age_days;
+    if (Number.isFinite(b.min_duration_seconds))overrides.min_duration_seconds= b.min_duration_seconds;
+    const result = await runScrapeAndPersist(env, overrides);
     return json(result, result.ok ? 200 : 500);
   } catch (e) {
     return json({ ok: false, msg: e.message }, 500);
@@ -689,7 +704,7 @@ export default {
         if (path === '/api/inbox/approve')        return await handleInboxApprove(body, env);
         if (path === '/api/inbox/reject')         return await handleInboxReject(body, env);
         if (path === '/api/inbox/block-channel')  return await handleBlockChannel(body, env);
-        if (path === '/api/scrape/run')           return await handleScrapeRun(env);
+        if (path === '/api/scrape/run')           return await handleScrapeRun(body, env);
         if (path === '/api/ideas/embed')          return await handleIdeasEmbed(body, env);
         if (path === '/api/ideas/search')         return await handleIdeasSearch(body, env);
         if (path === '/api/ideas/related')        return await handleIdeasRelated(body, env);
