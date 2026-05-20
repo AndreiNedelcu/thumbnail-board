@@ -122,30 +122,69 @@ function getCardInfo(card) {
   if (!m) return null;
   const id = m[1];
 
-  const title =
-       card.querySelector('#video-title')?.textContent?.trim()
-    || card.querySelector('a#video-title-link')?.textContent?.trim()
-    || card.querySelector('yt-formatted-string.ytd-rich-grid-media')?.textContent?.trim()
+  // Title — many selectors, but importantly we look at SPECIFIC title
+  // elements (spans inside the title link), not container textContents,
+  // because containers can swallow duration / "paid promotion" badges.
+  // Order:  watch-link title attr → watch-link aria-label →
+  //         dedicated title spans → finally a sanitized textContent.
+  let title =
+       link.getAttribute('title')?.trim()
     || card.querySelector('h3 a[title]')?.getAttribute('title')?.trim()
-    || link.getAttribute('title')?.trim()
-    || link.getAttribute('aria-label')?.replace(/\s+by\s+.+$/, '').trim()
+    || card.querySelector('a#video-title-link')?.getAttribute('title')?.trim()
     || '';
+  if (!title) {
+    // Newer yt-lockup-view-model layout has the title inside a span
+    // INSIDE the watch link — that span only contains the title text.
+    const span = link.querySelector('span.yt-core-attributed-string, span.yt-formatted-string');
+    if (span) title = span.textContent.trim();
+  }
+  if (!title) {
+    // aria-label is usually "Title by Channel · 1.2M views · 22 minutes"
+    // — strip the trailing segments after the first separator.
+    const al = link.getAttribute('aria-label') || '';
+    if (al) {
+      // Drop everything from " by ChannelName" onward, plus duration / view counts.
+      title = al
+        .split(/\s+by\s+.+$/)[0]
+        .split(/\s+\d+[\d.,]*\s*(?:views?|hours?|minutes?|seconds?|days?|weeks?|months?|years?)/i)[0]
+        .trim();
+    }
+  }
+  if (!title) {
+    // Last resort: a dedicated title element. We .trim and collapse but
+    // explicitly EXCLUDE child text from badges via :not().
+    const t = card.querySelector('#video-title, yt-formatted-string.ytd-rich-grid-media');
+    if (t) {
+      // Take only the first text node if possible (avoids picking up
+      // sibling "Includes paid promotion" or duration overlays).
+      const first = [...t.childNodes].find(n => n.nodeType === 3 && n.textContent.trim());
+      title = (first ? first.textContent : t.textContent).trim();
+    }
+  }
 
-  // Channel — most reliable signal is a link that points to a channel
-  // page (/@handle, /channel/UC..., /user/...). Skip the watch link.
+  // Channel — only accept hrefs that point to an ACTUAL channel page.
+  // The older fallback that grabbed any non-watch link was matching
+  // "Includes paid promotion" links to /about/sponsorships.
   let channel = '';
   const channelLink = card.querySelector(
     'a[href^="/@"], a[href^="/channel/"], a[href^="/user/"], a[href^="/c/"], ' +
-    'ytd-channel-name a, .ytd-channel-name a, .ytd-video-meta-block a:not([href*="/watch"])'
+    'ytd-channel-name a, .ytd-channel-name a'
   );
-  if (channelLink) channel = channelLink.textContent.trim();
-  // Fallback: anchor inside the metadata block (whichever is first that isn't a watch link)
+  if (channelLink) {
+    const t = channelLink.textContent.trim();
+    // Defensive: still filter out obvious bad text
+    if (t && !/includes paid promotion|sponsorship/i.test(t)) channel = t;
+  }
+  // Strict fallback: only consider links whose href is channel-shaped
   if (!channel) {
     for (const a of card.querySelectorAll('a')) {
       const h = a.getAttribute('href') || '';
-      if (!h || /\/watch\?v=/.test(h)) continue;
+      if (!/^(\/@|\/channel\/|\/user\/|\/c\/)/.test(h)) continue;
       const t = (a.textContent || '').trim();
-      if (t && t.length < 80 && !/views?/i.test(t)) { channel = t; break; }
+      if (t && t.length < 80 && !/includes paid promotion|sponsorship/i.test(t)) {
+        channel = t;
+        break;
+      }
     }
   }
 
@@ -797,6 +836,11 @@ function injectIntoYTControls(ytContainer) {
   const m = link.href.match(/[?&]v=([A-Za-z0-9_-]{11})/);
   if (!m) return;
   const vid = m[1];
+
+  // If this card already has the absolute fallback button (from scanCards),
+  // remove it — the inline-preview YT-controls variant looks more native
+  // when both are technically applicable (home feed cards).
+  card?.querySelector('.tb-card-btn')?.remove();
 
   const btn = document.createElement('button');
   btn.className = 'tb-yt-btn';
