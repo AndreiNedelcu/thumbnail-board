@@ -78,11 +78,11 @@
   }
   .commit-btn {
     padding:8px 16px; border-radius:9px;
-    background:var(--grad); color:#0d1117; border:none;
+    background:var(--purple); color:#fff; border:none;
     font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
     transition:all .15s;
   }
-  .commit-btn:hover { box-shadow:0 6px 20px rgba(58,236,186,.25); transform:translateY(-1px); }
+  .commit-btn:hover { box-shadow:0 6px 20px rgba(82,74,221,.35); transform:translateY(-1px); }
   .commit-btn:disabled { opacity:.4; cursor:not-allowed; transform:none; box-shadow:none; }
   .commit-btn.secondary {
     background:var(--surface2); color:var(--text); border:1px solid var(--border);
@@ -119,7 +119,6 @@
   .card:hover .thumb { box-shadow:0 14px 30px rgba(0,0,0,.5); }
   .thumb img { width:100%; height:100%; object-fit:cover; display:block; transition:filter .15s, opacity .15s; }
   .card.rejected .thumb img { filter:grayscale(.8) brightness(.5); }
-  .card.low-confidence .thumb img { opacity:.82; }
 
   /* Info row under the thumbnail — YouTube-style: title, then channel · views · age, with score on the right */
   .info {
@@ -139,19 +138,22 @@
   }
   .card .sub .dot { opacity:.45; margin:0 5px; }
 
-  /* Outlier badge — now sits in the info row, beside the title block */
+  /* Outlier badge — 4 tiers using the brand palette.
+     score-1 = 1.5-3   normal       (muted dark)
+     score-2 = 3-7     good         (purple)
+     score-3 = 7-15    great        (mint)
+     score-4 = 15+     exceptional  (purple→mint gradient) */
   .score-badge {
     flex-shrink:0;
     padding:4px 9px; border-radius:8px;
-    background:var(--surface3); color:var(--text);
     font-size:12px; font-weight:800; letter-spacing:.3px;
     display:inline-flex; align-items:center; gap:3px;
     line-height:1;
   }
-  .score-badge.score-hot   { background:rgba(58,236,186,0.92); color:#0d1117; }
-  .score-badge.score-warm  { background:rgba(245,165,36,0.92); color:#0d1117; }
-  .score-badge.score-tepid { background:var(--surface3); color:var(--muted); }
-  .score-badge.low-confidence { opacity:.6; font-style:italic; }
+  .score-badge.score-1 { background:var(--surface3);             color:var(--muted); }
+  .score-badge.score-2 { background:var(--purple);               color:#fff; }
+  .score-badge.score-3 { background:var(--mint);                 color:#0d1117; }
+  .score-badge.score-4 { background:linear-gradient(135deg,#524add 0%,#3aecba 100%); color:#fff; }
   .score-badge .x { font-size:9px; opacity:.7; font-weight:700; }
 
   /* Keep checkmark — appears bottom-right of the thumb when kept */
@@ -292,9 +294,10 @@ function esc(s) {
 
 function scoreClass(it) {
   const s = it.outlierScore || 0;
-  if (s >= 5) return 'score-hot';
-  if (s >= 2) return 'score-warm';
-  return 'score-tepid';
+  if (s >= 15) return 'score-4';
+  if (s >= 7)  return 'score-3';
+  if (s >= 3)  return 'score-2';
+  return 'score-1';
 }
 
 function ageLabel(days) {
@@ -344,7 +347,6 @@ function render() {
   grid.innerHTML = list.map(it => {
     const state = decisions.get(it.id) || '';
     const cls = state === 'keep' ? 'kept' : state === 'reject' ? 'rejected' : '';
-    const lc  = it.outlierConfidence === 'low' ? 'low-confidence' : '';
     const scoreLabel = it.outlierScore ? `<span class="x">x</span>${it.outlierScore}` : '—';
     const subParts = [
       esc(it.channel || ''),
@@ -352,7 +354,7 @@ function render() {
       ageLabel(it.ageDays),
     ].filter(Boolean);
     return `
-      <div class="card ${cls} ${lc}" data-id="${esc(it.id)}" onclick="toggle('${esc(it.id)}')">
+      <div class="card ${cls}" data-id="${esc(it.id)}" onclick="toggle('${esc(it.id)}')">
         <div class="thumb">
           <img loading="lazy"
                src="https://i.ytimg.com/vi/${esc(it.id)}/maxresdefault.jpg"
@@ -370,7 +372,7 @@ function render() {
             <div class="title">${esc(it.title)}</div>
             <div class="sub">${subParts.map(p => esc(p)).join('<span class="dot">·</span>')}</div>
           </div>
-          <div class="score-badge ${scoreClass(it)} ${lc}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
+          <div class="score-badge ${scoreClass(it)}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
             ${scoreLabel}
           </div>
         </div>
