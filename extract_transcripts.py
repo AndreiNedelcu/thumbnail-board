@@ -66,7 +66,7 @@ def extract_one(vid):
         "--cookies-from-browser", "chrome",
         "--skip-download",
         "--write-auto-subs",
-        "--sub-langs", "en.*,es.*",
+        "--sub-langs", "en,es",   # plain "en"/"es" — yt-dlp picks the best variant
         "--sub-format", "vtt",
         "--no-warnings",
         "-o", f"{OUT_DIR}/%(id)s.%(ext)s",
@@ -76,24 +76,37 @@ def extract_one(vid):
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT)
     except subprocess.TimeoutExpired:
         return {"id": vid, "status": "timeout"}
-    if r.returncode != 0:
-        err = (r.stderr or "")[:160].strip()
-        return {"id": vid, "status": "yt-dlp-error", "error": err}
 
+    # IMPORTANT: don't bail on non-zero exit. yt-dlp returns non-zero if e.g.
+    # the "es" sub fetches a 429 even after the "en" was already saved to disk.
+    # Always check for .vtt files on disk first.
     vtt_files = list(OUT_DIR.glob(f"{vid}.*.vtt"))
+
     if not vtt_files:
+        # No vtt produced at all → real failure
+        err = (r.stderr or "")[:160].strip()
+        if r.returncode != 0:
+            return {"id": vid, "status": "yt-dlp-error", "error": err}
         return {"id": vid, "status": "no-captions-available"}
 
     # Prefer English if available, else first match
-    vtt = next((f for f in vtt_files if ".en" in f.name), vtt_files[0])
+    LANG_PRIORITY = ["en-orig", "en-US", "en-GB", "en", "en-en", "es-419", "es-US", "es", "es-es"]
+    def rank(f):
+        # filename: {id}.{lang}.vtt → take the {lang} part
+        parts = f.stem.rsplit(".", 1)
+        lang = parts[1] if len(parts) == 2 else ""
+        return LANG_PRIORITY.index(lang) if lang in LANG_PRIORITY else len(LANG_PRIORITY)
+    vtt_files.sort(key=rank)
+    vtt = vtt_files[0]
+
     text = vtt_to_plain(vtt.read_text())
-    if not text:
-        for f in vtt_files: f.unlink(missing_ok=True)
+    for f in vtt_files: f.unlink(missing_ok=True)
+
+    if not text or len(text) < 100:
         return {"id": vid, "status": "empty-transcript"}
 
     txt_path.write_text(text)
-    for f in vtt_files: f.unlink(missing_ok=True)
-    return {"id": vid, "status": "ok", "chars": len(text), "lang": vtt.suffixes[0].lstrip(".")}
+    return {"id": vid, "status": "ok", "chars": len(text)}
 
 def main():
     ap = argparse.ArgumentParser()

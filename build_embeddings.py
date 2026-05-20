@@ -47,7 +47,13 @@ def post_embed(item, token):
     req = urllib.request.Request(
         f"{WORKER_URL}/api/ideas/embed",
         data=body,
-        headers={"Content-Type": "application/json", "X-Auth-Token": token},
+        headers={
+            "Content-Type": "application/json",
+            "X-Auth-Token": token,
+            # Cloudflare's default-bot detection (error 1010) bans the
+            # plain "Python-urllib/..." User-Agent. Use a normal one.
+            "User-Agent": "thumbnail-board-client/1.0 (+local-pipeline)",
+        },
         method="POST",
     )
     try:
