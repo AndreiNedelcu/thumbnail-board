@@ -252,23 +252,24 @@
   }
   .toolbar-spacer { flex:1; }
 
-  /* Sort segmented control */
+  /* Sort buttons + Shuffle + Select all share the same surface so the
+     toolbar reads as one consistent row of pills. */
   .sort-group {
-    display:inline-flex; align-items:center;
-    background:var(--surface2); border:1px solid var(--border);
-    border-radius:10px; padding:3px;
+    display:inline-flex; align-items:center; gap:6px;
   }
   .sort-btn {
-    display:inline-flex; align-items:center; gap:5px;
-    padding:6px 11px; border:none; background:transparent;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:7px 14px; border-radius:10px;
+    background:var(--surface2); border:1px solid var(--border);
     color:var(--muted); font-family:inherit; font-size:12px; font-weight:600;
-    cursor:pointer; border-radius:7px;
+    cursor:pointer;
     transition:all .15s;
   }
-  .sort-btn:hover { color:var(--text); }
+  .sort-btn:hover { color:var(--text-bright); border-color:var(--border-hover); background:var(--surface3); }
   .sort-btn.active {
-    background:var(--surface3); color:var(--text-bright);
-    box-shadow:0 1px 3px rgba(0,0,0,.25);
+    color:var(--text-bright);
+    background:var(--surface3);
+    border-color:var(--border-hover);
   }
   .sort-btn svg { width:13px; height:13px; }
 
