@@ -663,6 +663,25 @@ async function blockChannel(channelId, channelName) {
   }
 }
 
+/** Returns "Xh Ym" until the next midnight in America/Los_Angeles (when
+ *  the YouTube Data API daily quota resets). Handles DST automatically
+ *  via Intl.DateTimeFormat — no offset math needed. */
+function timeUntilPTMidnight() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+  }).formatToParts(new Date());
+  const hh = parseInt(parts.find(p => p.type === 'hour').value, 10);
+  const mm = parseInt(parts.find(p => p.type === 'minute').value, 10);
+  const ss = parseInt(parts.find(p => p.type === 'second').value, 10);
+  // Seconds until next 00:00 PT
+  let secsLeft = (24 - hh) * 3600 - mm * 60 - ss;
+  if (secsLeft <= 0) secsLeft += 86400;
+  const h = Math.floor(secsLeft / 3600);
+  const m = Math.floor((secsLeft % 3600) / 60);
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
 async function runScrape() {
   const btn = document.getElementById('runBtn');
   btn.disabled = true;
@@ -690,7 +709,7 @@ async function runScrape() {
     const errs = s.errors || [];
     const quotaHits = errs.filter(e => /quota|403/i.test(e)).length;
     if (s.discovered === 0 && quotaHits >= 5) {
-      toast('YouTube API quota exceeded — resets at midnight PT', 'error');
+      toast(`YouTube API quota exceeded — resets in ${timeUntilPTMidnight()}`, 'error');
     } else {
       toast(`Scrape done · +${d.added} new · seen ${s.discovered||0} → niche ${s.after_filters||0} → outlier ${s.after_outlier||0}`, 'success');
     }
