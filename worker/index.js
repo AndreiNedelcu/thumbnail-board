@@ -507,12 +507,17 @@ async function handleIdeasEmbed(body, env) {
 
 /**
  * Index a batch of scrape candidates into the discovery vector index.
- * Lightweight embedding from title + channel + tags only — no transcript
- * or summary, because discovery's purpose is fast wide coverage, not deep
- * matching. Skips any vid already in the board index.
+ * Two-phase: a fast lightweight embed (title + channel + score) goes
+ * in immediately so the candidate is queryable on `ideas.html`. The
+ * id also lands in discovery_queue.json so the Mac's index_tick can
+ * pick it up, fetch its transcript (yt-dlp or Whisper) and call back
+ * with /api/ideas/discovery-enrich for a richer embedding.
  */
+const DISCOVERY_QUEUE_PATH = 'discovery_queue.json';
+
 async function embedDiscoveryBatch(env, candidates, boardIds) {
   let added = 0, skipped = 0, failed = 0;
+  const newlyAdded = [];
   for (const c of candidates) {
     if (boardIds.has(c.id)) { skipped++; continue; }
     const text =
@@ -528,15 +533,97 @@ async function embedDiscoveryBatch(env, candidates, boardIds) {
           title:        String(c.title || '').slice(0, 240),
           channel:      String(c.channel || '').slice(0, 120),
           outlierScore: c.outlierScore || 0,
+          enriched:     false,         // upgraded to true after Mac enriches
           source:       'discovery',
         },
       }]);
       added++;
+      newlyAdded.push({
+        id:      c.id,
+        title:   String(c.title || '').slice(0, 240),
+        channel: String(c.channel || '').slice(0, 120),
+      });
     } catch (e) {
       failed++;
     }
   }
+
+  // Append newly-added IDs to the queue file so the local tick knows
+  // what still needs a transcript-grade embedding.
+  if (newlyAdded.length) {
+    try {
+      await mutate(env, (current) => {
+        const queue = Array.isArray(current) ? current : [];
+        const existing = new Set(queue.map(x => x.id));
+        const additions = newlyAdded.filter(x => !existing.has(x.id));
+        if (!additions.length) return null;
+        return [...queue, ...additions];
+      }, `discovery_queue: +${newlyAdded.length}`, DISCOVERY_QUEUE_PATH);
+    } catch (e) {
+      // Non-fatal — the lightweight embeds are already in the index
+    }
+  }
+
   return { added, skipped, failed };
+}
+
+/**
+ * Re-embed a discovery video with title + channel + transcript chunk,
+ * overriding the lightweight version. Called by the Mac after it pulls
+ * the transcript (yt-dlp captions or Whisper). Also removes the id from
+ * discovery_queue.json on success.
+ */
+async function handleDiscoveryEnrich(body, env) {
+  const id      = String(body.id      || '').trim();
+  const title   = String(body.title   || '').trim();
+  const channel = String(body.channel || '').trim();
+  const transcript = String(body.transcript || '').slice(0, 12000);
+  if (!id || !transcript) return json({ ok: false, msg: 'Need id and transcript' }, 400);
+
+  const text =
+    `Title: ${title}\n` +
+    `Channel: ${channel}\n\n` +
+    `Transcript: ${transcript}`;
+
+  try {
+    const vec = await embedText(env, text);
+    await env.VECTORIZE_DISCOVERY.upsert([{
+      id,
+      values: vec,
+      metadata: {
+        title:    title.slice(0, 240),
+        channel:  channel.slice(0, 120),
+        enriched: true,
+        source:   'discovery',
+      },
+    }]);
+  } catch (e) {
+    return json({ ok: false, msg: e.message }, 500);
+  }
+
+  // Pop from the queue
+  try {
+    await mutate(env, (current) => {
+      const queue = Array.isArray(current) ? current : [];
+      const filtered = queue.filter(x => x.id !== id);
+      if (filtered.length === queue.length) return null;
+      return filtered;
+    }, `discovery_queue: -${id}`, DISCOVERY_QUEUE_PATH);
+  } catch {}
+
+  return json({ ok: true, id });
+}
+
+async function handleDiscoveryQueue(env) {
+  try {
+    const { text, missing } = await ghGet(env, DISCOVERY_QUEUE_PATH);
+    return new Response(missing ? '[]' : text, {
+      status: 200,
+      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    });
+  } catch (e) {
+    return json({ ok: false, msg: e.message }, 500);
+  }
 }
 
 async function handleIdeasRelated(body, env) {
@@ -763,6 +850,10 @@ export default {
       try { return await handleGetInbox(env); }
       catch (e) { return json({ ok: false, msg: e.message }, 500); }
     }
+    if (path === '/api/ideas/discovery-queue' && req.method === 'GET') {
+      try { return await handleDiscoveryQueue(env); }
+      catch (e) { return json({ ok: false, msg: e.message }, 500); }
+    }
     if (path === '/api/health') return json({ ok: true });
 
     // All write endpoints require auth
@@ -783,9 +874,10 @@ export default {
         if (path === '/api/inbox/reject')         return await handleInboxReject(body, env);
         if (path === '/api/inbox/block-channel')  return await handleBlockChannel(body, env);
         if (path === '/api/scrape/run')           return await handleScrapeRun(body, env);
-        if (path === '/api/ideas/embed')          return await handleIdeasEmbed(body, env);
-        if (path === '/api/ideas/search')         return await handleIdeasSearch(body, env);
-        if (path === '/api/ideas/related')        return await handleIdeasRelated(body, env);
+        if (path === '/api/ideas/embed')             return await handleIdeasEmbed(body, env);
+        if (path === '/api/ideas/search')            return await handleIdeasSearch(body, env);
+        if (path === '/api/ideas/related')           return await handleIdeasRelated(body, env);
+        if (path === '/api/ideas/discovery-enrich')  return await handleDiscoveryEnrich(body, env);
       } catch (e) {
         return json({ ok: false, msg: e.message }, 500);
       }

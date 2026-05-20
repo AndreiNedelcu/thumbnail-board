@@ -110,4 +110,10 @@ if ! git diff --quiet summaries/ embedded.json; then
 fi
 
 FINAL_EMBEDDED=$(python3 -c "import json; print(len(json.load(open('embedded.json'))))")
-echo "[$(date '+%F %T')] tick: done, manifest now $FINAL_EMBEDDED entries" >> "$LOG"
+echo "[$(date '+%F %T')] tick: board done, manifest now $FINAL_EMBEDDED entries" >> "$LOG"
+
+# 6) Enrich the discovery index — for every item the Worker added to
+#    discovery_queue.json, pull its transcript locally (reuse the same
+#    transcripts/ folder) and POST it to /api/ideas/discovery-enrich so
+#    the lightweight embed gets upgraded to a transcript-grade one.
+python3 enrich_discovery.py >> "$LOG" 2>&1 || true
