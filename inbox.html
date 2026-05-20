@@ -89,16 +89,21 @@
   }
   .commit-btn.danger:hover { background:rgba(233,69,96,0.22); color:#fff; box-shadow:none; transform:none; }
 
-  /* Split button — main approve + dropdown caret for the secondary option.
-     Caret + main button live as one visual unit: same height, same opacity
-     when disabled, separator is a 1px inset shadow on the caret side so the
-     border tracks the caret's opacity (not the main button's). */
+  /* Split button — main approve + dropdown caret.
+     The two halves brighten together: hover on EITHER triggers both via
+     `.split-btn-group:hover`. No inset separator — they read as one piece. */
   .split-btn-group { display:inline-flex; position:relative; }
   .split-btn-group .commit-btn {
     border-radius:9px 0 0 9px;
     padding:8px 14px;
   }
-  .split-btn-group .commit-btn:hover { transform:none; box-shadow:none; background:#0058e5; }
+  /* Suppress the standalone .commit-btn lift/glow when it's part of the split */
+  .split-btn-group .commit-btn:hover { transform:none; box-shadow:none; }
+  /* Both halves brighten in lockstep when the group is hovered */
+  .split-btn-group:hover .commit-btn:not(:disabled),
+  .split-btn-group:hover .split-caret:not(:disabled) {
+    background:#0058e5;
+  }
 
   .split-caret {
     padding:0 10px;
@@ -106,9 +111,7 @@
     background:#004ac1; color:#fff; border:none;
     cursor:pointer; transition:background .15s;
     display:inline-flex; align-items:center; justify-content:center;
-    box-shadow:inset 1px 0 0 rgba(255,255,255,0.20);
   }
-  .split-caret:hover:not(:disabled) { background:#0058e5; }
   .split-caret:disabled { opacity:.4; cursor:not-allowed; }
   .split-caret.open:not(:disabled) { background:#003a99; }
   .split-caret svg { width:11px; height:11px; transition:transform .18s; }
