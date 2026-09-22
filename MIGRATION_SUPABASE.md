@@ -19,12 +19,25 @@ https://supabase.com/dashboard/project/zdodflwtphnzvfkuarmn
   smoke test used disposable fixtures and left the user's collection unchanged.
 - Image/metadata maintenance runs each minute. Discovery runs every six hours; its live test added 10 candidates from 9 channels.
   It uses the existing YouTube Data API key stored as a Supabase secret.
-- The old Cloudflare cron is disabled. The public configuration targets Supabase. Jev integration is optional and awaits
-  a TypeSafe API key and real-sample validation.
+- Published at https://andreinedelcu.github.io/thumbnail-board/ and verified against
+  live Supabase images. The old Cloudflare cron, production URL and preview URLs
+  are disabled; both old URL types returned 404. Its source and indexes remain
+  available for rollback, with no active board traffic.
+- All 2,163 board records are indexed in pgvector; the discovery index has 129
+  records after the initial collection run. English semantic queries were relevant;
+  the Spanish sample was less precise (THE-63).
+- Jev integration is optional and awaits a TypeSafe API key and real-sample validation
+  (THE-61). It is not enabled in production.
 
 Private migration credentials live in `.env.migration` (gitignored, mode 600).
 Never publish that file. `TB_AUTH_TOKEN` is the new owner token; the old token is
-not valid in Supabase.
+not valid in Supabase. The owner can copy the new token from
+`.local/access-token.txt` into the web login prompt; refresh the page afterwards
+if signing in for the first time. This private file is not committed.
+
+Reload/load the updated `extension/` directory in the browser extension manager
+and replace its old saved token with the new one. A previously installed copy of
+the extension still targets Cloudflare until updated.
 
 ## Local development
 
