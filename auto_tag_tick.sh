@@ -46,8 +46,10 @@ fi
 # Quick check: anything to do?
 todo=$(python3 -c "
 import json
-pending = json.load(open('eagle-pending.json'))
-board   = json.load(open('data.json'))
+from pathlib import Path
+from board_data import load_board_file
+pending = load_board_file(Path('eagle-pending.json'), '/api/pending')
+board = load_board_file(Path('data.json'), '/api/data')
 done = {v['id'] for v in board}
 print(sum(1 for p in pending if p['id'] not in done))
 ")

@@ -48,8 +48,9 @@ NEW=$(python3 -c "
 import json
 from pathlib import Path
 ROOT = Path('.')
-data = json.loads((ROOT/'data.json').read_text())
-embedded = set(json.loads((ROOT/'embedded.json').read_text())) if (ROOT/'embedded.json').exists() else set()
+from board_data import load_board_file
+data = load_board_file(ROOT/'data.json', '/api/data')
+embedded = set(json.loads((ROOT/'.local/embedded-supabase.json').read_text())) if (ROOT/'.local/embedded-supabase.json').exists() else set()
 print(sum(1 for v in data if v['id'] not in embedded))
 ")
 
@@ -77,7 +78,8 @@ if command -v whisper-cli >/dev/null && [ -f models/ggml-large-v3-turbo.bin ]; t
 import json
 from pathlib import Path
 ROOT = Path('.')
-data = json.loads((ROOT/'data.json').read_text())
+from board_data import load_board_file
+data = load_board_file(ROOT/'data.json', '/api/data')
 existing = {p.stem for p in (ROOT/'transcripts').glob('*.txt')}
 print(sum(1 for v in data if v['id'] not in existing))
 ")
@@ -103,13 +105,13 @@ else
 fi
 
 # 5) Commit + push the new summaries and updated manifest
-if ! git diff --quiet summaries/ embedded.json; then
-  git add summaries/ embedded.json
+if ! git diff --quiet summaries/; then
+  git add summaries/
   git commit -m "data: auto-index $NEW new items via index_tick" --quiet >> "$LOG" 2>&1
   git push --quiet >> "$LOG" 2>&1 && echo "[$(date '+%F %T')] tick: pushed new summaries" >> "$LOG"
 fi
 
-FINAL_EMBEDDED=$(python3 -c "import json; print(len(json.load(open('embedded.json'))))")
+FINAL_EMBEDDED=$(python3 -c "import json; print(len(json.load(open('.local/embedded-supabase.json'))))")
 echo "[$(date '+%F %T')] tick: board done, manifest now $FINAL_EMBEDDED entries" >> "$LOG"
 
 # 6) Enrich the discovery index — for every item the Worker added to

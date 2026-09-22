@@ -19,11 +19,11 @@ REVIEW_FILE   = ROOT / "pending_review.json"
 REJECTED_FILE = ROOT / "pending_rejected.json"
 FEEDBACK_FILE = ROOT / "auto_tag_feedback.json"  # learning signal for next batch
 
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKER_URL = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 AUTH_TOKEN = os.environ.get("TB_AUTH_TOKEN") or ""
 if not AUTH_TOKEN:
     print("⚠ Set TB_AUTH_TOKEN env var with your AUTH_TOKEN. e.g.:")
-    print("   export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+    print("   export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'")
     print("   python3 review.py")
     sys.exit(1)
 

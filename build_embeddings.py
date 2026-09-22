@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
 build_embeddings.py — for each summary in summaries/, send (title + tags +
-summary) to the Worker's /api/ideas/embed endpoint, which generates an
-embedding via CF Workers AI and upserts into Vectorize.
+summary) to Supabase's /api/ideas/embed endpoint, which generates a native
+GTE-small embedding and stores it in pgvector.
 
 Reuses the auth pattern of the other scripts: TB_AUTH_TOKEN env var.
 
-Maintains embedded.json as a manifest of IDs already indexed; skips
-those on subsequent runs. Committed to the repo so the launchd tick
-on your Mac knows what's new.
+Maintains .local/embedded-supabase.json as a private manifest of indexed IDs;
+skips successful IDs on subsequent runs.
 
 Usage:
   export TB_AUTH_TOKEN='...'
@@ -29,8 +28,9 @@ ROOT        = Path(__file__).parent
 DATA        = ROOT / "data.json"
 SUMMARIES   = ROOT / "summaries"
 TRANSCRIPTS = ROOT / "transcripts"
-MANIFEST    = ROOT / "embedded.json"
-WORKER_URL  = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+MANIFEST    = ROOT / ".local/embedded-supabase.json"
+MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+WORKER_URL  = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 WORKERS     = 3
 TIMEOUT     = 60
 
@@ -96,7 +96,8 @@ def main():
         print("ERROR: TB_AUTH_TOKEN env var not set", file=sys.stderr)
         sys.exit(1)
 
-    data = json.loads(DATA.read_text())
+    from board_data import load_board_file
+    data = load_board_file(DATA, "/api/data")
     meta_by_id = {v["id"]: v for v in data if v.get("id")}
 
     embedded = load_manifest()
@@ -108,6 +109,8 @@ def main():
             print(f"ERROR: {SUMMARIES} not found. Run summarize.py first.")
             sys.exit(1)
         candidate_ids = sorted(p.stem for p in SUMMARIES.glob("*.txt"))
+
+    candidate_ids = [vid for vid in candidate_ids if vid in meta_by_id]
 
     # Filter out already-embedded unless --ids or --force is set
     if args.ids or args.force:

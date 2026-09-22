@@ -3,7 +3,7 @@
 // feed. Auto-tags with local Ollama and publishes to the board.
 // Marks already-saved videos so you don't re-process.
 
-const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
+const WORKER_URL = globalThis.TB_EXTENSION_API_URL || 'https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api';
 const LOCAL_URL  = 'http://localhost:3000';
 const OLLAMA_URL = 'http://localhost:11434';
 const MODEL      = 'qwen2.5vl:7b';
@@ -340,6 +340,7 @@ async function saveAuthToken(t) {
 }
 
 async function detectServer() {
+  if (globalThis.TB_EXTENSION_API_URL) { SERVER = WORKER_URL; return; }
   try {
     const r = await fetch(`${WORKER_URL}/api/health`, { method:'GET' });
     if (r.ok) { SERVER = WORKER_URL; return; }

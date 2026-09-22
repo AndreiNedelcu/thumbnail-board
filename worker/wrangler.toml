@@ -1,6 +1,8 @@
 name = "thumbnail-board-api"
 main = "index.js"
 compatibility_date = "2025-05-19"
+workers_dev = false
+preview_urls = false
 
 [vars]
 GITHUB_REPO = "AndreiNedelcu/thumbnail-board"
@@ -29,6 +31,6 @@ binding = "AI"
 #   AUTH_TOKEN       — random string, shared with frontend/extension
 #   YOUTUBE_API_KEY  — YouTube Data API v3 key (Google Cloud Console)
 
-# Scrape bot cron — runs the scheduled() handler every 6 hours.
+# Retired after Supabase cutover. Keep the source for rollback only.
 [triggers]
-crons = ["0 */6 * * *"]
+crons = []

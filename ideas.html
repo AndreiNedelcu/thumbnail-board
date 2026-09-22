@@ -8,7 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="app-config.js"></script>
 <script src="api-client.js"></script>
+<script src="board-utils.js"></script>
 <style>
   :root {
     --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
@@ -480,7 +482,7 @@ function render(results) {
   if (!results || !results.length) {
     grid.innerHTML = '';
     empty.style.display = 'block';
-    empty.innerHTML = '<h2>No matches yet</h2><p>The Vectorize index might still be empty, or your query is too far from the indexed content. Try a more specific script.</p>';
+    empty.innerHTML = '<h2>No matches yet</h2><p>The search index might still be empty, or your query is too far from the indexed content. Try a more specific script.</p>';
     return;
   }
 
@@ -491,9 +493,7 @@ function render(results) {
   grid.innerHTML = results.map((r, i) => `
     <div class="card" onclick="openLightbox(${i})" title="Click to preview · double-click area on bottom-right for actions">
       <div class="thumb">
-        <img loading="lazy"
-             src="https://i.ytimg.com/vi/${esc(r.id)}/maxresdefault.jpg"
-             onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(r.id)}/hqdefault.jpg'">
+        ${TBBoard.imageMarkup(r)}
         <div class="score-badge ${scoreClass(r.score)}">${scorePct(r.score)}<span class="pct">%</span></div>
         ${r.is_own ? '<div class="own-badge">Mine</div>' : ''}
       </div>
@@ -514,11 +514,7 @@ function openLightbox(indexOrItem) {
   lightboxStack.push(item);
 
   // Image
-  document.getElementById('lb-img').src = `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`;
-  document.getElementById('lb-img').onerror = function() {
-    this.onerror = null;
-    this.src = `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`;
-  };
+  TBBoard.setImage(document.getElementById('lb-img'),item);
 
   // Score (only show if it came from a search, not from related click)
   const scoreEl = document.getElementById('lb-score');
@@ -580,12 +576,10 @@ async function loadRelated(id) {
     }
     root.innerHTML = `<div class="lb-related-grid">${d.results.map(rel => `
       <div class="lb-related-card" onclick='openLightbox(${JSON.stringify({
-        id: rel.id, title: rel.title, channel: rel.channel, is_own: rel.is_own
+        id: rel.id, title: rel.title, channel: rel.channel, is_own: rel.is_own, thumbnailUrl: rel.thumbnailUrl, tags: rel.tags
       }).replace(/'/g, "&#39;")})' title="${esc(rel.title)}">
         <div class="lb-related-thumb">
-          <img loading="lazy"
-               src="https://i.ytimg.com/vi/${esc(rel.id)}/mqdefault.jpg"
-               onerror="this.onerror=null;this.src='https://i.ytimg.com/vi/${esc(rel.id)}/hqdefault.jpg'">
+          ${TBBoard.imageMarkup(rel,true)}
         </div>
         <div class="t">${esc(rel.title)}</div>
         <div class="c">${esc(rel.channel || '')}</div>

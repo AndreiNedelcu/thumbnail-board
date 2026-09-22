@@ -1,3 +1,5 @@
+> Supabase migration: see [MIGRATION_SUPABASE.md](MIGRATION_SUPABASE.md). Use `npm run dev` for a separate local database. The Cloudflare instructions below apply only before cutover.
+
 # Thumbnail Board — Project Onboarding
 
 A YouTube thumbnail reference board for **@therealseniordev** and **@theSeniorDevPodcast**, plus curated picks from the wider tech / dev / design space.
@@ -31,7 +33,7 @@ Eagle is **decommissioned for the production flow**. The user's library still ex
 
 The Worker is publicly readable (`GET /api/data`) but every write endpoint requires the header `X-Auth-Token`. The token is a single shared secret.
 
-- Token (the user's): `91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo=`
+- Token (the user's): `YOUR_ACCESS_TOKEN`
 - Stored in the user's browser via `localStorage` (key: `tb-auth-token`)
 - Stored in the Chrome extension via `chrome.storage.local` (key: `tbAuthToken`)
 - Stored in the Worker via `wrangler secret` (`AUTH_TOKEN`)
@@ -186,7 +188,7 @@ wrangler secret put AUTH_TOKEN       # set if missing
 ## Running the auto-tag pipeline
 
 ```bash
-export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'
 
 # Tier 1: review every batch
 python3 auto_tag.py                  # process 10 items

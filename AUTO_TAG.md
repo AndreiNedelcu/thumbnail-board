@@ -1,3 +1,5 @@
+> Supabase migration: see [MIGRATION_SUPABASE.md](MIGRATION_SUPABASE.md). Use `npm run dev` for a separate local database. The Cloudflare instructions below apply only before cutover.
+
 # Auto-tag workflow (incremental learning)
 
 The model gets **better with each batch** because your corrections become its training examples.
@@ -18,7 +20,7 @@ The model gets **better with each batch** because your corrections become its tr
 
 **One-time setup:**
 ```bash
-export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'
 ```
 (or put it in your `~/.zshrc`)
 
@@ -68,7 +70,7 @@ click "Approve all remaining" once you're confident the queue is fine.
 **Tier 2 — Auto-approve flag**
 Skip the review queue entirely for items that pass a sanity filter:
 ```bash
-export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'
 python3 auto_tag.py --batch 50 --auto-approve
 ```
 Items with 3-10 valid tags and at least one `style-*` go straight to the board.
@@ -77,7 +79,7 @@ Anything that fails the check still queues for review.
 **Tier 3 — Full background run**
 For the entire backlog at once:
 ```bash
-export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='
+export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'
 ./run_all.sh          # runs in background, logs to /tmp/tb-auto-tag.log
 ./run_all.sh log      # watch progress
 ./run_all.sh stop     # stop the run

@@ -14,12 +14,14 @@ Usage:
   python3 backfill_views.py --batch-size 40  # how many to send per commit
 """
 from __future__ import annotations
+from board_data import load_board_file
 import argparse, json, re, subprocess, sys, time, urllib.request
+import os
 from pathlib import Path
 
 ROOT = Path(__file__).parent
 DATA_FILE = ROOT / "data.json"
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKER_URL = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 
 VIEW_RE = re.compile(r'^\s*[\d.,]+\s*[KkMmBb]?\s*$')
 
@@ -95,7 +97,7 @@ def main():
         print("⚠ Set TB_AUTH_TOKEN env var first", file=sys.stderr)
         sys.exit(1)
 
-    data = json.loads(DATA_FILE.read_text())
+    data = load_board_file(DATA_FILE, "/api/data")
     broken = [v for v in data if not looks_like_valid_views(v.get('views', ''))]
     print(f"📊 Total items: {len(data)}")
     print(f"   Broken views: {len(broken)}")

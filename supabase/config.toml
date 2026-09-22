@@ -1,0 +1,6 @@
+project_id = "thumbnail-board"
+
+[functions.board-api]
+# This API keeps the existing X-Auth-Token protocol for the extension/scripts.
+# The shared API handler verifies that secret on EVERY private read and mutation.
+verify_jwt = false

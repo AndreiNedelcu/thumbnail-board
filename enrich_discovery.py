@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT       = Path(__file__).parent
 TX_DIR     = ROOT / "transcripts"
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKER_URL = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 
 def fetch_queue(token):
     req = urllib.request.Request(
@@ -51,7 +51,7 @@ def ensure_transcript(vid):
 
     # Try yt-dlp captions first
     r = subprocess.run(
-        ["python3", str(ROOT / "extract_transcripts.py"), f"--ids={vid}", "--workers=1"],
+        ["python3", str(ROOT / "extract_transcripts.py"), f"--ids={vid}"],
         capture_output=True, text=True, timeout=180,
     )
     if p.exists() and p.stat().st_size > 100:

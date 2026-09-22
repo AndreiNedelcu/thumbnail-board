@@ -25,7 +25,7 @@ CONFIG_FILE       = ROOT / "scrape_config.json"
 CANDIDATES_FILE   = ROOT / "youtube_candidates.json"
 BOARD_FILE        = ROOT / "data.json"
 
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKER_URL = "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api"
 
 def load_published_ids() -> set:
     """Returns set of video IDs already on the board.

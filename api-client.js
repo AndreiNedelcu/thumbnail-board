@@ -2,19 +2,20 @@
  * Thumbnail Board — unified API client
  *
  * Auto-detects environment:
- *   - localhost  → calls /api/* on the local Python server
- *   - elsewhere  → calls the Cloudflare Worker
+ *   - localhost  → calls /api/* on the isolated development server
+ *   - elsewhere  → calls the configured Supabase API
  *
  * Handles auth: pulls AUTH_TOKEN from localStorage and adds it to every
  * write request. Shows a one-time login overlay if missing.
  */
 (function () {
-  // CHANGE THIS after deploying the Worker — the URL wrangler prints.
-  // Until then, the cloud fallback won't be reachable.
-  const WORKER_URL = 'https://thumbnail-board-api.andrei-nndd.workers.dev';
+  const DEFAULT_API_URL = 'https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api';
 
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const API_BASE = isLocal ? '' : WORKER_URL;
+  const config = window.TB_CONFIG || {};
+  const API_BASE = (isLocal ? (config.localApiBase || '') : (config.apiBase || DEFAULT_API_URL)).replace(/\/$/, '');
+  const needsAuth = Boolean(API_BASE) || !isLocal;
+  const features = {};
 
   function getToken() {
     return localStorage.getItem('tb-auth-token') || '';
@@ -30,7 +31,7 @@
   async function tbFetch(path, options = {}) {
     const isWrite = (options.method || 'GET').toUpperCase() !== 'GET';
     const headers = { ...(options.headers || {}) };
-    if (isWrite && !isLocal) {
+    if ((isWrite || ['/api/favorites','/api/pending','/api/maintenance/status','/api/ideas/discovery-queue'].includes(path)) && needsAuth) {
       const tok = getToken();
       if (!tok) {
         showLoginOverlay();
@@ -38,7 +39,35 @@
       }
       headers['X-Auth-Token'] = tok;
     }
-    return fetch(API_BASE + path, { ...options, headers });
+    return fetch(API_BASE + path, { signal: AbortSignal.timeout(path === '/api/scrape/run' ? 125000 : 30000), ...options, headers });
+  }
+
+  async function request(path, options = {}) {
+    const response = await tbFetch(path, options);
+    let data;
+    try { data = await response.json(); }
+    catch { throw new Error('API unavailable. Use the app server for editing, not a static preview.'); }
+    if (!response.ok || data?.ok === false) {
+      if (response.status === 401) {
+        setToken('');
+        showLoginOverlay();
+      }
+      throw new Error(data?.msg || `Request failed (${response.status})`);
+    }
+    return data;
+  }
+
+  async function loadData() {
+    try {
+      const [data, health] = await Promise.all([request('/api/data'), request('/api/health').catch(() => ({}))]);
+      Object.assign(features, health.features || {});
+      if (!Array.isArray(data)) throw new Error('Invalid board data');
+      return { data, readOnly: false };
+    } catch {
+      const response = await fetch('data.json?v=' + Date.now());
+      if (!response.ok) throw new Error('Cannot load the board. Please retry.');
+      return { data: await response.json(), readOnly: true };
+    }
   }
 
   // ── Login overlay ──────────────────────────────────────────────
@@ -61,7 +90,7 @@
         <h2>Enter your access token</h2>
         <p>You're viewing the public board, but you need a token to make changes (add, edit, delete). Your token is stored locally in this browser.</p>
         <input id="tb-token-input"
-               type="text"
+               type="password"
                placeholder="paste your token here…"
                autocomplete="off"
                autocapitalize="off"
@@ -93,6 +122,9 @@
     base: API_BASE,
     isLocal,
     fetch: tbFetch,
+    request,
+    loadData,
+    features,
     getToken,
     setToken,
     showLoginOverlay,

@@ -29,7 +29,7 @@ FEEDBACK_FILE  = ROOT / "auto_tag_feedback.json"
 AUTO_PUBLISHED_FILE = ROOT / "auto_published_log.json"  # audit log when --auto-approve
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-WORKER_URL = "https://thumbnail-board-api.andrei-nndd.workers.dev"
+WORKER_URL = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 
 # ── Tag schema (must match server.py / Worker canonicaliseTags) ──────
 CATS = {
@@ -83,10 +83,10 @@ def discover_custom_tags(board: list, feedback: list) -> int:
 ALL_VALID = build_all_valid()
 
 # ── Helpers ──────────────────────────────────────────────────────────
-def download_thumb_b64(video_id: str) -> str | None:
+def download_thumb_b64(video_id: str, saved_url: str = "") -> str | None:
     """Returns base64-encoded JPEG of the YouTube thumbnail, or None."""
-    for quality in ("maxresdefault", "mqdefault"):
-        url = f"https://img.youtube.com/vi/{video_id}/{quality}.jpg"
+    urls = ([saved_url] if saved_url.startswith("https://") else []) + [f"https://img.youtube.com/vi/{video_id}/{q}.jpg" for q in ("maxresdefault", "hqdefault", "mqdefault")]
+    for url in urls:
         try:
             req = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urlopen(req, timeout=10) as r:
@@ -257,6 +257,7 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="Alias for --batch")
     ap.add_argument("--resume", action="store_true", default=True,
                     help="Skip items already in pending_review.json (default on)")
+    ap.add_argument("--tagger", choices=["ollama", "jev"], default="ollama")
     ap.add_argument("--model", default="qwen2.5vl:7b")
     ap.add_argument("--auto-approve", action="store_true", dest="auto_approve",
                     help="Publish directly to the board if AI output passes sanity checks. "
@@ -272,16 +273,19 @@ def main():
     if args.limit and not args.batch:
         args.batch = args.limit
 
+    if args.tagger == "jev" and args.auto_approve:
+        ap.error("Jev suggestions require review; omit --auto-approve until evaluated on your collection.")
     auth_token = ""
     if args.auto_approve:
         auth_token = os.environ.get("TB_AUTH_TOKEN", "")
         if not auth_token:
             print("⚠ --auto-approve needs TB_AUTH_TOKEN env var:")
-            print("   export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+            print("   export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'")
             sys.exit(1)
 
-    pending = json.loads(PENDING_FILE.read_text())
-    board   = json.loads(BOARD_FILE.read_text())
+    from board_data import load_board_file
+    pending = load_board_file(PENDING_FILE, "/api/pending")
+    board = load_board_file(BOARD_FILE, "/api/data")
     review  = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
     skip    = set(json.loads(SKIP_FILE.read_text()) if SKIP_FILE.exists() else [])
     feedback = load_feedback()
@@ -336,7 +340,7 @@ def main():
         eta = rate * (len(todo) - i)
         print(f"[{i:4d}/{len(todo)}] {vid}  '{title[:60]}'  (eta {eta/60:.1f}min)", flush=True)
 
-        img_b64 = download_thumb_b64(vid)
+        img_b64 = download_thumb_b64(vid, item.get("thumbnailUrl", ""))
         if not img_b64:
             print(f"           ⚠ thumbnail not available (private/deleted) — skipping")
             skip.add(vid)
@@ -346,7 +350,13 @@ def main():
 
         positive, corrections = build_few_shot(board, k=6)
         try:
-            tags = call_ollama(args.model, img_b64, title, positive, corrections)
+            analysis = {}
+            if args.tagger == "jev":
+                from jev_tagger import analyze_thumbnail
+                analysis = analyze_thumbnail(img_b64, ALL_VALID, args.model)
+                tags = analysis["tags"]
+            else:
+                tags = call_ollama(args.model, img_b64, title, positive, corrections)
         except Exception as e:
             print(f"           ❌ Ollama error: {e}")
             fails += 1
@@ -368,6 +378,7 @@ def main():
             "tags": tags,
             "ai_tags": list(tags),
             "auto_tagged_at": int(time.time()),
+            **analysis,
         }
 
         if args.auto_approve:
@@ -411,7 +422,7 @@ def main():
         print(f"\n✅ Batch done. {len(review)} items waiting in {REVIEW_FILE.name}")
         print(f"   Errors: {fails}")
         print(f"   Next:")
-        print(f"     export TB_AUTH_TOKEN='91q9YY3Eqgp5xwbA9dlGZWeGjYOLr6FQXDRdSqpr1eo='")
+        print(f"     export TB_AUTH_TOKEN='YOUR_ACCESS_TOKEN'")
         print(f"     python3 review.py     # review this batch")
         print(f"     python3 auto_tag.py   # next batch learns from your corrections")
 

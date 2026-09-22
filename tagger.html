@@ -9,7 +9,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="app-config.js"></script>
 <script src="api-client.js"></script>
+<script src="board-utils.js"></script>
 <style>
   :root {
     --bg:#0d1117; --surface:#171e25; --surface2:#1e252c; --surface3:#272e35;
@@ -120,7 +122,7 @@
 
 <div id="loading">
   <div class="spinner"></div>
-  <p id="load-msg" style="color:var(--muted);font-size:13px">Connecting to Eagle…</p>
+  <p id="load-msg" style="color:var(--muted);font-size:13px">Loading thumbnails…</p>
 </div>
 
 <main id="main" style="display:none">
@@ -147,7 +149,7 @@
   </svg>
   <h2 style="font-size:21px;font-weight:700">All tagged!</h2>
   <p style="color:var(--muted);font-size:14px;text-align:center">Every thumbnail has official tags now.<br>Website syncs automatically.</p>
-  <a href="/" style="margin-top:8px;color:#7c4dff;font-size:13px;text-decoration:none;border:1px solid #7c4dff44;padding:6px 16px;border-radius:8px">← Back to Thumbnail Board</a>
+  <a href="index.html" style="margin-top:8px;color:#7c4dff;font-size:13px;text-decoration:none;border:1px solid #7c4dff44;padding:6px 16px;border-radius:8px">← Back to Thumbnail Board</a>
 </div>
 
 <div id="toast"></div>
@@ -188,11 +190,9 @@ function extractVid(item) {
 async function loadItems() {
   msg('Loading items…');
   try {
-    // Load all items from data.json (source of truth — works on localhost and cloud)
-    const dataResp = await fetch(`${SERVER}/data.json?v=${Date.now()}`)
-      .catch(() => fetch(`${SERVER}/api/data`));
-    if (!dataResp.ok) throw new Error(`HTTP ${dataResp.status}`);
-    const boardData = await dataResp.json();
+    const loaded = await TBApi.loadData();
+    if (loaded.readOnly) throw new Error('Editing service unavailable. Please retry later.');
+    const boardData = loaded.data;
 
     // Normalise: tagger items reuse "id" (videoId) and synthesise a YouTube URL
     const items = boardData.map(v => ({
@@ -202,6 +202,7 @@ async function loadItems() {
       annotation: `Channel: ${v.channel || ''}\nViews: ${v.views || ''}\nhttps://www.youtube.com/watch?v=${v.id}`,
       tags: v.tags || [],
       _videoId: v.id,
+      thumbnailUrl: v.thumbnailUrl,
     }));
     msg(`Loaded ${items.length} items…`);
 
@@ -328,8 +329,7 @@ function render() {
   const vid = current._videoId || (current.url||current.annotation||'').match(/(?:watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)?.[1] || null;
   const img = document.getElementById('timg');
   if (vid) {
-    img.src = `https://img.youtube.com/vi/${vid}/maxresdefault.jpg`;
-    img.onerror = () => { img.src = `https://img.youtube.com/vi/${vid}/mqdefault.jpg`; img.onerror=null; };
+    TBBoard.setImage(img,{id:vid,thumbnailUrl:current.thumbnailUrl});
     document.getElementById('turl').href = `https://www.youtube.com/watch?v=${vid}`;
   }
   document.getElementById('ttitle').textContent = current.name || '';
@@ -425,17 +425,6 @@ function openInEagle() {
   window.location.href = `eagle://item/${current.id}`;
 }
 
-// ── Publish to GitHub ─────────────────────────────────────────────
-// publishToGithub kept as no-op safety net; auto-publish handles every save.
-async function publishToGithub() {
-  try {
-    const r = await fetch(`${SERVER}/api/publish`, { method:'POST' });
-    const d = await r.json();
-    if (d.ok) toast(d.msg || 'Published', 'success');
-    else toast(d.msg || 'Publish failed', 'error');
-  } catch(e) { toast(e.message, 'error'); }
-}
-
 // ── Save ──────────────────────────────────────────────────────────
 async function saveTags() {
   if (!current) return;
@@ -448,8 +437,7 @@ async function saveTags() {
     const r = await TBApi.fetch('/api/update', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
-        id: current.id, vid, tags: newTags,
-        name: current.name || '', channel: '', views: ''
+        id: current.id, vid, tags: newTags
       })
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);

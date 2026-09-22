@@ -15,6 +15,7 @@ Usage:
 
 Cost: ~$0.005 per video at 5000-token transcript truncation.
 """
+from board_data import load_board_file
 import argparse
 import json
 import os
@@ -50,7 +51,7 @@ Write in English regardless of the transcript's language. Plain prose, no bullet
 def load_meta_map():
     """Map id → {title, channel} from data.json for prompt context."""
     by_id = {}
-    for v in json.loads(DATA.read_text()):
+    for v in load_board_file(DATA, "/api/data"):
         if v.get("id"):
             by_id[v["id"]] = {"title": v.get("title", ""), "channel": v.get("channel", "")}
     return by_id

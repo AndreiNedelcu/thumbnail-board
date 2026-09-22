@@ -10,7 +10,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="app-config.js"></script>
 <script src="api-client.js"></script>
+<script src="board-utils.js"></script>
 <style>
   :root {
     /* theSeniorDev palette */
@@ -578,12 +580,31 @@
     transition:all .15s;
   }
   .inbox-fab-badge.has-items { background:var(--brand-grad); color:#0d1117; }
+  .collection-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:22px; }
+  .collection-btn { border:1px solid var(--border-hover); background:var(--surface); color:var(--text); border-radius:10px; padding:10px 15px; cursor:pointer; font-size:13px; font-weight:600; }
+  .collection-btn[aria-pressed="true"] { color:var(--mint); border-color:var(--mint); background:rgba(58,236,186,.08); }
+  .collection-toggle { margin-left:auto; display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; }
+  .collection-toggle input { accent-color:var(--mint); width:16px; height:16px; }
+  .favorite-btn { position:absolute; top:8px; right:8px; z-index:3; width:34px; height:34px; border:1px solid rgba(255,255,255,.2); border-radius:50%; background:rgba(13,17,23,.85); color:white; cursor:pointer; display:grid; place-items:center; }
+  .favorite-btn svg { width:17px; height:17px; }
+  .favorite-btn[aria-pressed="true"], #lb-favorite[aria-pressed="true"] { color:var(--mint); }
+  .favorite-btn[aria-pressed="true"] svg { fill:var(--mint); }
+  .card-channel { color:#d7e3ec; font-size:11px; margin-top:5px; }
+  #lb-channel a { color:inherit; text-decoration:none; }
+  #lb-channel a:hover { text-decoration:underline; }
+  .image-unavailable { opacity:.7; }
+  #board-notice { padding:12px 16px; margin-bottom:16px; border:1px solid var(--border-hover); border-radius:10px; font-size:13px; color:var(--text); }
+  #confirm-error { color:#ff8295; margin-top:12px; font-size:13px; }
+  button:disabled { opacity:.55; cursor:wait; }
+  :focus-visible { outline:2px solid var(--mint); outline-offset:3px; }
+  @media(max-width:650px) { .collection-toggle { margin-left:0; width:100%; } .header-top { flex-wrap:wrap; } }
 </style>
 </head>
 <body>
 
 <!-- Top-right FABs (fixed) -->
 <div class="top-fabs">
+  <button class="fab" onclick="setCollection('saved')" title="Your saved thumbnails">♡ Saved <span id="saved-top-count">0</span></button>
   <a class="fab" href="ideas.html" title="Find thumbnail references for a new video">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
     <span>Ideas</span>
@@ -608,6 +629,7 @@
         </button>
       </div>
       <div class="stats" id="mini-stats"></div>
+      <button class="collection-btn" id="mini-saved" onclick="setCollection(showSaved ? 'all' : 'saved')" aria-pressed="false" title="Saved thumbnails">♡</button>
       <div class="mini-sort">
         <button class="mini-sort-btn active" data-sort="default" onclick="setSort('default')" title="Default">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -651,6 +673,12 @@
 
 <!-- Main content -->
 <div class="container">
+  <div id="board-notice" hidden></div>
+  <nav class="collection-bar" aria-label="Thumbnail collections">
+    <button class="collection-btn" id="collection-all" onclick="setCollection('all')" aria-pressed="true">All thumbnails</button>
+    <button class="collection-btn" id="collection-saved" onclick="setCollection('saved')" aria-pressed="false">Saved <span id="saved-count">0</span></button>
+    <label class="collection-toggle"><input type="checkbox" id="hide-own" onchange="setHideOwn(this.checked)"> Hide our channels</label>
+  </nav>
   <div class="toolbar">
     <div class="toolbar-spacer"></div>
     <div class="size-wrap">
@@ -674,10 +702,6 @@
     <button class="tagger-btn" id="shuffle-btn" onclick="setSort('shuffle')" title="Re-shuffle (click again to re-randomise)">
       <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="m21 3-9 9"/><path d="M3 21l6-6"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M3 3l6 6"/></svg>
       Shuffle
-    </button>
-    <button class="broken-btn" id="broken-btn" onclick="deleteAllBroken()">
-      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-      Delete unavailable
     </button>
     <button class="select-btn" id="select-btn" onclick="toggleSelectMode()">
       <svg class="icon" id="select-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
@@ -721,6 +745,7 @@
         </div>
       </div>
       <div class="lb-actions">
+        <button class="lb-btn" id="lb-favorite" aria-pressed="false">♡ Save</button>
         <a class="lb-btn lb-btn-yt" id="lb-yt" href="#" target="_blank">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
           YouTube
@@ -823,6 +848,58 @@ let allVideos = [], visibleVideos = [];
 let shuffleOrder = null; // when set, an array of video IDs in shuffled order
 let currentSort = 'default'; // 'default' | 'recent' | 'views' | 'shuffle'
 const STATE_KEY = 'tb-board-state';
+const FAVORITES_KEY = 'tb-favorites';
+let favoriteIds = new Set();
+try {
+  const stored = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]');
+  if (Array.isArray(stored)) favoriteIds = new Set(stored.filter(id => /^[\w-]{11}$/.test(id)));
+} catch {}
+let showSaved = false, hideOwn = false, boardReadOnly = false;
+
+function updateCollections() {
+  const count = allVideos.filter(v => favoriteIds.has(v.id)).length;
+  document.getElementById('saved-count').textContent = count;
+  document.getElementById('saved-top-count').textContent = count;
+  document.getElementById('collection-all').setAttribute('aria-pressed', String(!showSaved));
+  document.getElementById('collection-saved').setAttribute('aria-pressed', String(showSaved));
+  document.getElementById('mini-saved').setAttribute('aria-pressed', String(showSaved));
+  document.getElementById('hide-own').checked = hideOwn;
+}
+function setCollection(name) {
+  showSaved = name === 'saved';
+  applyFilters(); saveState();
+}
+function setHideOwn(value) {
+  hideOwn = value;
+  applyFilters(); saveState();
+}
+const favoriteBusy = new Set();
+async function toggleFavorite(id, event) {
+  event?.stopPropagation();
+  if (favoriteBusy.has(id)) return;
+  const saved = !favoriteIds.has(id);
+  if (TBApi.features.favorites) {
+    favoriteBusy.add(id);
+    try {
+      await TBApi.request('/api/favorites', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,saved})});
+    } catch(error) {showToast(error.message,'error');return;}
+    finally {favoriteBusy.delete(id);}
+  }
+  const next = new Set(favoriteIds);
+  if (saved) next.add(id); else next.delete(id);
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...next])); }
+  catch { if(!TBApi.features.favorites) {showToast('Cannot save on this browser. Check available storage.', 'error');return;} }
+  favoriteIds = next;
+  const currentId = visibleVideos[currentIndex]?.id;
+  const lightboxOpen = document.getElementById('lightbox').classList.contains('open');
+  applyFilters();
+  if (lightboxOpen) {
+    const index = visibleVideos.findIndex(v => v.id === currentId);
+    if (index < 0) closeLightbox();
+    else { currentIndex = index; renderLightbox(); }
+  }
+  showToast(next.has(id) ? 'Saved to your favorites' : 'Removed from favorites', 'success');
+}
 
 // ── Persistent state (sort + search + scroll position) ───────────
 function saveState() {
@@ -831,6 +908,8 @@ function saveState() {
       sort: currentSort,
       search: searchQuery,
       scrollY: window.scrollY,
+      showSaved,
+      hideOwn,
     }));
   } catch {}
 }
@@ -839,6 +918,8 @@ function loadState() {
     const s = JSON.parse(localStorage.getItem(STATE_KEY) || '{}');
     if (s.sort) currentSort = s.sort;
     if (typeof s.search === 'string') searchQuery = s.search;
+    showSaved = s.showSaved === true;
+    hideOwn = s.hideOwn === true;
     return s.scrollY || 0;
   } catch { return 0; }
 }
@@ -907,8 +988,26 @@ async function init() {
   // Restore persisted state BEFORE fetching (so currentSort/searchQuery are set)
   const savedScrollY = loadState();
 
-  const res = await fetch('data.json?v=' + Date.now());
-  allVideos = await res.json();
+  try {
+    const loaded = await TBApi.loadData();
+    allVideos = loaded.data.map(v => ({...v, title:v.title||'', channel:v.channel||'', tags:Array.isArray(v.tags)?v.tags:[]}));
+    boardReadOnly = loaded.readOnly;
+    if (TBApi.features.favorites && (TBApi.isLocal || TBApi.getToken())) {
+      try {
+        const saved = await TBApi.request('/api/favorites');
+        favoriteIds = new Set(saved.ids);
+        localStorage.setItem(FAVORITES_KEY, JSON.stringify(saved.ids));
+      } catch(error) {showToast('Could not sync favorites: '+error.message,'error');}
+    }
+    if (boardReadOnly) {
+      const notice = document.getElementById('board-notice');
+      notice.hidden = false;
+      notice.textContent = 'Read-only snapshot: the editing service is unavailable. Favorites are saved in this browser.';
+    }
+  } catch (error) {
+    document.getElementById('stats').textContent = 'Could not load thumbnails';
+    showToast(error.message, 'error'); return;
+  }
 
   // Dynamically extract custom tags from data.json
   allVideos.forEach(v => {
@@ -1082,6 +1181,7 @@ function openDrawer(cat, cfg) {
 
 function closeDrawer() {
   const drawer = document.getElementById('subcat-drawer');
+  if (!drawer) return;
   drawer.classList.remove('open');
   setTimeout(() => { drawer.innerHTML = ''; }, 260);
 }
@@ -1105,6 +1205,8 @@ function selectSubcat(sub, btn, color, bg) {
 function applyFilters() {
   const q = searchQuery.toLowerCase().trim();
   visibleVideos = allVideos.filter(v => {
+    if (showSaved && !favoriteIds.has(v.id)) return false;
+    if (hideOwn && TBBoard.isOwnChannel(v)) return false;
     if (activeSubcat) {
       if (!v.tags.includes(activeSubcat)) return false;
     } else if (activeCategory !== 'ALL') {
@@ -1120,6 +1222,7 @@ function applyFilters() {
     return true;
   });
   visibleVideos = applySort(visibleVideos);
+  updateCollections();
   renderGrid();
 }
 
@@ -1138,61 +1241,26 @@ function clearSearch() {
   saveState();
 }
 
-// Track broken cards after images load
-function updateBrokenBtn() {
-  const count = document.querySelectorAll('.card.broken').length;
-  const btn = document.getElementById('broken-btn');
-  if (count > 0) {
-    btn.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete ${count} unavailable`;
-    btn.classList.add('visible');
-  } else {
-    btn.classList.remove('visible');
+// A missing remote image never deletes its reference.
+function thumbnailImage(v, small = false) {
+  const source = TBBoard.imageSources(v, small)[0] || 'image-unavailable.svg';
+  return `<img loading="lazy" src="${esc(source)}" data-video-id="${esc(v.id)}" data-small="${small}" data-source-index="0" onerror="nextThumbnailSource(this)" onload="checkThumbnail(this)" alt="${esc(v.title)}">`;
+}
+function nextThumbnailSource(img) {
+  const v = allVideos.find(item => item.id === img.dataset.videoId);
+  const sources = v ? TBBoard.imageSources(v, img.dataset.small === 'true') : [];
+  const next = Number(img.dataset.sourceIndex || 0) + 1;
+  img.dataset.sourceIndex = String(next);
+  if (next < sources.length) img.src = sources[next];
+  else {
+    img.onerror = null; img.onload = null;
+    img.src = 'image-unavailable.svg';
+    img.classList.add('image-unavailable');
   }
 }
-// Poll briefly after render to catch broken images
-function scheduleBrokenCheck() {
-  clearTimeout(window._brokenTimer);
-  window._brokenTimer = setTimeout(updateBrokenBtn, 2500);
-}
-
-async function deleteAllBroken() {
-  const broken = [...document.querySelectorAll('.card.broken')];
-  if (!broken.length) return;
-  const ids = broken.map(card => {
-    const idx = [...document.querySelectorAll('.card')].indexOf(card);
-    return visibleVideos[idx]?.id;
-  }).filter(Boolean);
-  if (!confirm(`Delete ${ids.length} unavailable thumbnails?`)) return;
-  let deleted = 0;
-  // Use bulk-delete endpoint when on cloud (single commit). Falls back to per-item on localhost.
-  if (!TBApi.isLocal) {
-    try {
-      const r = await TBApi.fetch('/api/bulk-delete', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ids })
-      });
-      const d = await r.json();
-      if (d.ok) { deleted = d.deleted; }
-    } catch {}
-  } else {
-    for (const id of ids) {
-      try {
-        const r = await TBApi.fetch('/api/delete', {
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({id})
-        });
-        const d = await r.json();
-        if (d.ok) deleted++;
-      } catch {}
-    }
-  }
-  // Remove deleted items from local state
-  for (const id of ids) {
-    const i = allVideos.findIndex(v => v.id === id);
-    if (i !== -1) allVideos.splice(i, 1);
-  }
-  applyFilters();
-  showToast(`Deleted ${deleted} unavailable thumbnails`, 'success');
+function checkThumbnail(img) {
+  // YouTube sometimes answers 200 with its 120px grey placeholder.
+  if (img.src.startsWith('https://img.youtube.com/') && img.naturalWidth <= 120) nextThumbnailSource(img);
 }
 
 function setCardSize(val) {
@@ -1225,20 +1293,23 @@ function renderGrid() {
   if (!visibleVideos.length) {
     grid.innerHTML = '';
     empty.style.display = 'block';
+    empty.querySelector('h2').textContent = showSaved ? 'No saved thumbnails here' : 'No results';
+    empty.querySelector('p').textContent = showSaved ? 'Save thumbnails using the heart, or clear your filters.' : 'Try a different search or clear the filters';
     grid.style.minHeight = '';
     return;
   }
   empty.style.display = 'none';
 
   grid.innerHTML = visibleVideos.map((v, i) => `
-    <div class="card${selectedIds.has(v.id) ? ' selected' : ''}" onclick="handleCardClick(event,${i},'${v.id}')">
+    <div data-video-id="${esc(v.id)}" class="card${selectedIds.has(v.id) ? ' selected' : ''}" onclick="handleCardClick(event,${i},'${v.id}')">
       <div class="sel-check"></div>
-      <img loading="lazy"
-        src="https://img.youtube.com/vi/${v.id}/maxresdefault.jpg"
-        onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${v.id}/mqdefault.jpg';this.parentElement.classList.add('broken')"
-        alt="${esc(v.title)}">
+      ${thumbnailImage(v)}
+      <button class="favorite-btn" aria-label="${favoriteIds.has(v.id) ? 'Unsave' : 'Save'} thumbnail" aria-pressed="${favoriteIds.has(v.id)}" onclick="toggleFavorite('${v.id}', event)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+      </button>
       <div class="card-overlay">
         <div class="card-title">${esc(v.title || v.id)}</div>
+        <div class="card-channel">${esc(v.channel || 'Channel unavailable')}</div>
       </div>
     </div>`).join('');
 
@@ -1246,7 +1317,7 @@ function renderGrid() {
     if (window.scrollY !== prevScrollY) window.scrollTo(0, prevScrollY);
     grid.style.minHeight = '';
   });
-  scheduleBrokenCheck();
+
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────
@@ -1300,11 +1371,20 @@ function renderLightbox() {
   history.replaceState(null, '', '#v=' + v.id);
 
   const img = document.getElementById('lb-img');
-  img.src = `https://img.youtube.com/vi/${v.id}/maxresdefault.jpg`;
-  img.onerror = () => { img.src = `https://img.youtube.com/vi/${v.id}/mqdefault.jpg`; img.onerror = null; };
+  img.dataset.videoId = v.id; img.dataset.small = 'false'; img.dataset.sourceIndex = '0';
+  img.classList.remove('image-unavailable');
+  img.onerror = () => nextThumbnailSource(img); img.onload = () => checkThumbnail(img);
+  img.alt = v.title || 'Thumbnail';
+  img.src = TBBoard.imageSources(v)[0] || 'image-unavailable.svg';
+  const favorite = document.getElementById('lb-favorite');
+  favorite.setAttribute('aria-pressed', String(favoriteIds.has(v.id)));
+  favorite.textContent = favoriteIds.has(v.id) ? '♥ Saved' : '♡ Save';
+  favorite.onclick = () => toggleFavorite(v.id);
+
 
   document.getElementById('lb-title').textContent = v.title || v.id;
-  document.getElementById('lb-channel').textContent = v.channel || '';
+  const channelLink = TBBoard.channelUrl(v);
+  document.getElementById('lb-channel').innerHTML = channelLink ? `<a href="${esc(channelLink)}" target="_blank" rel="noopener">${esc(v.channel || 'YouTube channel')}</a>` : esc(v.channel || 'Channel unavailable');
   document.getElementById('lb-views').textContent = v.views ? `${v.views} views` : '';
   document.getElementById('lb-yt').href = `https://www.youtube.com/watch?v=${v.id}`;
 
@@ -1346,7 +1426,7 @@ function renderLightbox() {
   // Related — sorted by shared tags count
   const tagSet = new Set(v.tags);
   const related = allVideos
-    .filter(r => r.id !== v.id)
+    .filter(r => r.id !== v.id && (!hideOwn || !TBBoard.isOwnChannel(r)))
     .map(r => ({ v: r, score: r.tags.filter(t => tagSet.has(t)).length }))
     .filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -1354,7 +1434,7 @@ function renderLightbox() {
 
   document.getElementById('lb-related').innerHTML = related.map(x => `
     <div class="related-card" onclick="jumpTo('${x.v.id}')">
-      <img loading="lazy" src="https://img.youtube.com/vi/${x.v.id}/mqdefault.jpg" alt="${esc(x.v.title)}">
+      ${thumbnailImage(x.v, true)}
     </div>`).join('');
 }
 
@@ -1372,6 +1452,8 @@ function jumpTo(videoId) {
   } else {
     // Not in current filter — reset and find globally
     activeCategory = 'ALL'; activeSubcat = null; expandedCat = null;
+    searchQuery = ''; showSaved = false;
+    document.getElementById('search').value = '';
     document.querySelectorAll('.cat-btn').forEach(b => { b.classList.remove('active','expanded'); b.style.background = b.style.color = ''; });
     document.querySelector('.cat-btn')?.classList.add('active');
     if (typeof closeDrawer === 'function') closeDrawer();
@@ -1403,7 +1485,8 @@ function filterByTag(tag) {
 
 // ── Copy image ────────────────────────────────────────────────────
 async function copyImage(videoId, btn) {
-  const url = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  const video = allVideos.find(v => v.id === videoId) || { id: videoId };
+  const url = TBBoard.imageSources(video)[0];
   try {
     const image = new Image();
     image.crossOrigin = 'anonymous';
@@ -1467,6 +1550,14 @@ document.getElementById('lightbox').addEventListener('click', e => {
   if (e.target === document.getElementById('lightbox')) closeLightbox();
 });
 document.addEventListener('keydown', e => {
+  if (document.getElementById('confirm-modal')?.classList.contains('show')) {
+    if (e.key === 'Escape') hideDeleteConfirm();
+    if (e.key === 'Tab') {
+      const buttons = [...document.querySelectorAll('#confirm-modal button:not(:disabled)')];
+      if (buttons.length) { e.preventDefault(); buttons[(buttons.indexOf(document.activeElement) + (e.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus(); }
+    }
+    return;
+  }
   if (!document.getElementById('lightbox').classList.contains('open')) return;
   if (e.key === 'Escape') closeLightbox();
   if (e.key === 'ArrowLeft') navigate(-1);
@@ -1497,7 +1588,7 @@ function renderLbTags(v) {
 // (lb-tag-search, lb-tag-suggestions) have been removed too.
 
 async function addLbTag(tag) {
-  const v = videos[currentIndex];
+  const v = visibleVideos[currentIndex];
   if (!v || (v.tags||[]).includes(tag)) return;
 
   const parts = tag.split('-');
@@ -1509,32 +1600,27 @@ async function addLbTag(tag) {
 
   const newTags = [...(v.tags||[]), tag];
   await saveLbTags(v, newTags);
-  document.getElementById('lb-tag-search').value = '';
-  updateTagSuggestions('');
+
 }
 
 async function removeLbTag(tag) {
-  const v = videos[currentIndex];
+  const v = visibleVideos[currentIndex];
   if (!v) return;
   const newTags = (v.tags||[]).filter(t => t !== tag);
   await saveLbTags(v, newTags);
 }
 
 async function saveLbTags(v, newTags) {
-  v.tags = newTags;
-  renderLbTags(v);
+  if (boardReadOnly) { showToast('Editing is unavailable in this read-only snapshot.', 'error'); return; }
   try {
-    const r = await TBApi.fetch('/api/update', {
+    await TBApi.request('/api/update', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ id: v.eid || v.id, vid: v.id, tags: newTags, name: v.title, channel: v.channel, views: v.views })
+      body: JSON.stringify({ vid: v.id, tags: newTags })
     });
-    const d = await r.json();
-    if (d.ok) showToast('Tags updated', 'success');
-    else showToast(d.msg || 'Update failed', 'error');
-  } catch(e) {
-    showToast(e.message || 'Cannot reach server', 'error');
-  }
-  applyFilters();
+    v.tags = newTags;
+    renderLbTags(v); applyFilters();
+    showToast('Tags updated', 'success');
+  } catch(e) { showToast(e.message || 'Cannot reach server', 'error'); }
 }
 
 // ── Edit Tags side panel (inline replacement for tagger.html) ─────
@@ -1597,6 +1683,7 @@ function lepCatsMerged() {
 
 function openEditPanel(video) {
   if (!video) return;
+  if (boardReadOnly) { showToast('Editing is unavailable in this read-only snapshot.', 'error'); return; }
   lepLoadCustomFromLocalStorage();
   lepDiscoverFromBoard();
   _editTargetVideo = video;
@@ -1700,8 +1787,7 @@ async function saveEditPanel() {
     const r = await TBApi.fetch('/api/update', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: v.eid || v.id, vid: v.id, tags: _editTags,
-        name: v.title, channel: v.channel || '', views: v.views || ''
+        id: v.id, tags: _editTags
       })
     });
     const d = await r.json();
@@ -1729,20 +1815,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const ns = document.getElementById('lep-newsub');
   if (ns) ns.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); lepCreateCustom(); } });
 });
-
-// ── Publish ───────────────────────────────────────────────────────
-// Manual publish button removed — auto-publish runs on every add/update.
-// Function kept for safety in case any old code path references it.
-async function publishToGithub() {
-  try {
-    const r = await fetch('http://localhost:3000/api/publish', { method: 'POST' });
-    const d = await r.json();
-    if (d.ok) showToast('Published to GitHub Pages!', 'success');
-    else showToast(d.msg || 'Publish failed', 'error');
-  } catch {
-    showToast('Server not running', 'error');
-  }
-}
 
 // ── Select mode ───────────────────────────────────────────────────
 let selectMode = false;
@@ -1785,11 +1857,8 @@ function toggleCardSelect(videoId) {
   } else {
     selectedIds.add(videoId);
   }
-  // Toggle .selected on the card element directly (no full re-render)
-  const cards = document.querySelectorAll('.card');
-  cards.forEach(card => {
-    const vid = visibleVideos[Array.from(cards).indexOf(card)]?.id;
-    if (vid) card.classList.toggle('selected', selectedIds.has(vid));
+  document.querySelectorAll('#grid .card').forEach(card => {
+    card.classList.toggle('selected', selectedIds.has(card.dataset.videoId));
   });
   updateSelBar();
 }
@@ -1805,82 +1874,61 @@ function updateSelBar() {
   if (miniBtn) miniBtn.classList.toggle('visible', show);
 }
 
-async function deleteSelected() {
-  if (!selectedIds.size) return;
-  const ids = [...selectedIds];
-  if (!confirm(`Delete ${ids.length} selected thumbnail${ids.length > 1 ? 's' : ''}?`)) return;
-  let deleted = 0;
-  if (!TBApi.isLocal) {
-    // Cloud: bulk-delete (single commit)
-    try {
-      const r = await TBApi.fetch('/api/bulk-delete', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids })
-      });
-      const d = await r.json();
-      if (d.ok) deleted = d.deleted;
-    } catch (e) { showToast(e.message, 'error'); }
-  } else {
-    for (const id of ids) {
-      try {
-        const r = await TBApi.fetch('/api/delete', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id })
-        });
-        const d = await r.json();
-        if (d.ok || (d.msg && d.msg.includes('not found'))) deleted++;
-      } catch {}
-    }
-  }
-  for (const id of ids) {
-    const i = allVideos.findIndex(v => v.id === id);
-    if (i !== -1) allVideos.splice(i, 1);
-  }
-  selectedIds.clear();
-  toggleSelectMode();
-  applyFilters();
-  showToast(`Deleted ${deleted} thumbnail${deleted !== 1 ? 's' : ''}`, 'success');
+function deleteSelected() {
+  if (selectedIds.size) showDeleteConfirm([...selectedIds]);
 }
 
-// ── Delete ────────────────────────────────────────────────────────
-let _deleteId = null;
-
-function showDeleteConfirm(videoId, title) {
-  _deleteId = videoId;
-  document.getElementById('confirm-title').textContent = title || videoId;
+// One confirmation and one request for both single and bulk deletion.
+let _deleteIds = [], _deleteBusy = false, _confirmFocus = null;
+function showDeleteConfirm(videoIds, title) {
+  if (boardReadOnly) { showToast('Editing is unavailable in this read-only snapshot.', 'error'); return; }
+  _deleteIds = [...new Set(Array.isArray(videoIds) ? videoIds : [videoIds])];
+  _confirmFocus = document.activeElement;
+  document.getElementById('confirm-heading').textContent = _deleteIds.length === 1 ? 'Delete thumbnail?' : `Delete ${_deleteIds.length} thumbnails?`;
+  document.getElementById('confirm-title').textContent = title || `${_deleteIds.length} selected thumbnails`;
+  document.getElementById('confirm-error').textContent = '';
   document.getElementById('confirm-modal').classList.add('show');
+  document.getElementById('confirm-cancel').focus();
 }
-
 function hideDeleteConfirm() {
-  _deleteId = null;
+  if (_deleteBusy) return;
+  _deleteIds = [];
   document.getElementById('confirm-modal').classList.remove('show');
+  _confirmFocus?.focus();
 }
-
 async function confirmDelete() {
-  if (!_deleteId) return;
+  if (!_deleteIds.length || _deleteBusy) return;
+  const ids = [..._deleteIds];
   const btn = document.getElementById('confirm-delete-btn');
-  btn.disabled = true; btn.textContent = 'Deleting…';
+  const cancel = document.getElementById('confirm-cancel');
+  _deleteBusy = true;
+  btn.disabled = cancel.disabled = true;
+  btn.textContent = `Deleting ${ids.length}…`;
+  document.getElementById('confirm-error').textContent = '';
   try {
-    const r = await TBApi.fetch('/api/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: _deleteId })
+    const response = await TBApi.request('/api/bulk-delete', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
     });
-    const d = await r.json();
-    if (d.ok || (d.msg && d.msg.includes('not found'))) {
-      const idx = allVideos.findIndex(v => v.id === _deleteId);
-      if (idx !== -1) allVideos.splice(idx, 1);
-      hideDeleteConfirm();
-      closeLightbox();
-      applyFilters();
-      showToast('Thumbnail deleted', 'success');
-    } else {
-      showToast(d.msg || 'Delete failed', 'error');
-    }
-  } catch(e) {
-    showToast(e.message || 'Delete failed', 'error');
+    const deletedIds = new Set(TBBoard.confirmedDeletedIds(response, ids));
+    allVideos = allVideos.filter(v => !deletedIds.has(v.id));
+    for (const id of deletedIds) { selectedIds.delete(id); favoriteIds.delete(id); }
+    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoriteIds])); } catch {}
+    _deleteBusy = false;
+    hideDeleteConfirm(); closeLightbox();
+    if (selectMode && !selectedIds.size) toggleSelectMode();
+    else updateSelBar();
+    applyFilters();
+    if (deletedIds.size !== ids.length) {
+      showToast(`Deleted ${deletedIds.size} of ${ids.length}. The remaining thumbnails are still selected.`, 'error');
+    } else showToast(`Deleted ${deletedIds.size} thumbnail${deletedIds.size === 1 ? '' : 's'}`, 'success');
+  } catch (error) {
+    document.getElementById('confirm-error').textContent = error.message;
+    showToast(error.message, 'error');
   } finally {
-    btn.disabled = false; btn.textContent = 'Delete';
+    _deleteBusy = false;
+    btn.disabled = cancel.disabled = false;
+    btn.textContent = 'Delete';
   }
 }
 
@@ -1896,11 +1944,12 @@ document.addEventListener('DOMContentLoaded', () => {
 </script>
 
 <div id="confirm-modal">
-  <div class="confirm-box">
-    <h3>Delete thumbnail?</h3>
-    <p>This will remove <strong id="confirm-title"></strong> from the board. You can always re-add it by tagging it in Eagle.</p>
+  <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="confirm-heading">
+    <h3 id="confirm-heading">Delete thumbnail?</h3>
+    <p>This will remove <strong id="confirm-title"></strong> from the board.</p>
+    <p id="confirm-error" role="alert"></p>
     <div class="confirm-actions">
-      <button class="confirm-cancel" onclick="hideDeleteConfirm()">Cancel</button>
+      <button class="confirm-cancel" id="confirm-cancel" onclick="hideDeleteConfirm()">Cancel</button>
       <button class="confirm-delete" id="confirm-delete-btn" onclick="confirmDelete()">Delete</button>
     </div>
   </div>

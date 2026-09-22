@@ -12,6 +12,7 @@ Usage:
   python3 whisper_transcripts.py             # everything missing
   python3 whisper_transcripts.py --limit 20  # quick test on 20 vids
 """
+from board_data import load_board_file
 import argparse
 import json
 import os
@@ -107,7 +108,7 @@ def main():
     if args.ids:
         ids = [s.strip() for s in args.ids.split(",") if s.strip()]
     else:
-        data = json.loads(DATA.read_text())
+        data = load_board_file(DATA, "/api/data")
         existing = {p.stem for p in OUT_DIR.glob("*.txt")}
         ids = [v["id"] for v in data if v["id"] not in existing]
 

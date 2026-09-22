@@ -13,6 +13,7 @@ Usage:
 Output: transcripts/{videoId}.txt (gitignored — large + regenerable)
 Skips IDs that already have a transcript file.
 """
+from board_data import load_board_file
 import argparse
 import json
 import re
@@ -116,7 +117,7 @@ def main():
     args = ap.parse_args()
 
     OUT_DIR.mkdir(exist_ok=True)
-    data = json.loads(DATA.read_text())
+    data = load_board_file(DATA, "/api/data")
 
     if args.ids:
         ids = [s.strip() for s in args.ids.split(",") if s.strip()]

@@ -25,10 +25,16 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v5
+      - name: Assemble public site
+        run: |
+          mkdir _site
+          cp index.html inbox.html ideas.html tagger.html api-client.js board-utils.js app-config.js image-unavailable.svg favicon.png _site/
+          cp data.json _site/
+          touch _site/.nojekyll
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

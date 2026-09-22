@@ -1,5 +1,5 @@
 {
-  "_comment": "Sources for the web scrape bot (worker/scrape.js). The local Python scraper reads scrape_config.json instead — they can diverge.",
+  "_comment": "Rotating niche and cross-topic discovery. Seeds do not restrict channels found via search or trending. Outlier measures performance, not visual quality.",
   "channels": [
     "@Fireship",
     "@ThePrimeagen",
@@ -22,25 +22,49 @@
     "@midudev",
     "@midulive"
   ],
-  "queries": [
-    "software engineering best practices",
-    "senior developer career",
-    "AI agent tutorial",
-    "system design interview",
-    "tech founder story",
-    "developer productivity",
-    "programming explained",
-    "computer science education",
-    "indie hacker product",
-    "startup story",
-    "engineering documentary"
-  ],
   "thresholds": {
     "min_views": 50000,
     "max_age_days": 730,
     "min_duration_seconds": 90,
     "min_outlier_score": 1.5,
     "cap_per_run": 30,
-    "max_inbox_size": 100
-  }
+    "max_inbox_size": 120
+  },
+  "query_groups": {
+    "niche": [
+      "software engineering best practices",
+      "senior developer career",
+      "AI agent tutorial",
+      "system design interview",
+      "tech founder story",
+      "developer productivity",
+      "programming explained",
+      "computer science education",
+      "indie hacker product",
+      "startup story",
+      "engineering documentary"
+    ],
+    "inspiration": [
+      "science documentary",
+      "architecture explained",
+      "sports transformation",
+      "film cinematography",
+      "history mystery",
+      "creative design challenge",
+      "food science experiment",
+      "travel documentary",
+      "business investigation",
+      "art process",
+      "photography behind the scenes",
+      "engineering impossible challenge"
+    ]
+  },
+  "channels_per_run": 10,
+  "queries_per_group": 3,
+  "max_per_channel": 2,
+  "regions": [
+    "US",
+    "GB",
+    "ES"
+  ]
 }
