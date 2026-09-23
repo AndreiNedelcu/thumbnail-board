@@ -6,10 +6,12 @@ test('own channel filter covers both names and original channel tags',()=>{
   for(const video of [{channel:'TheSeniorDev'},{channelHandle:'@theSeniorDevPodcast'},{tags:['channel-theseniordev-main']}])assert.equal(board.isOwnChannel(video),true);
   assert.equal(board.isOwnChannel({channel:'Other Developer'}),false);
 });
-test('permanent images precede YouTube and unsafe URLs are rejected',()=>{
+test('full views prefer permanent images, grids load light images with archive fallback, unsafe URLs are rejected',()=>{
   assert.equal(board.imageSources({id:'abcdefghijk',thumbnailUrl:'https://archive.test/img.jpg'})[0],'https://archive.test/img.jpg');
   assert.ok(board.imageSources({id:'abcdefghijk',thumbnailUrl:'javascript:alert(1)'})[0].startsWith('https://img.youtube.com'));
   assert.equal(board.channelUrl({channelUrl:'https://youtube.com.evil.test/'}),'');
+  const grid=board.imageSources({id:'abcdefghijk',thumbnailUrl:'https://archive.test/img.jpg'},true);
+  assert.deepEqual(grid.slice(0,2),['https://img.youtube.com/vi/abcdefghijk/hqdefault.jpg','https://archive.test/img.jpg']);
 });
 test('partial deletions do not silently remove unconfirmed thumbnails',()=>{
   assert.deepEqual(board.confirmedDeletedIds({ok:true,deletedIds:['a','other']},['a','b']),['a']);

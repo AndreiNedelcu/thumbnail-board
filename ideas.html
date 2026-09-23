@@ -493,7 +493,7 @@ function render(results) {
   grid.innerHTML = results.map((r, i) => `
     <div class="card" onclick="openLightbox(${i})" aria-label="Click to preview · double-click area on bottom-right for actions">
       <div class="thumb">
-        ${TBBoard.imageMarkup(r)}
+        ${TBBoard.imageMarkup(r,true)}
         <div class="score-badge ${scoreClass(r.score)}">${scorePct(r.score)}<span class="pct">%</span></div>
         ${r.is_own ? '<div class="own-badge">Mine</div>' : ''}
       </div>

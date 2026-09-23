@@ -110,6 +110,29 @@ asset backup (or another independent copy) in addition to database backups.
 Records and images use separate lifetimes: board deletion leaves image bytes in
 Storage, and a deletion tombstone prevents scraper/tagger resurrection.
 
+## Speed and inbox approvals (September 2026)
+
+- Pages render immediately from the last board copy saved in the browser and
+  refresh in the background; `/api/data` is one database query (`tb_list`) and is
+  revalidated with an ETag. Cards are reused, so saving, sorting, filtering and
+  refreshing never reload images. Grids load YouTube's light 480px image first
+  and fall back to the archived copy; full views prefer the archived image.
+  New archive uploads are marked immutable for browser caching.
+- Inbox "Apply" now sends kept candidates straight to the board (previously the
+  default sent them to `pending`, waiting for the Mac tagger). Approved items go
+  to the end of the board, so "Recent" shows them first. The inbox's "Waiting for
+  tags" tab lists older approvals still in `pending` and can publish them.
+- The Mac tagger (`auto_tag_tick.sh`) also tags untagged board items through
+  `/api/tag-untagged`, which only writes when the item still has no tags.
+  Its launchd job must export the NEW `TB_AUTH_TOKEN`; with the old Cloudflare
+  token it cannot read `/api/pending` and silently does nothing.
+
+Deploy order: `npx supabase db push` (migration `202609240002`), then
+`npx supabase functions deploy board-api --project-ref PROJECT_REF --use-api`,
+then publish the frontend (merge to `main`). The old function keeps working with
+the new migration; the new frontend works with the old function except the
+"Waiting for tags" publish button.
+
 ## Collector and tagging
 
 `scrape_sources.json` has rotating niche and cross-topic search groups, rotating

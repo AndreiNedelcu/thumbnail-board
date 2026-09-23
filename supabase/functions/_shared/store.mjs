@@ -23,8 +23,13 @@ export class SupabaseStore {
     }
   }
   async list(status) {
-    const rows = await this.rows(`select=id,data&status=eq.${status}&deleted_at=is.null`);
-    return rows.map(row => ({...row.data, id:row.id}));
+    try { return await this.rpc('tb_list',{list_status:status}); }
+    catch (error) {
+      // Before migration 202609240002 is applied: page through the rows instead.
+      if (!/PGRST202|42883/.test(error.message)) throw error;
+      const rows = await this.rows(`select=id,data&status=eq.${status}&deleted_at=is.null`);
+      return rows.map(row => ({...row.data, id:row.id}));
+    }
   }
   discoveryQueue(model='gte-small') { return this.rpc('tb_discovery_queue_for',{current_model:model}).then(rows=>rows.map(v=>v.data)); }
   allIds() { return this.rows('select=id'); }
@@ -54,8 +59,9 @@ export class SupabaseStore {
     let response;
     for(let attempt=0;attempt<4;attempt++) {
       try {
+        // Content-addressed: the bytes behind a URL never change, so browsers may keep them.
         response = await this.fetcher(`${this.url}/storage/v1/object/thumbnails/${path}`, {
-          method:'POST', headers:{apikey:this.key,Authorization:`Bearer ${this.key}`,'Content-Type':'image/jpeg','x-upsert':'false'}, body:bytes, signal:AbortSignal.timeout(30000),
+          method:'POST', headers:{apikey:this.key,Authorization:`Bearer ${this.key}`,'Content-Type':'image/jpeg','x-upsert':'false','Cache-Control':'max-age=31536000, immutable'}, body:bytes, signal:AbortSignal.timeout(30000),
         });
         if(response.status<500 && response.status!==429)break;
       }catch(error){if(attempt===3)throw new Error('Image archive connection failed; retry is safe.');}

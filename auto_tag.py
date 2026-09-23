@@ -303,6 +303,11 @@ def main():
     published = set(v["id"] for v in board)
     done_ids = set(r["id"] for r in review) | published
     todo = [p for p in pending if p["id"] not in done_ids and p["id"] not in skip]
+    # Inbox approvals land on the board untagged; tag them too. They are saved
+    # with /api/tag-untagged, which never overwrites tags added by hand.
+    reviewed = set(r["id"] for r in review)
+    todo += [{**v, "untagged_board": True} for v in board
+             if not v.get("tags") and v["id"] not in reviewed and v["id"] not in skip]
     if args.batch > 0:
         todo = todo[:args.batch]
 
@@ -317,6 +322,16 @@ def main():
     pending_batch = []  # accumulated entries waiting for batch commit
 
     def flush_batch(batch, token):
+        if not batch: return
+        untagged = [e for e in batch if e.get("untagged_board")]
+        batch = [e for e in batch if not e.get("untagged_board")]
+        if untagged:
+            ok, msg = _post_worker("/api/tag-untagged", {"items": [{"id": e["id"], "tags": e["tags"]} for e in untagged]}, token, timeout=60)
+            print(f"           🏷  tagged board items: {msg if not ok else 'ok'}")
+            if not ok:
+                current = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
+                current += [e for e in untagged if not any(r.get("id") == e["id"] for r in current)]
+                REVIEW_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2))
         if not batch: return
         ok, msg, n = publish_batch_to_worker(batch, token)
         if ok:
@@ -377,6 +392,7 @@ def main():
             "views": item.get("views",""),
             "tags": tags,
             "ai_tags": list(tags),
+            **({"untagged_board": True} if item.get("untagged_board") else {}),
             "auto_tagged_at": int(time.time()),
             **analysis,
         }

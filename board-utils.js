@@ -14,12 +14,16 @@
       return ['https:', 'http:'].includes(url.protocol) ? value : '';
     } catch { return ''; }
   }
+  // Grids (small) load YouTube's light 480px image first (~25 KB, fast CDN) and
+  // fall back to our archived copy, so a video removed from YouTube still shows.
+  // Full views (lightbox, copy) prefer the archived full-size image.
   function imageSources(video, small = false) {
     const saved = safeUrl(video.thumbnailUrl || video.thumbnail_url || video.imageUrl);
-    const qualities = small ? ['mqdefault', 'hqdefault', 'default'] : ['maxresdefault', 'hqdefault', 'mqdefault', 'default'];
-    const youtube = /^[\w-]{11}$/.test(video.id || '')
-      ? qualities.map(q => `https://img.youtube.com/vi/${video.id}/${q}.jpg`) : [];
-    return [...new Set([saved, ...youtube].filter(Boolean))];
+    const valid = /^[\w-]{11}$/.test(video.id || '');
+    const yt = q => valid ? `https://img.youtube.com/vi/${video.id}/${q}.jpg` : '';
+    const order = small ? [yt('hqdefault'), saved, yt('mqdefault')]
+      : [saved, yt('maxresdefault'), yt('hqdefault'), yt('mqdefault'), yt('default')];
+    return [...new Set(order.filter(Boolean))];
   }
   function channelUrl(video) {
     if (/^UC[\w-]{22}$/.test(video.channelId || '')) return `https://www.youtube.com/channel/${video.channelId}`;
@@ -42,7 +46,7 @@
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   function imageMarkup(video, small=false) {
     const sources=imageSources(video,small);
-    return `<img loading="lazy" alt="${escape(video.title||'Thumbnail')}" src="${escape(sources[0]||'image-unavailable.svg')}" data-sources="${escape(JSON.stringify(sources))}" data-source-index="0" onerror="TBBoard.imageError(this)" onload="TBBoard.imageLoaded(this)">`;
+    return `<img loading="lazy" decoding="async" alt="${escape(video.title||'Thumbnail')}" src="${escape(sources[0]||'image-unavailable.svg')}" data-sources="${escape(JSON.stringify(sources))}" data-source-index="0" onerror="TBBoard.imageError(this)" onload="TBBoard.imageLoaded(this)">`;
   }
   function imageError(img) {
     const sources=JSON.parse(img.dataset.sources||'[]');

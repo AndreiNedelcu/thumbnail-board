@@ -260,9 +260,19 @@
   body.select-mode .card:hover { outline:1px solid rgba(255,255,255,.3); }
   .size-wrap { display:flex; align-items:center; gap:8px; }
   .size-wrap svg { color:var(--muted); flex-shrink:0; }
-  #size-slider { -webkit-appearance:none; appearance:none; width:90px; height:4px; background:var(--surface3); border-radius:2px; outline:none; cursor:pointer; }
-  #size-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--mint); cursor:pointer; box-shadow:0 0 8px rgba(58,236,186,0.4); }
-  #size-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--mint); border:none; cursor:pointer; }
+  .size-wrap { height:36px; padding:0 12px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; }
+  #size-slider {
+    -webkit-appearance:none; appearance:none; width:88px; height:16px; background:transparent; outline:none; cursor:pointer; margin:0;
+    --fill:37.5%;
+  }
+  #size-slider::-webkit-slider-runnable-track { height:2px; border-radius:1px; background:linear-gradient(to right, var(--text) var(--fill), var(--surface3) var(--fill)); }
+  #size-slider::-moz-range-track { height:2px; border-radius:1px; background:var(--surface3); }
+  #size-slider::-moz-range-progress { height:2px; border-radius:1px; background:var(--text); }
+  #size-slider::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; margin-top:-5px; border-radius:50%; background:var(--text-bright); border:none; box-shadow:0 1px 4px rgba(0,0,0,.5); transition:transform .12s; }
+  #size-slider::-moz-range-thumb { width:12px; height:12px; border-radius:50%; background:var(--text-bright); border:none; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+  #size-slider:hover::-webkit-slider-thumb, #size-slider:focus-visible::-webkit-slider-thumb { transform:scale(1.2); }
+  #size-slider:focus-visible { outline:none; }
+  .size-wrap:focus-within { border-color:var(--border-hover); }
 
   /* ── TOOLBAR (above grid) ── */
   .toolbar {
@@ -580,15 +590,54 @@
     transition:all .15s;
   }
   .inbox-fab-badge.has-items { background:var(--brand-grad); color:#0d1117; }
-  .collection-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:22px; }
-  .collection-btn { border:1px solid var(--border-hover); background:var(--surface); color:var(--text); border-radius:10px; padding:10px 15px; cursor:pointer; font-size:13px; font-weight:600; }
-  .collection-btn[aria-pressed="true"] { color:var(--mint); border-color:var(--mint); background:rgba(58,236,186,.08); }
-  .collection-toggle { margin-left:auto; display:flex; align-items:center; gap:9px; font-size:13px; cursor:pointer; }
-  .collection-toggle input { accent-color:var(--mint); width:16px; height:16px; }
-  .favorite-btn { position:absolute; top:8px; right:8px; z-index:3; width:34px; height:34px; border:1px solid rgba(255,255,255,.2); border-radius:50%; background:rgba(13,17,23,.85); color:white; cursor:pointer; display:grid; place-items:center; }
-  .favorite-btn svg { width:17px; height:17px; }
-  .favorite-btn[aria-pressed="true"], #lb-favorite[aria-pressed="true"] { color:var(--mint); }
-  .favorite-btn[aria-pressed="true"] svg { fill:var(--mint); }
+  .toolbar > .tagger-btn, .toolbar > .select-btn, .toolbar > .sel-delete-btn { height:36px; border-radius:10px; padding:0 13px; }
+  .toolbar > .sel-delete-btn:not(.visible) { display:none; }
+  /* Collection segmented control + "hide ours" chip share the sort controls' look */
+  .seg-btn {
+    display:inline-flex; align-items:center; gap:5px; height:28px;
+    padding:0 11px; border:none; background:transparent;
+    color:var(--muted); font-family:inherit; font-size:12px; font-weight:600;
+    cursor:pointer; border-radius:7px; transition:all .15s;
+  }
+  .seg-btn:hover { color:var(--text); }
+  .seg-btn.active { background:var(--surface3); color:var(--text-bright); box-shadow:0 1px 3px rgba(0,0,0,.25); }
+  .seg-btn svg { width:12px; height:12px; }
+  .seg-count { color:var(--muted); font-weight:600; font-variant-numeric:tabular-nums; }
+  .chip-toggle {
+    display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 12px;
+    background:transparent; border:1px solid var(--border); border-radius:10px;
+    color:var(--muted); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    transition:all .15s;
+  }
+  .chip-toggle svg { width:13px; height:13px; }
+  .chip-toggle:hover { color:var(--text); border-color:var(--border-hover); }
+  .chip-toggle.active { color:var(--text-bright); background:var(--surface3); border-color:var(--border-hover); }
+  .mini-icon-btn {
+    width:32px; height:32px; border-radius:8px; border:1px solid var(--border); background:var(--surface2);
+    color:var(--muted); cursor:pointer; display:inline-flex; align-items:center; justify-content:center;
+  }
+  .mini-icon-btn svg { width:14px; height:14px; }
+  .mini-icon-btn:hover { color:var(--text-bright); }
+  .mini-icon-btn.active { color:var(--text-bright); background:var(--surface3); }
+  .mini-icon-btn.active svg { fill:currentColor; }
+  /* Save: a small heart that only appears on hover; saved items keep a tiny mark */
+  .favorite-btn {
+    position:absolute; top:6px; right:6px; z-index:3; width:28px; height:28px;
+    border:none; border-radius:8px; background:rgba(13,17,23,.55); backdrop-filter:blur(6px);
+    color:#fff; cursor:pointer; display:grid; place-items:center;
+    opacity:0; transform:scale(.9); transition:opacity .15s, transform .15s, background .15s;
+  }
+  .favorite-btn svg { width:14px; height:14px; }
+  .card:hover .favorite-btn, .favorite-btn:focus-visible { opacity:1; transform:scale(1); }
+  .favorite-btn:hover { background:rgba(13,17,23,.8); }
+  .card.is-saved .favorite-btn { opacity:1; transform:scale(1); background:transparent; backdrop-filter:none; }
+  .card.is-saved .favorite-btn svg { fill:#fff; filter:drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
+  .card.is-saved:hover .favorite-btn { background:rgba(13,17,23,.55); }
+  body.select-mode .favorite-btn { display:none; }
+  @media (hover:none) { .favorite-btn { opacity:.85; transform:none; } }
+  #lb-favorite svg { flex-shrink:0; }
+  #lb-favorite[aria-pressed="true"] { color:var(--text-bright); border-color:var(--border-hover); }
+  #lb-favorite[aria-pressed="true"] svg { fill:currentColor; }
   .card-channel { color:#d7e3ec; font-size:11px; margin-top:5px; }
   #lb-channel a { color:inherit; text-decoration:none; }
   #lb-channel a:hover { text-decoration:underline; }
@@ -597,14 +646,13 @@
   #confirm-error { color:#ff8295; margin-top:12px; font-size:13px; }
   button:disabled { opacity:.55; cursor:wait; }
   :focus-visible { outline:2px solid var(--mint); outline-offset:3px; }
-  @media(max-width:650px) { .collection-toggle { margin-left:0; width:100%; } .header-top { flex-wrap:wrap; } }
+  @media(max-width:650px) { .header-top { flex-wrap:wrap; } .toolbar-spacer, .size-wrap { display:none; } }
 </style>
 </head>
 <body>
 
 <!-- Top-right FABs (fixed) -->
 <div class="top-fabs">
-  <button class="fab" onclick="setCollection('saved')" aria-label="Your saved thumbnails">♡ Saved <span id="saved-top-count">0</span></button>
   <a class="fab" href="ideas.html" aria-label="Find thumbnail references for a new video">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>
     <span>Ideas</span>
@@ -629,7 +677,7 @@
         </button>
       </div>
       <div class="stats" id="mini-stats"></div>
-      <button class="collection-btn" id="mini-saved" onclick="setCollection(showSaved ? 'all' : 'saved')" aria-pressed="false" aria-label="Saved thumbnails">♡</button>
+      <button class="mini-icon-btn" id="mini-saved" onclick="setCollection(showSaved ? 'all' : 'saved')" aria-pressed="false" aria-label="Show saved thumbnails"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg></button>
       <div class="mini-sort">
         <button class="mini-sort-btn active" data-sort="default" onclick="setSort('default')" aria-label="Default">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
@@ -674,16 +722,23 @@
 <!-- Main content -->
 <div class="container">
   <div id="board-notice" hidden></div>
-  <nav class="collection-bar" aria-label="Thumbnail collections">
-    <button class="collection-btn" id="collection-all" onclick="setCollection('all')" aria-pressed="true">All thumbnails</button>
-    <button class="collection-btn" id="collection-saved" onclick="setCollection('saved')" aria-pressed="false">Saved <span id="saved-count">0</span></button>
-    <label class="collection-toggle"><input type="checkbox" id="hide-own" onchange="setHideOwn(this.checked)"> Hide our channels</label>
-  </nav>
   <div class="toolbar">
+    <div class="sort-group" role="group" aria-label="Collection">
+      <button class="seg-btn active" id="collection-all" onclick="setCollection('all')" aria-pressed="true">All</button>
+      <button class="seg-btn" id="collection-saved" onclick="setCollection('saved')" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
+        Saved <span class="seg-count" id="saved-count"></span>
+      </button>
+    </div>
+    <button class="chip-toggle" id="hide-own" onclick="setHideOwn(!hideOwn)" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10 10 0 0 1 12 4c7 0 10 8 10 8a17 17 0 0 1-2.2 3.4"/><path d="M6.6 6.6A16.6 16.6 0 0 0 2 12s3 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/></svg>
+      Hide ours
+    </button>
     <div class="toolbar-spacer"></div>
-    <div class="size-wrap">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-      <input id="size-slider" type="range" min="160" max="480" value="280" oninput="setCardSize(this.value)">
+    <div class="size-wrap" aria-label="Thumbnail size">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <input id="size-slider" type="range" min="160" max="480" step="10" value="280" oninput="setCardSize(this.value)" aria-label="Thumbnail size">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
     </div>
     <div class="sort-group" id="sort-group">
       <button class="sort-btn active" data-sort="default" onclick="setSort('default')">
@@ -745,7 +800,7 @@
         </div>
       </div>
       <div class="lb-actions">
-        <button class="lb-btn" id="lb-favorite" aria-pressed="false">♡ Save</button>
+        <button class="lb-btn lb-btn-copy" id="lb-favorite" aria-pressed="false"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg><span>Save</span></button>
         <a class="lb-btn lb-btn-yt" id="lb-yt" href="#" target="_blank">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2C0 8.1 0 12 0 12s0 3.9.5 5.8a3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1C24 15.9 24 12 24 12s0-3.9-.5-5.8zM9.7 15.5V8.5l6.3 3.5-6.3 3.5z"/></svg>
           YouTube
@@ -858,12 +913,15 @@ let showSaved = false, hideOwn = false, boardReadOnly = false;
 
 function updateCollections() {
   const count = allVideos.filter(v => favoriteIds.has(v.id)).length;
-  document.getElementById('saved-count').textContent = count;
-  document.getElementById('saved-top-count').textContent = count;
+  document.getElementById('saved-count').textContent = count || '';
+  document.getElementById('collection-all').classList.toggle('active', !showSaved);
+  document.getElementById('collection-saved').classList.toggle('active', showSaved);
   document.getElementById('collection-all').setAttribute('aria-pressed', String(!showSaved));
   document.getElementById('collection-saved').setAttribute('aria-pressed', String(showSaved));
+  document.getElementById('mini-saved').classList.toggle('active', showSaved);
   document.getElementById('mini-saved').setAttribute('aria-pressed', String(showSaved));
-  document.getElementById('hide-own').checked = hideOwn;
+  document.getElementById('hide-own').setAttribute('aria-pressed', String(hideOwn));
+  document.getElementById('hide-own').classList.toggle('active', hideOwn);
 }
 function setCollection(name) {
   showSaved = name === 'saved';
@@ -873,32 +931,47 @@ function setHideOwn(value) {
   hideOwn = value;
   applyFilters(); saveState();
 }
-const favoriteBusy = new Set();
-async function toggleFavorite(id, event) {
+// Saving is optimistic: the heart changes at once and the request runs in the
+// background (serialised per thumbnail). A failure restores the previous state.
+const favoriteQueue = new Map();
+function paintFavorite(id) {
+  const saved = favoriteIds.has(id);
+  const card = cardCache.get(id);
+  const btn = card?.querySelector('.favorite-btn');
+  if (btn) { btn.setAttribute('aria-pressed', String(saved)); btn.setAttribute('aria-label', (saved ? 'Unsave' : 'Save') + ' thumbnail'); }
+  card?.classList.toggle('is-saved', saved);
+  const lbFav = document.getElementById('lb-favorite');
+  if (visibleVideos[currentIndex]?.id === id) {
+    lbFav.setAttribute('aria-pressed', String(saved));
+    lbFav.querySelector('span').textContent = saved ? 'Saved' : 'Save';
+  }
+}
+function setFavoriteLocal(id, saved) {
+  if (saved) favoriteIds.add(id); else favoriteIds.delete(id);
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoriteIds])); } catch {}
+  paintFavorite(id);
+  if (showSaved) {
+    const currentId = visibleVideos[currentIndex]?.id;
+    const lightboxOpen = document.getElementById('lightbox').classList.contains('open');
+    applyFilters();
+    if (lightboxOpen) {
+      const index = visibleVideos.findIndex(v => v.id === currentId);
+      if (index < 0) closeLightbox(); else currentIndex = index;
+    }
+  } else updateCollections();
+}
+function toggleFavorite(id, event) {
   event?.stopPropagation();
-  if (favoriteBusy.has(id)) return;
   const saved = !favoriteIds.has(id);
-  if (TBApi.features.favorites) {
-    favoriteBusy.add(id);
-    try {
-      await TBApi.request('/api/favorites', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,saved})});
-    } catch(error) {showToast(error.message,'error');return;}
-    finally {favoriteBusy.delete(id);}
-  }
-  const next = new Set(favoriteIds);
-  if (saved) next.add(id); else next.delete(id);
-  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify([...next])); }
-  catch { if(!TBApi.features.favorites) {showToast('Cannot save on this browser. Check available storage.', 'error');return;} }
-  favoriteIds = next;
-  const currentId = visibleVideos[currentIndex]?.id;
-  const lightboxOpen = document.getElementById('lightbox').classList.contains('open');
-  applyFilters();
-  if (lightboxOpen) {
-    const index = visibleVideos.findIndex(v => v.id === currentId);
-    if (index < 0) closeLightbox();
-    else { currentIndex = index; renderLightbox(); }
-  }
-  showToast(next.has(id) ? 'Saved to your favorites' : 'Removed from favorites', 'success');
+  setFavoriteLocal(id, saved);
+  if (!TBApi.features.favorites) return;
+  const previous = favoriteQueue.get(id) || Promise.resolve();
+  const next = previous.then(() => TBApi.request('/api/favorites', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,saved})}))
+    .catch(error => {
+      if (favoriteQueue.get(id) === next) { setFavoriteLocal(id, !saved); showToast('Could not save: ' + error.message, 'error'); }
+    })
+    .finally(() => { if (favoriteQueue.get(id) === next) favoriteQueue.delete(id); });
+  favoriteQueue.set(id, next);
 }
 
 // ── Persistent state (sort + search + scroll position) ───────────
@@ -961,14 +1034,7 @@ function setSort(name) {
   // Each click on Shuffle generates a NEW random order, even if already
   // in shuffle mode. The other sorts are deterministic, so clicking
   // them again is a no-op.
-  if (name === 'shuffle') {
-    const ids = allVideos.map(v => v.id);
-    for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ids[i], ids[j]] = [ids[j], ids[i]];
-    }
-    shuffleOrder = ids;
-  }
+  if (name === 'shuffle') newShuffle();
   currentSort = name;
   // Highlight the active sort in BOTH segmented controls (main toolbar + sticky mini-header)
   document.querySelectorAll('.sort-btn, .mini-sort-btn').forEach(b => {
@@ -983,33 +1049,87 @@ let searchQuery = '';
 let currentIndex = 0;
 let expandedCat = null;
 
+// ── Shuffle order survives page changes within this tab ──────────
+const SHUFFLE_KEY = 'tb-shuffle-order';
+function newShuffle() {
+  const ids = allVideos.map(v => v.id);
+  for (let i = ids.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+  }
+  shuffleOrder = ids;
+  try { sessionStorage.setItem(SHUFFLE_KEY, JSON.stringify(ids)); } catch {}
+}
+function restoreShuffle() {
+  try {
+    const ids = JSON.parse(sessionStorage.getItem(SHUFFLE_KEY) || 'null');
+    if (Array.isArray(ids) && ids.length) { shuffleOrder = ids; return; }
+  } catch {}
+  newShuffle();
+}
+
+// Unchanged records keep the same object, so their cards (and loaded images)
+// are reused when fresh data arrives.
+const videoKeys = new Map();
+function setVideos(data) {
+  const previous = new Map(allVideos.map(v => [v.id, v]));
+  allVideos = data.map(raw => {
+    const v = {...raw, title:raw.title||'', channel:raw.channel||'', tags:Array.isArray(raw.tags)?raw.tags:[]};
+    const key = JSON.stringify(v);
+    if (previous.has(v.id) && videoKeys.get(v.id) === key) return previous.get(v.id);
+    videoKeys.set(v.id, key);
+    return v;
+  });
+}
+
+async function syncFavorites() {
+  if (!(TBApi.isLocal || TBApi.getToken())) return;
+  try {
+    const saved = await TBApi.request('/api/favorites');
+    const pendingIds = new Set(favoriteQueue.keys());
+    favoriteIds = new Set([...saved.ids.filter(id => !pendingIds.has(id)), ...[...favoriteIds].filter(id => pendingIds.has(id))]);
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify([...favoriteIds]));
+    if (showSaved) applyFilters();
+    else { updateCollections(); for (const card of cardCache.values()) paintFavorite(card.dataset.videoId); }
+  } catch {}
+}
+
 // ── Init ──────────────────────────────────────────────────────────
 async function init() {
   // Restore persisted state BEFORE fetching (so currentSort/searchQuery are set)
   const savedScrollY = loadState();
-
+  const cached = TBApi.cachedData();
+  const favorites = syncFavorites();
+  if (cached) {
+    setVideos(cached.data);
+    firstRender(savedScrollY);
+  }
+  let loaded;
   try {
-    const loaded = await TBApi.loadData();
-    allVideos = loaded.data.map(v => ({...v, title:v.title||'', channel:v.channel||'', tags:Array.isArray(v.tags)?v.tags:[]}));
-    boardReadOnly = loaded.readOnly;
-    if (TBApi.features.favorites && (TBApi.isLocal || TBApi.getToken())) {
-      try {
-        const saved = await TBApi.request('/api/favorites');
-        favoriteIds = new Set(saved.ids);
-        localStorage.setItem(FAVORITES_KEY, JSON.stringify(saved.ids));
-      } catch(error) {showToast('Could not sync favorites: '+error.message,'error');}
-    }
-    if (boardReadOnly) {
-      const notice = document.getElementById('board-notice');
-      notice.hidden = false;
-      notice.textContent = 'Read-only snapshot: the editing service is unavailable. Favorites are saved in this browser.';
-    }
+    loaded = await TBApi.loadData(cached);
   } catch (error) {
     document.getElementById('stats').textContent = 'Could not load thumbnails';
     showToast(error.message, 'error'); return;
   }
+  boardReadOnly = loaded.readOnly;
+  if (boardReadOnly) {
+    const notice = document.getElementById('board-notice');
+    notice.hidden = false;
+    notice.textContent = cached ? 'Offline: showing the last copy saved in this browser.' : 'Read-only snapshot: the editing service is unavailable. Favorites are saved in this browser.';
+  }
+  if (!cached) { setVideos(loaded.data); firstRender(savedScrollY); }
+  else if (loaded.changed) {
+    const currentId = visibleVideos[currentIndex]?.id;
+    setVideos(loaded.data);
+    addCustomTags();
+    applyFilters();
+    const index = visibleVideos.findIndex(v => v.id === currentId);
+    if (index >= 0) currentIndex = index;
+  }
+  await favorites;
+}
 
-  // Dynamically extract custom tags from data.json
+function addCustomTags() {
   allVideos.forEach(v => {
     (v.tags || []).forEach(tag => {
       const parts = tag.split('-');
@@ -1021,7 +1141,10 @@ async function init() {
   });
 
   if (typeof updateAllTags === 'function') updateAllTags();
+}
 
+function firstRender(savedScrollY) {
+  addCustomTags();
   // Reflect restored state in the UI
   if (searchQuery) {
     document.getElementById('search').value = searchQuery;
@@ -1034,21 +1157,14 @@ async function init() {
   document.querySelectorAll('.sort-btn, .mini-sort-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.sort === currentSort);
   });
-  // If shuffle was the saved sort, generate an order
-  if (currentSort === 'shuffle' && !shuffleOrder) {
-    const ids = allVideos.map(v => v.id);
-    for (let i = ids.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [ids[i], ids[j]] = [ids[j], ids[i]];
-    }
-    shuffleOrder = ids;
-  }
+  // Returning to the page keeps the same shuffled order (and scroll position)
+  if (currentSort === 'shuffle' && !shuffleOrder) restoreShuffle();
 
   applyFilters();
 
   // Restore scroll position after the grid has rendered + images allocated
   if (savedScrollY > 0) {
-    setTimeout(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' }), 50);
+    gridReady.then(() => requestAnimationFrame(() => window.scrollTo({ top: savedScrollY, behavior: 'instant' })));
   }
 
   // If the URL contained a video id (#v=...), reopen that lightbox
@@ -1265,15 +1381,47 @@ function checkThumbnail(img) {
 
 function setCardSize(val) {
   document.documentElement.style.setProperty('--card-size', val + 'px');
-  localStorage.setItem('cardSize', val);
+  const slider = document.getElementById('size-slider');
+  slider.style.setProperty('--fill', ((val - slider.min) / (slider.max - slider.min) * 100) + '%');
+  try { localStorage.setItem('cardSize', val); } catch {}
 }
 // Restore saved size
 (function() {
   const saved = localStorage.getItem('cardSize');
-  if (saved) { document.documentElement.style.setProperty('--card-size', saved + 'px'); document.getElementById('size-slider').value = saved; }
+  if (saved) document.getElementById('size-slider').value = saved;
+  setCardSize(document.getElementById('size-slider').value);
 })();
 
 // ── Grid ──────────────────────────────────────────────────────────
+const cardCache = new Map();
+let renderToken = 0, gridReady = Promise.resolve();
+const HEART = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>';
+function cardElement(v) {
+  let card = cardCache.get(v.id);
+  if (!card || card._video !== v) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+    <div data-video-id="${esc(v.id)}" class="card" onclick="handleCardClick(event,'${v.id}')">
+      <div class="sel-check"></div>
+      ${thumbnailImage(v)}
+      <button class="favorite-btn" onclick="toggleFavorite('${v.id}', event)">${HEART}</button>
+      <div class="card-overlay">
+        <div class="card-title">${esc(v.title || v.id)}</div>
+        <div class="card-channel">${esc(v.channel || 'Channel unavailable')}</div>
+      </div>
+    </div>`;
+    card = wrap.firstElementChild;
+    card._video = v;
+    cardCache.set(v.id, card);
+  }
+  card.classList.toggle('selected', selectedIds.has(v.id));
+  const saved = favoriteIds.has(v.id);
+  card.classList.toggle('is-saved', saved);
+  const btn = card.querySelector('.favorite-btn');
+  btn.setAttribute('aria-pressed', String(saved));
+  btn.setAttribute('aria-label', (saved ? 'Unsave' : 'Save') + ' thumbnail');
+  return card;
+}
 function renderGrid() {
   const grid = document.getElementById('grid');
   const empty = document.getElementById('empty');
@@ -1291,7 +1439,7 @@ function renderGrid() {
   const prevScrollY = window.scrollY;
 
   if (!visibleVideos.length) {
-    grid.innerHTML = '';
+    ++renderToken; grid.replaceChildren();
     empty.style.display = 'block';
     empty.querySelector('h2').textContent = showSaved ? 'No saved thumbnails here' : 'No results';
     empty.querySelector('p').textContent = showSaved ? 'Save thumbnails using the heart, or clear your filters.' : 'Try a different search or clear the filters';
@@ -1300,22 +1448,23 @@ function renderGrid() {
   }
   empty.style.display = 'none';
 
-  grid.innerHTML = visibleVideos.map((v, i) => `
-    <div data-video-id="${esc(v.id)}" class="card${selectedIds.has(v.id) ? ' selected' : ''}" onclick="handleCardClick(event,${i},'${v.id}')">
-      <div class="sel-check"></div>
-      ${thumbnailImage(v)}
-      <button class="favorite-btn" aria-label="${favoriteIds.has(v.id) ? 'Unsave' : 'Save'} thumbnail" aria-pressed="${favoriteIds.has(v.id)}" onclick="toggleFavorite('${v.id}', event)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg>
-      </button>
-      <div class="card-overlay">
-        <div class="card-title">${esc(v.title || v.id)}</div>
-        <div class="card-channel">${esc(v.channel || 'Channel unavailable')}</div>
-      </div>
-    </div>`).join('');
-
+  // Existing cards are moved, not rebuilt: loaded images never reload on
+  // filter, sort, save or background refresh. The first screenful is placed
+  // at once and the rest in small batches so the page stays responsive.
+  const token = ++renderToken, list = visibleVideos;
+  let next = 120;
+  grid.replaceChildren(...list.slice(0, next).map(cardElement));
+  gridReady = new Promise(resolve => {
+    const step = () => {
+      if (token !== renderToken) return resolve();
+      if (next >= list.length) { grid.style.minHeight = ''; return resolve(); }
+      grid.append(...list.slice(next, next += 400).map(cardElement));
+      setTimeout(step, 0);
+    };
+    step();
+  });
   requestAnimationFrame(() => {
     if (window.scrollY !== prevScrollY) window.scrollTo(0, prevScrollY);
-    grid.style.minHeight = '';
   });
 
 }
@@ -1378,7 +1527,7 @@ function renderLightbox() {
   img.src = TBBoard.imageSources(v)[0] || 'image-unavailable.svg';
   const favorite = document.getElementById('lb-favorite');
   favorite.setAttribute('aria-pressed', String(favoriteIds.has(v.id)));
-  favorite.textContent = favoriteIds.has(v.id) ? '♥ Saved' : '♡ Save';
+  favorite.querySelector('span').textContent = favoriteIds.has(v.id) ? 'Saved' : 'Save';
   favorite.onclick = () => toggleFavorite(v.id);
 
 
@@ -1564,7 +1713,6 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowRight') navigate(1);
 });
 
-init();
 
 // ── Tag editing in lightbox ───────────────────────────────────────
 let ALL_TAGS = [];
@@ -1843,11 +1991,11 @@ function toggleSelectMode() {
   renderGrid();
 }
 
-function handleCardClick(e, index, videoId) {
+function handleCardClick(e, videoId) {
   if (selectMode) {
     toggleCardSelect(videoId);
   } else {
-    openLightbox(index);
+    openLightbox(visibleVideos.findIndex(v => v.id === videoId));
   }
 }
 
@@ -1941,6 +2089,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === modal) hideDeleteConfirm();
   });
 });
+// Last: every declaration above must exist before the first (cached) render.
+init();
 </script>
 
 <div id="confirm-modal">

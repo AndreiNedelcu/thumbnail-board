@@ -5,6 +5,15 @@ const idPattern=/^[\w-]{11}$/;
 const prefixes=new Set(['style','mood','text','element','camera','subject','formation','topic','callout','backdrop','channel']);
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Content-Type, X-Auth-Token','Cache-Control':'no-store'};
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{...cors,'Content-Type':'application/json'}});
+// Public lists are revalidated with an ETag: an unchanged board costs a 304, not ~0.5 MB.
+async function cachedJson(req,value) {
+  const body=JSON.stringify(value);
+  const digest=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(body));
+  const etag='"'+Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('')+'"';
+  const headers={...cors,'Cache-Control':'no-cache','ETag':etag,'Access-Control-Expose-Headers':'ETag'};
+  if(req.headers.get('If-None-Match')===etag) return new Response(null,{status:304,headers});
+  return new Response(body,{headers:{...headers,'Content-Type':'application/json'}});
+}
 const own=v=>(v.tags||[]).some(t=>['channel-theseniordev-main','channel-theseniordev-podcast'].includes(t)) || ['theseniordev','therealseniordev','theseniordevpodcast'].includes(String(v.channel||'').toLowerCase().replace(/[^a-z0-9]/g,''));
 function validIds(ids) {
   if (!Array.isArray(ids) || !ids.length || ids.length>5000 || ids.some(id=>typeof id!=='string'||!idPattern.test(id))) throw new Error('Provide valid YouTube video IDs.');
@@ -33,8 +42,8 @@ export function createHandler({store,authToken,embed,youtubeKey,fetcher=fetch,em
     try {
       if(path==='/api/health' && req.method==='GET') return json({ok:true,backend:'supabase',features:{favorites:true,archive:true,embeddingModel}});
       if(path==='/api/pending' && req.method==='GET') return json(await store.list('pending'));
-      if(path==='/api/data' && req.method==='GET') return json(await store.list('board'));
-      if(path==='/api/inbox' && req.method==='GET') return json(await store.list('inbox'));
+      if(path==='/api/data' && req.method==='GET') return cachedJson(req,await store.list('board'));
+      if(path==='/api/inbox' && req.method==='GET') return cachedJson(req,await store.list('inbox'));
       if(path==='/api/favorites' && req.method==='GET') return json({ok:true,ids:await store.favorites()});
       if(path==='/api/ideas/discovery-queue' && req.method==='GET') return json(await store.discoveryQueue(embeddingModel));
       if(path==='/api/maintenance/status' && req.method==='GET') return json(await store.rest('tb_jobs?completed_at=is.null&select=video_id,kind,attempts,last_error&limit=10000'));
@@ -64,6 +73,11 @@ export function createHandler({store,authToken,embed,youtubeKey,fetcher=fetch,em
       if(path==='/api/inbox/approve'||path==='/api/inbox/reject') {
         const destination=path.endsWith('reject')?'rejected':body.destination==='board'?'board':'pending';
         return json(await store.decide(validIds(body.ids),destination));
+      }
+      if(path==='/api/pending/publish') return json(await store.rpc('tb_publish_pending',{ids:validIds(body.ids)}));
+      if(path==='/api/tag-untagged') {
+        if(!Array.isArray(body.items)||!body.items.length||body.items.length>500) return json({ok:false,msg:'Provide 1–500 items'},400);
+        return json(await store.rpc('tb_tag_untagged',{items:body.items.map(item=>{const v=videoItem(item,true);return {id:v.id,tags:v.tags||[]};})}));
       }
       if(path==='/api/inbox/visual-review') {
         validIds([body.id]);

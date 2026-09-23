@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm} from 'node:fs/promises';
+import {mkdtemp,readFile,readdir,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {PGlite} from '@electric-sql/pglite';
@@ -46,7 +46,8 @@ test('existing local databases receive new migrations without losing records',as
     assert.deepEqual(await store.discoveryQueue('gte-small'),[]);
     await store.db.close();
     store=await openLocalStore(dir); // reopening must not re-run migrations
-    assert.equal((await store.db.query('select count(*)::int as n from tb_local_migrations')).rows[0].n,2);
+    const files=(await readdir(new URL('../supabase/migrations/',import.meta.url))).filter(f=>f.endsWith('.sql'));
+    assert.equal((await store.db.query('select count(*)::int as n from tb_local_migrations')).rows[0].n,files.length);
     await store.db.close();
   } finally {await rm(dir,{recursive:true,force:true});}
 });

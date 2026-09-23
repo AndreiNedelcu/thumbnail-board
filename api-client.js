@@ -57,16 +57,41 @@
     return data;
   }
 
-  async function loadData() {
+  // Last board copy, kept in this browser so pages render instantly and then
+  // refresh in the background (stale-while-revalidate).
+  const DATA_CACHE_KEY = 'tb-data-cache-v1';
+  const FEATURES_CACHE_KEY = 'tb-features-cache-v1';
+  function cachedData() {
+    try {
+      const raw = localStorage.getItem(DATA_CACHE_KEY);
+      const data = raw && JSON.parse(raw);
+      if (!Array.isArray(data)) return null;
+      Object.assign(features, JSON.parse(localStorage.getItem(FEATURES_CACHE_KEY) || '{}'));
+      return { data, raw };
+    } catch { return null; }
+  }
+  function storeData(raw) {
+    try {
+      localStorage.setItem(DATA_CACHE_KEY, raw);
+      localStorage.setItem(FEATURES_CACHE_KEY, JSON.stringify(features));
+    } catch { try { localStorage.removeItem(DATA_CACHE_KEY); } catch {} }
+  }
+
+  /** Returns { data, readOnly, changed }. `changed` is false when the server
+   *  copy equals the cached one, so callers can skip re-rendering. */
+  async function loadData(cached = null) {
     try {
       const [data, health] = await Promise.all([request('/api/data'), request('/api/health').catch(() => ({}))]);
       Object.assign(features, health.features || {});
       if (!Array.isArray(data)) throw new Error('Invalid board data');
-      return { data, readOnly: false };
+      const raw = JSON.stringify(data);
+      storeData(raw);
+      return { data, readOnly: false, changed: !cached || cached.raw !== raw };
     } catch {
+      if (cached) return { data: cached.data, readOnly: true, changed: false };
       const response = await fetch('data.json?v=' + Date.now());
       if (!response.ok) throw new Error('Cannot load the board. Please retry.');
-      return { data: await response.json(), readOnly: true };
+      return { data: await response.json(), readOnly: true, changed: true };
     }
   }
 
@@ -124,6 +149,7 @@
     fetch: tbFetch,
     request,
     loadData,
+    cachedData,
     features,
     getToken,
     setToken,

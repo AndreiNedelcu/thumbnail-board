@@ -57,7 +57,7 @@ async function migrate(db,existing) {
 class LocalStore {
   constructor(db){this.db=db;}
   async rpc(name,args){
-    const names={tb_save:['items','mode','destination'],tb_delete:['ids'],tb_decide:['ids','destination'],tb_claim_jobs:['batch_size'],tb_collect:['candidates','history','max_size'],tb_register_image:['vid','patch'],tb_match:['query_embedding','match_count','include_own','include_discovery','match_model'],tb_discovery_queue_for:['current_model'],tb_block_channel:['channel_id','channel_name']};
+    const names={tb_save:['items','mode','destination'],tb_delete:['ids'],tb_decide:['ids','destination'],tb_claim_jobs:['batch_size'],tb_collect:['candidates','history','max_size'],tb_register_image:['vid','patch'],tb_match:['query_embedding','match_count','include_own','include_discovery','match_model'],tb_discovery_queue_for:['current_model'],tb_block_channel:['channel_id','channel_name'],tb_publish_pending:['ids'],tb_tag_untagged:['items']};
     if(!names[name])throw new Error('Unknown local RPC');
     const keys=names[name];
     const values=keys.map(k=>['items','candidates','history','patch','query_embedding'].includes(k)?JSON.stringify(args[k]):args[k]);
