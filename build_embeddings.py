@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
 build_embeddings.py — for each summary in summaries/, send (title + tags +
-summary) to Supabase's /api/ideas/embed endpoint, which generates a native
-GTE-small embedding and stores it in pgvector.
+summary) to Supabase's /api/ideas/embed endpoint, which generates an
+embedding with the API's configured model (native GTE-small by default, or a
+multilingual provider — see MIGRATION_SUPABASE.md) and stores it in pgvector.
 
 Reuses the auth pattern of the other scripts: TB_AUTH_TOKEN env var.
 
-Maintains .local/embedded-supabase.json as a private manifest of indexed IDs;
-skips successful IDs on subsequent runs.
+Maintains a private manifest of indexed IDs per model
+(.local/embedded-supabase.json for gte-small, .local/embedded-supabase-<model>.json
+otherwise); skips successful IDs on later runs. Changing the model therefore
+re-embeds everything from the existing summaries and transcripts.
 
 Usage:
   export TB_AUTH_TOKEN='...'
@@ -29,7 +32,6 @@ DATA        = ROOT / "data.json"
 SUMMARIES   = ROOT / "summaries"
 TRANSCRIPTS = ROOT / "transcripts"
 MANIFEST    = ROOT / ".local/embedded-supabase.json"
-MANIFEST.parent.mkdir(parents=True, exist_ok=True)
 WORKER_URL  = os.environ.get("TB_API_URL", "https://zdodflwtphnzvfkuarmn.supabase.co/functions/v1/board-api").rstrip("/")
 WORKERS     = 3
 TIMEOUT     = 60
@@ -74,6 +76,17 @@ def post_embed(item, token):
     except Exception as e:
         return {"id": item["id"], "status": "exception", "msg": str(e)[:200]}
 
+def embedding_model():
+    req = urllib.request.Request(f"{WORKER_URL}/api/health", headers={"User-Agent": "thumbnail-board-client/1.0 (+local-pipeline)"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return json.loads(r.read().decode()).get("features", {}).get("embeddingModel") or "gte-small"
+
+def manifest_for(model):
+    if model == "gte-small":
+        return ROOT / ".local/embedded-supabase.json"
+    safe = "".join(c if c.isalnum() or c in "-._" else "_" for c in model)
+    return ROOT / f".local/embedded-supabase-{safe}.json"
+
 def load_manifest():
     if not MANIFEST.exists():
         return set()
@@ -95,6 +108,12 @@ def main():
     if not token:
         print("ERROR: TB_AUTH_TOKEN env var not set", file=sys.stderr)
         sys.exit(1)
+
+    global MANIFEST
+    model = embedding_model()
+    MANIFEST = manifest_for(model)
+    MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Embedding model: {model} · manifest {MANIFEST.relative_to(ROOT)}")
 
     from board_data import load_board_file
     data = load_board_file(DATA, "/api/data")

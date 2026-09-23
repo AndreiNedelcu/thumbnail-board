@@ -24,19 +24,19 @@ function videoItem(item, partial=false) {
   return data;
 }
 
-export function createHandler({store,authToken,embed,youtubeKey,fetcher=fetch}) {
+export function createHandler({store,authToken,embed,youtubeKey,fetcher=fetch,embeddingModel='gte-small'}) {
   return async function handler(req) {
     if(req.method==='OPTIONS') return new Response(null,{status:204,headers:cors});
     const path=new URL(req.url).pathname.replace(/^.*\/board-api(?=\/|$)/,'');
     const protectedRead=['/api/favorites','/api/ideas/discovery-queue','/api/maintenance/status','/api/pending'].includes(path);
     if((req.method!=='GET'||protectedRead) && (!authToken||req.headers.get('X-Auth-Token')!==authToken)) return json({ok:false,msg:'Unauthorized'},401);
     try {
-      if(path==='/api/health' && req.method==='GET') return json({ok:true,backend:'supabase',features:{favorites:true,archive:true}});
+      if(path==='/api/health' && req.method==='GET') return json({ok:true,backend:'supabase',features:{favorites:true,archive:true,embeddingModel}});
       if(path==='/api/pending' && req.method==='GET') return json(await store.list('pending'));
       if(path==='/api/data' && req.method==='GET') return json(await store.list('board'));
       if(path==='/api/inbox' && req.method==='GET') return json(await store.list('inbox'));
       if(path==='/api/favorites' && req.method==='GET') return json({ok:true,ids:await store.favorites()});
-      if(path==='/api/ideas/discovery-queue' && req.method==='GET') return json(await store.discoveryQueue());
+      if(path==='/api/ideas/discovery-queue' && req.method==='GET') return json(await store.discoveryQueue(embeddingModel));
       if(path==='/api/maintenance/status' && req.method==='GET') return json(await store.rest('tb_jobs?completed_at=is.null&select=video_id,kind,attempts,last_error&limit=10000'));
       if(req.method!=='POST') return json({ok:false,msg:'Not found'},404);
       const raw=await req.text();
@@ -97,20 +97,20 @@ export function createHandler({store,authToken,embed,youtubeKey,fetcher=fetch}) 
         const text=String(body.text||[body.title,body.channel,body.transcript].filter(Boolean).join('\n')).slice(0,12000);
         if(!text) return json({ok:false,msg:'Text required'},400);
         const source=path.endsWith('discovery-enrich')?'discovery':'board';
-        await store.upsertEmbedding(body.id,await embed(text),{title:body.title||row.data.title,channel:body.channel||row.data.channel,is_own:own(row.data)},source);
+        await store.upsertEmbedding(body.id,await embed(text),{title:body.title||row.data.title,channel:body.channel||row.data.channel,is_own:own(row.data)},source,embeddingModel);
         return json({ok:true,id:body.id});
       }
       if(path==='/api/ideas/search') {
         const text=[body.title,body.script].filter(v=>typeof v==='string').join('\n').trim();
         if(!text) return json({ok:false,msg:'Add a title or some ideas'},400);
-        return json({ok:true,results:await store.match(await embed(text.slice(0,12000)),body)});
+        return json({ok:true,results:await store.match(await embed(text.slice(0,12000)),body,embeddingModel)});
       }
       if(path==='/api/ideas/related') {
         validIds([body.id]);
         const entry=await store.getEmbedding(body.id);
-        if(!entry) return json({ok:false,msg:'Thumbnail has not been indexed yet'},404);
+        if(!entry||(entry.model&&entry.model!==embeddingModel)) return json({ok:false,msg:'Thumbnail has not been indexed with the current search model yet'},404);
         const vector=typeof entry.embedding==='string'?JSON.parse(entry.embedding):entry.embedding;
-        const results=await store.match(vector,{...body,topK:Math.min(49,Number(body.topK)||8)+1});
+        const results=await store.match(vector,{...body,topK:Math.min(49,Number(body.topK)||8)+1},embeddingModel);
         return json({ok:true,results:results.filter(v=>v.id!==body.id).slice(0,body.topK||8)});
       }
       return json({ok:false,msg:'Not found'},404);

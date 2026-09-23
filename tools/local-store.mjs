@@ -1,6 +1,6 @@
 import { PGlite } from '@electric-sql/pglite';
 import { vector } from '@electric-sql/pglite-pgvector';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, readdir, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 export async function openLocalStore(directory, seed=false) {
@@ -8,8 +8,8 @@ export async function openLocalStore(directory, seed=false) {
   const exists=await db.query("select to_regclass('public.tb_videos') as name");
   if(!exists.rows[0].name) {
     await db.exec("create schema if not exists extensions; create schema if not exists storage; create role anon; create role authenticated; create role service_role; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);");
-    await db.exec(await readFile(new URL('../supabase/migrations/202609230001_board.sql',import.meta.url),'utf8'));
   }
+  await migrate(db,Boolean(exists.rows[0].name));
   const store=new LocalStore(db);
   if(seed) {
     const count=await db.query('select count(*)::integer as n from tb_videos');
@@ -37,20 +37,37 @@ export async function openLocalStore(directory, seed=false) {
   return store;
 }
 
+// Applies each supabase/migrations file once, in order, like `supabase db push`.
+async function migrate(db,existing) {
+  const folder=new URL('../supabase/migrations/',import.meta.url);
+  const files=(await readdir(folder)).filter(f=>f.endsWith('.sql')).sort();
+  const tracked=await db.query("select to_regclass('public.tb_local_migrations') as name");
+  await db.exec('create table if not exists public.tb_local_migrations(name text primary key)');
+  // Local databases created before migration tracking already contain the first one.
+  if(existing&&!tracked.rows[0].name) await db.query('insert into public.tb_local_migrations values($1)',[files[0]]);
+  const applied=new Set((await db.query('select name from public.tb_local_migrations')).rows.map(v=>v.name));
+  for(const file of files.filter(f=>!applied.has(f))) {
+    await db.transaction(async tx=>{
+      await tx.exec(await readFile(new URL(file,folder),'utf8'));
+      await tx.query('insert into public.tb_local_migrations values($1)',[file]);
+    });
+  }
+}
+
 class LocalStore {
   constructor(db){this.db=db;}
   async rpc(name,args){
-    const names={tb_save:['items','mode','destination'],tb_delete:['ids'],tb_decide:['ids','destination'],tb_claim_jobs:['batch_size'],tb_collect:['candidates','history','max_size'],tb_register_image:['vid','patch'],tb_match:['query_embedding','match_count','include_own','include_discovery'],tb_block_channel:['channel_id','channel_name']};
+    const names={tb_save:['items','mode','destination'],tb_delete:['ids'],tb_decide:['ids','destination'],tb_claim_jobs:['batch_size'],tb_collect:['candidates','history','max_size'],tb_register_image:['vid','patch'],tb_match:['query_embedding','match_count','include_own','include_discovery','match_model'],tb_discovery_queue_for:['current_model'],tb_block_channel:['channel_id','channel_name']};
     if(!names[name])throw new Error('Unknown local RPC');
     const keys=names[name];
     const values=keys.map(k=>['items','candidates','history','patch','query_embedding'].includes(k)?JSON.stringify(args[k]):args[k]);
-    const setReturning=['tb_claim_jobs','tb_match'].includes(name);
+    const setReturning=['tb_claim_jobs','tb_match','tb_discovery_queue_for'].includes(name);
     const query=setReturning?`select * from public.${name}(${keys.map((_,i)=>'$'+(i+1))})`:`select public.${name}(${keys.map((_,i)=>'$'+(i+1))}) as result`;
     const result=await this.db.query(query,values);
     return setReturning?result.rows:result.rows[0].result;
   }
   async list(status){return (await this.db.query('select id,data from tb_videos where status=$1 and deleted_at is null order by position',[status])).rows.map(v=>({...v.data,id:v.id}));}
-  async discoveryQueue(){return (await this.db.query('select data from tb_discovery_queue limit 100')).rows.map(v=>v.data);}
+  async discoveryQueue(model='gte-small'){return (await this.rpc('tb_discovery_queue_for',{current_model:model})).map(v=>v.data);}
   async allIds(){return (await this.db.query('select id from tb_videos')).rows;}
   async get(id){return (await this.db.query('select * from tb_videos where id=$1',[id])).rows[0]||null;}
   save(items,mode='add',destination='board'){return this.rpc('tb_save',{items,mode,destination});}
@@ -76,12 +93,12 @@ class LocalStore {
     await writeFile(resolve('.local/images',hash+'.jpg'),bytes);
     return '/local-images/'+hash+'.jpg';
   }
-  async upsertEmbedding(id,embedding,metadata,source='board'){
-    await this.db.query('insert into tb_embeddings(video_id,embedding,metadata,source) values($1,$2,$3,$4) on conflict(video_id) do update set embedding=excluded.embedding,metadata=excluded.metadata,source=excluded.source',[id,JSON.stringify(embedding),JSON.stringify(metadata),source]);
+  async upsertEmbedding(id,embedding,metadata,source='board',model='gte-small'){
+    await this.db.query('insert into tb_embeddings(video_id,embedding,metadata,source,model) values($1,$2,$3,$4,$5) on conflict(video_id) do update set embedding=excluded.embedding,metadata=excluded.metadata,source=excluded.source,model=excluded.model,updated_at=now()',[id,JSON.stringify(embedding),JSON.stringify(metadata),source,model]);
   }
-  async getEmbedding(id){return (await this.db.query('select embedding,metadata from tb_embeddings where video_id=$1',[id])).rows[0];}
-  async match(vector,body){
-    const rows=await this.rpc('tb_match',{query_embedding:vector,match_count:body.topK||12,include_own:body.includeOwnChannels!==false,include_discovery:body.includeDiscovery!==false});
+  async getEmbedding(id){return (await this.db.query('select embedding,metadata,model from tb_embeddings where video_id=$1',[id])).rows[0];}
+  async match(vector,body,model=null){
+    const rows=await this.rpc('tb_match',{query_embedding:vector,match_count:body.topK||12,include_own:body.includeOwnChannels!==false,include_discovery:body.includeDiscovery!==false,match_model:model});
     return rows.map(v=>({...v.data,...v.metadata,id:v.id,score:v.score,source:v.source}));
   }
 }

@@ -26,7 +26,7 @@ export class SupabaseStore {
     const rows = await this.rows(`select=id,data&status=eq.${status}&deleted_at=is.null`);
     return rows.map(row => ({...row.data, id:row.id}));
   }
-  discoveryQueue() { return this.rest('tb_discovery_queue?select=data&limit=100').then(rows=>rows.map(v=>v.data)); }
+  discoveryQueue(model='gte-small') { return this.rpc('tb_discovery_queue_for',{current_model:model}).then(rows=>rows.map(v=>v.data)); }
   allIds() { return this.rows('select=id'); }
   async get(id) { return (await this.rest(`tb_videos?select=*&id=eq.${encodeURIComponent(id)}&limit=1`))[0] || null; }
   save(items, mode='add', destination='board') { return this.rpc('tb_save',{items,mode,destination}); }
@@ -67,12 +67,12 @@ export class SupabaseStore {
     }
     return `${this.url}/storage/v1/object/public/thumbnails/${path}`;
   }
-  async upsertEmbedding(id, embedding, metadata, source='board') {
-    return this.rest('tb_embeddings?on_conflict=video_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({video_id:id,embedding,metadata,source,model:'gte-small',updated_at:new Date().toISOString()})});
+  async upsertEmbedding(id, embedding, metadata, source='board', model='gte-small') {
+    return this.rest('tb_embeddings?on_conflict=video_id',{method:'POST',headers:{Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({video_id:id,embedding,metadata,source,model,updated_at:new Date().toISOString()})});
   }
-  async getEmbedding(id) { return (await this.rest(`tb_embeddings?video_id=eq.${encodeURIComponent(id)}&select=embedding,metadata`))[0]; }
-  async match(vector, body) {
-    const rows = await this.rpc('tb_match',{query_embedding:vector,match_count:Math.min(50,Math.max(1,Number(body.topK)||12)),include_own:body.includeOwnChannels!==false,include_discovery:body.includeDiscovery!==false});
+  async getEmbedding(id) { return (await this.rest(`tb_embeddings?video_id=eq.${encodeURIComponent(id)}&select=embedding,metadata,model`))[0]; }
+  async match(vector, body, model=null) {
+    const rows = await this.rpc('tb_match',{query_embedding:vector,match_count:Math.min(50,Math.max(1,Number(body.topK)||12)),include_own:body.includeOwnChannels!==false,include_discovery:body.includeDiscovery!==false,match_model:model});
     return rows.map(row=>({...row.data,...row.metadata,id:row.id,score:row.score,source:row.source}));
   }
 }
