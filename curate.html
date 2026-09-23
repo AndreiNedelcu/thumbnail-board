@@ -175,7 +175,7 @@ function render() {
         <img loading="lazy" src="https://img.youtube.com/vi/${esc(c.id)}/maxresdefault.jpg"
           onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${esc(c.id)}/mqdefault.jpg'">
         <div class="badge"></div>
-        <div class="reject-btn" onclick="event.stopPropagation();rejectCard('${esc(c.id)}')" title="Reject">
+        <div class="reject-btn" onclick="event.stopPropagation();rejectCard('${esc(c.id)}')" aria-label="Reject">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </div>
         <div class="meta">

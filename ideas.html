@@ -387,7 +387,7 @@
 <!-- Lightbox -->
 <div class="lb-overlay" id="lb" onclick="if(event.target===this) closeLightbox()">
   <div class="lb-container">
-    <button class="lb-close" onclick="closeLightbox()" title="Close (Esc)">
+    <button class="lb-close" onclick="closeLightbox()" aria-label="Close (Esc)">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
     </button>
     <div class="lb-thumb">
@@ -491,7 +491,7 @@ function render(results) {
   meta.textContent = `${results.length} matches · sorted by similarity`;
 
   grid.innerHTML = results.map((r, i) => `
-    <div class="card" onclick="openLightbox(${i})" title="Click to preview · double-click area on bottom-right for actions">
+    <div class="card" onclick="openLightbox(${i})" aria-label="Click to preview · double-click area on bottom-right for actions">
       <div class="thumb">
         ${TBBoard.imageMarkup(r)}
         <div class="score-badge ${scoreClass(r.score)}">${scorePct(r.score)}<span class="pct">%</span></div>
@@ -577,7 +577,7 @@ async function loadRelated(id) {
     root.innerHTML = `<div class="lb-related-grid">${d.results.map(rel => `
       <div class="lb-related-card" onclick='openLightbox(${JSON.stringify({
         id: rel.id, title: rel.title, channel: rel.channel, is_own: rel.is_own, thumbnailUrl: rel.thumbnailUrl, tags: rel.tags
-      }).replace(/'/g, "&#39;")})' title="${esc(rel.title)}">
+      }).replace(/'/g, "&#39;")})' aria-label="${esc(rel.title)}">
         <div class="lb-related-thumb">
           ${TBBoard.imageMarkup(rel,true)}
         </div>

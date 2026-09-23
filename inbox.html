@@ -335,7 +335,7 @@
       <option value="views">Sort: views ↓</option>
     </select>
     <button class="toggle" id="hcToggle" onclick="toggleHc()">High confidence only</button>
-    <select class="select" id="minScoreSel" title="Minimum outlier score for new candidates">
+    <select class="select" id="minScoreSel" aria-label="Minimum outlier score for new candidates">
       <option value="">Default (config)</option>
       <option value="1.2">x ≥ 1.2 · loose</option>
       <option value="1.5">x ≥ 1.5</option>
@@ -357,7 +357,7 @@
   <div class="commit-row">
     <div class="split-btn-group">
       <button class="commit-btn" id="processBtn" onclick="processSelection(false)">Process selection</button>
-      <button class="split-caret" id="splitCaretBtn" onclick="toggleSplitMenu(event)" title="More options" aria-label="More options">
+      <button class="split-caret" id="splitCaretBtn" onclick="toggleSplitMenu(event)" aria-label="More options">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
       <div class="split-btn-menu" id="splitMenu">
@@ -463,7 +463,7 @@ function render() {
       <div class="card ${cls}" data-id="${esc(it.id)}"
            onclick="toggle('${esc(it.id)}')"
            oncontextmenu="return rightClickReject(event, '${esc(it.id)}')"
-           title="Left-click: keep · Right-click: reject">
+           aria-label="Left-click: keep · Right-click: reject">
         <div class="thumb">
           ${TBBoard.imageMarkup(it)}
           <div class="keep-tick"></div>
@@ -471,7 +471,7 @@ function render() {
           <a class="yt-link" href="https://www.youtube.com/watch?v=${esc(it.id)}" target="_blank" rel="noopener"
              onclick="event.stopPropagation()"
              oncontextmenu="event.stopPropagation()"
-             title="Open on YouTube">
+             aria-label="Open on YouTube">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </a>
         </div>
@@ -480,15 +480,15 @@ function render() {
             <div class="title">${esc(it.title)}</div>
             <div class="sub">
               <span class="channel-name">${channel}</span>
-              ${Number.isFinite(it.visualQuality) ? `<span title="AI suggestion · ${Math.round((it.visualConfidence||0)*100)}% confidence · needs review">Visual ${(it.visualQuality+1).toFixed(1)}/5</span>` : ''}
-              ${channelId ? `<button class="block-channel-btn" onclick="event.stopPropagation(); blockChannel('${channelId}', items.find(v => v.id === '${esc(it.id)}')?.channel || '')" oncontextmenu="event.stopPropagation()" title="Block all videos from ${channel}" aria-label="Block channel">
+              ${Number.isFinite(it.visualQuality) ? `<span aria-label="AI suggestion · ${Math.round((it.visualConfidence||0)*100)}% confidence · needs review">Visual ${(it.visualQuality+1).toFixed(1)}/5</span>` : ''}
+              ${channelId ? `<button class="block-channel-btn" onclick="event.stopPropagation(); blockChannel('${channelId}', items.find(v => v.id === '${esc(it.id)}')?.channel || '')" oncontextmenu="event.stopPropagation()" aria-label="Block channel">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
               </button>` : ''}
               ${views ? `<span class="dot">·</span><span>${views}</span>` : ''}
               ${age   ? `<span class="dot">·</span><span>${age}</span>` : ''}
             </div>
           </div>
-          <div class="score-badge ${scoreClass(it)}" title="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
+          <div class="score-badge ${scoreClass(it)}" aria-label="${esc(it.outlierConfidence)} confidence · baseline ${it.baselineVpd||0} v/d (n=${it.baselineN||0})">
             ${scoreLabel}
           </div>
         </div>
