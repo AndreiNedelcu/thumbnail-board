@@ -115,6 +115,8 @@
   .bar-btn:hover { color:var(--bright); border-color:var(--border-h); }
   .bar-btn.primary { background:var(--bright); color:#0d1117; border-color:transparent; }
   .bar-btn.primary:hover { background:#dfe9f2; }
+  .bar-btn.primary.danger, .bar-btn.primary.danger:hover { background:var(--red); color:#fff; }
+  .block-channel-btn.armed { opacity:1 !important; color:var(--red); background:rgba(233,69,96,0.14); }
   .bar-btn:disabled { opacity:.5; cursor:wait; }
   .bar-btn[hidden] { display:none; }
   body.waiting-view .card { cursor:default; }
@@ -415,9 +417,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu();
 async function publishWaiting() {
   const chosen = waiting.filter(v => decisions.get(v.id) === 'keep').map(v => v.id);
   const ids = chosen.length ? chosen : waiting.map(v => v.id);
-  if (!chosen.length && !confirm(`Publish all ${ids.length} waiting thumbnails to the board without tags?`)) return;
   if (!ids.length) return;
   const btn = document.getElementById('processBtn');
+  if (!chosen.length && !armed(btn, `Click again to publish all ${ids.length}`)) return;
   btn.disabled = true;
   try {
     const d = await TBApi.request('/api/pending/publish', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
@@ -490,7 +492,7 @@ function render() {
             <div class="sub">
               <span class="channel-name">${channel}</span>
               ${Number.isFinite(it.visualQuality) ? `<span aria-label="AI suggestion · ${Math.round((it.visualConfidence||0)*100)}% confidence · needs review">Visual ${(it.visualQuality+1).toFixed(1)}/5</span>` : ''}
-              ${channelId ? `<button class="block-channel-btn" onclick="event.stopPropagation(); blockChannel('${channelId}', items.find(v => v.id === '${esc(it.id)}')?.channel || '')" oncontextmenu="event.stopPropagation()" aria-label="Block channel">
+              ${channelId ? `<button class="block-channel-btn" onclick="event.stopPropagation(); blockChannel(this, '${channelId}', items.find(v => v.id === '${esc(it.id)}')?.channel || '')" oncontextmenu="event.stopPropagation()" aria-label="Block channel">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg>
               </button>` : ''}
               ${views ? `<span class="dot">·</span><span>${views}</span>` : ''}
@@ -509,6 +511,8 @@ function render() {
 
 // Select the ones you like; everything else is discarded when you apply.
 function toggle(id) {
+  const btn = document.getElementById('processBtn');
+  delete btn.dataset.armed; btn.classList.remove('danger');
   if (decisions.get(id) === 'keep') decisions.delete(id);
   else decisions.set(id, 'keep');
   refreshCard(id);
@@ -554,6 +558,17 @@ function updateStats() {
 }
 
 
+// Browsers can silently suppress confirm() dialogs, so destructive actions ask
+// on the button itself: the first click arms it, a second click within 4 s runs it.
+function armed(btn, label) {
+  if (btn.dataset.armed === '1') { delete btn.dataset.armed; clearTimeout(btn._disarm); btn.classList.remove('danger'); return true; }
+  btn.dataset.armed = '1';
+  btn.textContent = label;
+  btn.classList.add('danger');
+  btn._disarm = setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('danger'); updateStats(); }, 4000);
+  return false;
+}
+
 async function doProcess() {
   const destination = 'board';
   // Only candidates shown on this page are decided; new ones collected in the
@@ -561,9 +576,8 @@ async function doProcess() {
   const keptIds     = items.filter(it => decisions.get(it.id) === 'keep').map(it => it.id);
   const rejectedIds = items.filter(it => decisions.get(it.id) !== 'keep').map(it => it.id);
   if (!items.length) return;
-  if (!keptIds.length && !confirm(`Discard all ${rejectedIds.length} candidates?`)) return;
-
   const btn = document.getElementById('processBtn');
+  if (!keptIds.length && !armed(btn, `Click again to discard ${rejectedIds.length}`)) return;
   btn.disabled = true;
   const oldLabel = btn.textContent;
   btn.textContent = 'Saving…';
@@ -605,10 +619,15 @@ async function doProcess() {
   }
 }
 
-async function blockChannel(channelId, channelName) {
+async function blockChannel(btn, channelId, channelName) {
   if (!channelId) { toast('Sin channelId, no se puede bloquear', 'error'); return; }
   const niceName = channelName || channelId;
-  if (!confirm(`Bloquear "${niceName}"?\n\nNo volverá a aparecer en el inbox y los items actuales de ese canal se descartan.`)) return;
+  if (btn.dataset.armed !== '1') {
+    btn.dataset.armed = '1'; btn.classList.add('armed');
+    toast(`Click the icon again to block ${niceName}`);
+    setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('armed'); }, 4000);
+    return;
+  }
   try {
     const r = await TBApi.fetch('/api/inbox/block-channel', {
       method:'POST',
