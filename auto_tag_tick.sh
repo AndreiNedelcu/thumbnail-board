@@ -51,7 +51,7 @@ from board_data import load_board_file
 pending = load_board_file(Path('eagle-pending.json'), '/api/pending')
 board = load_board_file(Path('data.json'), '/api/data')
 done = {v['id'] for v in board}
-print(sum(1 for p in pending if p['id'] not in done))
+print(sum(1 for p in pending if p['id'] not in done) + sum(1 for v in board if not v.get('tags')))
 ")
 if [ "$todo" -eq 0 ]; then
   exit 0   # silent no-op; no log spam every 10 min

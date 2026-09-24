@@ -110,6 +110,29 @@ asset backup (or another independent copy) in addition to database backups.
 Records and images use separate lifetimes: board deletion leaves image bytes in
 Storage, and a deletion tombstone prevents scraper/tagger resurrection.
 
+## Speed and inbox approvals (September 2026)
+
+- Pages render immediately from the last board copy saved in the browser and
+  refresh in the background; `/api/data` is one database query (`tb_list`) and is
+  revalidated with an ETag. Cards are reused, so saving, sorting, filtering and
+  refreshing never reload images. Grids load YouTube's light 480px image first
+  and fall back to the archived copy; full views prefer the archived image.
+  New archive uploads are marked immutable for browser caching.
+- Inbox "Apply" now sends kept candidates straight to the board (previously the
+  default sent them to `pending`, waiting for the Mac tagger). Approved items go
+  to the end of the board, so "Recent" shows them first. The inbox's "Waiting for
+  tags" tab lists older approvals still in `pending` and can publish them.
+- The Mac tagger (`auto_tag_tick.sh`) also tags untagged board items through
+  `/api/tag-untagged`, which only writes when the item still has no tags.
+  Its launchd job must export the NEW `TB_AUTH_TOKEN`; with the old Cloudflare
+  token it cannot read `/api/pending` and silently does nothing.
+
+Deploy order: `npx supabase db push` (migration `202609240002`), then
+`npx supabase functions deploy board-api --project-ref PROJECT_REF --use-api`,
+then publish the frontend (merge to `main`). The old function keeps working with
+the new migration; the new frontend works with the old function except the
+"Waiting for tags" publish button.
+
 ## Collector and tagging
 
 `scrape_sources.json` has rotating niche and cross-topic search groups, rotating
@@ -134,6 +157,64 @@ sort by visual quality after review. Unscored items remain available. This adapt
 is tested with synthetic responses; real accuracy, costs and calibration need a
 small reviewed sample before expanding usage. A typed response does not guarantee
 correct visual interpretation.
+
+### Evaluating Jev before use (THE-61)
+
+The request/response shapes were checked against the published docs (September
+2026): `POST https://api.typesafe.ai/v1/systemone`, model `jev-latest`, Noul answers
+in `answers.<tag>.noul`, Score criteria as an ordered array of 2–10 levels with
+`score` and `confidence`. Jev is text-only, so image understanding stays in Ollama.
+Before running `review-inbox.py`, evaluate a small sample. It is read-only:
+
+```sh
+python3 tools/jev-eval.py --limit 10                 # board: tags vs approved tags
+python3 tools/jev-eval.py --source inbox --limit 10  # candidates: judge by eye
+```
+
+It writes `.local/jev-eval/<time>/report.html` and `report.json`: precision/recall
+against approved visual tags (channel tags excluded), most frequent wrong/missed
+tags, token use and estimated cost. With TB_AUTH_TOKEN the board sample is half
+Saved: if Saved items do not score higher, the visual score is not reflecting our
+taste and must not be used to rank the inbox. Outlier score is not an input.
+
+## Multilingual search (THE-63)
+
+Native `gte-small` is English-centred; Spanish queries against English summaries
+and transcripts are imprecise. The API can instead use any OpenAI-compatible
+embeddings endpoint that honours `dimensions: 384` (for example OpenAI
+`text-embedding-3-small`), keeping the pgvector schema and every summary and
+transcript. Each vector records its model; search, related results and the
+discovery queue only use vectors from the active model, so a partial reindex never
+mixes vector spaces. Without `EMBEDDING_*` secrets the API keeps using gte-small.
+Summaries/transcripts are sent to that provider when indexing.
+
+Compare before switching production (read-only baseline, then a local candidate):
+
+```sh
+node --env-file=.env.migration tools/search-eval.mjs      # current gte-small baseline
+# Local candidate: separate PGlite database, production untouched
+EMBEDDING_API_URL=https://api.openai.com/v1/embeddings EMBEDDING_API_KEY=… \
+  EMBEDDING_MODEL=text-embedding-3-small TB_DEV_TOKEN=local-only npm run dev
+TB_API_URL=http://127.0.0.1:8080 TB_AUTH_TOKEN=local-only python3 build_embeddings.py
+TB_API_URL=http://127.0.0.1:8080 TB_AUTH_TOKEN=local-only node tools/search-eval.mjs
+node tools/search-eval.mjs --compare .local/search-eval/A.json .local/search-eval/B.json
+```
+
+Put the key in a private env file rather than the shell history. Queries live in
+`tools/search-eval-queries.json` (Spanish/English pairs); replace them with real
+searches. `overlap@10` measures how many Spanish results match the English twin;
+the comparison also prints titles for a human relevance check.
+
+To switch production after a better result:
+1. `npx supabase db push` (applies `202609240001_embedding_model.sql`; the current
+   function keeps working with it). Deploy the function only after this.
+2. Add `EMBEDDING_API_URL`, `EMBEDDING_API_KEY`, `EMBEDDING_MODEL` to `.env.edge`,
+   `npx supabase secrets set --env-file .env.edge --project-ref PROJECT_REF`, then
+   deploy `board-api`. `/api/health` reports `features.embeddingModel`.
+3. Run `python3 build_embeddings.py` (a new manifest per model re-embeds everything
+   from existing summaries/transcripts) and `python3 enrich_discovery.py`. Search
+   returns only reindexed items until this finishes (minutes for ~2,200 items).
+Rollback: remove the three secrets, redeploy and reindex with gte-small.
 
 Sources: [Jev quick start](https://docs.typesafe.ai/introduction/quickstart),
 [Supabase deployment](https://supabase.com/docs/guides/functions/deploy),

@@ -68,9 +68,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         FEEDBACK_FILE.write_text(json.dumps(fb, ensure_ascii=False, indent=2))
 
     def _handle_approve(self, entry):
-        payload = json.dumps(entry).encode()
+        # Items already on the board (approved untagged from the inbox) only get
+        # tags, and only if nobody tagged them by hand in the meantime.
+        untagged = entry.get("untagged_board")
+        body = {"items": [{"id": entry["id"], "tags": entry.get("tags", [])}]} if untagged else entry
+        payload = json.dumps(body).encode()
         req = urllib.request.Request(
-            f"{WORKER_URL}/api/add",
+            f"{WORKER_URL}/api/tag-untagged" if untagged else f"{WORKER_URL}/api/add",
             data=payload,
             headers={
                 "Content-Type": "application/json",

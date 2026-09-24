@@ -5,14 +5,19 @@ import { randomBytes } from 'node:crypto';
 import { resolve, extname } from 'node:path';
 import { openLocalStore } from './local-store.mjs';
 import { createHandler } from '../supabase/functions/_shared/api.mjs';
+import { createEmbedder } from '../supabase/functions/_shared/embeddings.mjs';
 
 await mkdir('.local',{recursive:true});
 const store=await openLocalStore('.local/database',true);
-const token=randomBytes(32).toString('hex');
+// TB_DEV_TOKEN lets local scripts (build_embeddings.py, search-eval.mjs) use this
+// localhost-only preview. Never reuse the production token here.
+const token=process.env.TB_DEV_TOKEN||randomBytes(32).toString('hex');
 const port=Number(process.env.PORT||8080);
 const allowed=new Set([`127.0.0.1:${port}`,`localhost:${port}`]);
-const handler=createHandler({store,authToken:token,youtubeKey:process.env.YOUTUBE_API_KEY,
-  embed:async()=>{throw new Error('Semantic search requires the Supabase AI runtime.');}});
+// Local semantic search works only with an API provider (EMBEDDING_* env vars);
+// native gte-small exists only in the Supabase Edge runtime.
+const embedder=createEmbedder(process.env,()=>{throw new Error('Semantic search requires the Supabase AI runtime or EMBEDDING_API_URL.');});
+const handler=createHandler({store,authToken:token,youtubeKey:process.env.YOUTUBE_API_KEY,embed:embedder.embed,embeddingModel:embedder.model});
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg'};
 createServer(async(req,res)=>{
   if(!allowed.has(req.headers.host)){res.writeHead(403).end();return;}
