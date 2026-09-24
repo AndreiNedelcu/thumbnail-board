@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse, base64, json, os, random, re, sys, time
 from pathlib import Path
 from urllib.request import urlopen, Request
+from urllib.error import HTTPError
 
 ROOT = Path(__file__).parent
 PENDING_FILE   = ROOT / "eagle-pending.json"
@@ -200,6 +201,11 @@ def build_taxonomy_str() -> str:
 # Computed at runtime in main() AFTER discover_custom_tags
 TAXONOMY_STR = ""
 
+def _ollama_generate(payload: dict) -> dict:
+    req = Request(OLLAMA_URL, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
+    with urlopen(req, timeout=180) as r:
+        return json.loads(r.read())
+
 def call_ollama(model: str, image_b64: str, title: str,
                 positive: list, corrections: list) -> list:
     """Call Ollama with the image + prompt. Returns list of tag strings."""
@@ -230,10 +236,15 @@ def call_ollama(model: str, image_b64: str, title: str,
         "format": "json",
         "options": {"temperature": 0.2}
     }
-    body = json.dumps(payload).encode()
-    req = Request(OLLAMA_URL, data=body, headers={"Content-Type":"application/json"})
-    with urlopen(req, timeout=120) as r:
-        resp = json.loads(r.read())
+    # Reasoning models (e.g. qwen3.5) would spend minutes "thinking" per image;
+    # tagging only needs the JSON answer. Older Ollama/models reject the flag,
+    # so retry without it.
+    try:
+        resp = _ollama_generate({**payload, "think": False})
+    except HTTPError as e:
+        if e.code != 400:
+            raise
+        resp = _ollama_generate(payload)
     raw = resp.get("response", "").strip()
     # Try to parse as JSON
     try:
@@ -258,7 +269,8 @@ def main():
     ap.add_argument("--resume", action="store_true", default=True,
                     help="Skip items already in pending_review.json (default on)")
     ap.add_argument("--tagger", choices=["ollama", "jev"], default="ollama")
-    ap.add_argument("--model", default="qwen2.5vl:7b")
+    ap.add_argument("--model", default=os.environ.get("TB_TAG_MODEL", "qwen2.5vl:7b"),
+                    help="Ollama vision model (default: $TB_TAG_MODEL or qwen2.5vl:7b)")
     ap.add_argument("--auto-approve", action="store_true", dest="auto_approve",
                     help="Publish directly to the board if AI output passes sanity checks. "
                          "Items that fail checks still go to pending_review.json.")

@@ -122,7 +122,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--source", choices=["board", "inbox"], default="board")
     ap.add_argument("--limit", type=int, default=10)
-    ap.add_argument("--model", default="qwen2.5vl:7b")
+    ap.add_argument("--model", default=os.environ.get("TB_TAG_MODEL", "qwen2.5vl:7b"))
     ap.add_argument("--threshold", type=float, default=0.8)
     ap.add_argument("--seed", type=int, default=61)
     args = ap.parse_args()

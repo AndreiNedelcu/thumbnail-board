@@ -12,7 +12,7 @@ from jev_tagger import analyze_thumbnail, post_json
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--limit',type=int,default=10)
-parser.add_argument('--model',default='qwen2.5vl:7b')
+parser.add_argument("--model",default=os.environ.get("TB_TAG_MODEL","qwen2.5vl:7b"))
 args=parser.parse_args()
 api=os.environ.get('TB_API_URL','').rstrip('/')
 token=os.environ.get('TB_AUTH_TOKEN','')

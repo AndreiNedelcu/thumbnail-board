@@ -103,3 +103,11 @@ To start fresh:
 ```bash
 rm pending_review.json auto_tag_feedback.json auto_tag_skip.json pending_rejected.json
 ```
+
+## Choosing the vision model
+
+`auto_tag.py`, `tools/review-inbox.py` and `tools/jev-eval.py` use `$TB_TAG_MODEL`
+(default `qwen2.5vl:7b`). The model must support images: check that
+`ollama show <model>` lists `vision` under Capabilities. Reasoning is disabled
+for tagging (`think: false`) so models such as `qwen3.5` answer in seconds.
+Set `TB_TAG_MODEL` in the launchd plist to change the scheduled tagger.
