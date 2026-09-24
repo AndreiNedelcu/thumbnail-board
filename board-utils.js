@@ -14,14 +14,14 @@
       return ['https:', 'http:'].includes(url.protocol) ? value : '';
     } catch { return ''; }
   }
-  // Grids (small) load YouTube's light 480px image first (~25 KB, fast CDN) and
-  // fall back to our archived copy, so a video removed from YouTube still shows.
-  // Full views (lightbox, copy) prefer the archived full-size image.
+  // Grids (small) load YouTube's full-resolution image first (fast CDN, as the
+  // board did before) and fall back to our archived copy, so a video removed
+  // from YouTube still shows. Full views (lightbox, copy) prefer the archive.
   function imageSources(video, small = false) {
     const saved = safeUrl(video.thumbnailUrl || video.thumbnail_url || video.imageUrl);
     const valid = /^[\w-]{11}$/.test(video.id || '');
     const yt = q => valid ? `https://img.youtube.com/vi/${video.id}/${q}.jpg` : '';
-    const order = small ? [yt('hqdefault'), saved, yt('mqdefault')]
+    const order = small ? [yt('maxresdefault'), saved, yt('hqdefault'), yt('mqdefault')]
       : [saved, yt('maxresdefault'), yt('hqdefault'), yt('mqdefault'), yt('default')];
     return [...new Set(order.filter(Boolean))];
   }

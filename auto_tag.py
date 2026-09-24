@@ -274,6 +274,10 @@ def main():
     ap.add_argument("--auto-approve", action="store_true", dest="auto_approve",
                     help="Publish directly to the board if AI output passes sanity checks. "
                          "Items that fail checks still go to pending_review.json.")
+    ap.add_argument("--publish-all", action="store_true", dest="publish_all",
+                    help="Unattended mode: publish every tagged item (no review queue), "
+                         "flush items left in pending_review.json and publish untaggable "
+                         "items untagged, so nothing waits forever. Implies --auto-approve.")
     ap.add_argument("--min-tags", type=int, default=3,
                     help="Minimum tags for auto-approve (default 3)")
     ap.add_argument("--max-tags", type=int, default=10,
@@ -282,6 +286,8 @@ def main():
                     help="In --auto-approve mode, send N items per /api/add-batch call. "
                          "Default 20. Reduces GitHub Pages build pressure.")
     args = ap.parse_args()
+    if args.publish_all:
+        args.auto_approve = True
     if args.limit and not args.batch:
         args.batch = args.limit
 
@@ -323,6 +329,23 @@ def main():
     if args.batch > 0:
         todo = todo[:args.batch]
 
+    # Unattended: items an earlier run left for manual review are published
+    # with the tags already proposed, if they are still waiting.
+    stale_review = []
+    if args.publish_all:
+        waiting_ids = {p["id"] for p in pending if p["id"] not in published}
+        untagged_ids = {v["id"] for v in board if not v.get("tags")}
+        for r in review:
+            if r.get("tags") and (r["id"] in waiting_ids or r["id"] in untagged_ids):
+                stale_review.append({**r, **({"untagged_board": True} if r["id"] in untagged_ids else {})})
+        if stale_review:
+            print(f"♻️  Publishing {len(stale_review)} items left in {REVIEW_FILE.name}")
+        # Entries already published and tagged elsewhere are obsolete.
+        tagged = {v["id"] for v in board if v.get("tags")}
+        if any(r["id"] in tagged for r in review):
+            current = json.loads(REVIEW_FILE.read_text())
+            REVIEW_FILE.write_text(json.dumps([r for r in current if r["id"] not in tagged], ensure_ascii=False, indent=2))
+
     print(f"📊 Total pending: {len([p for p in pending if p['id'] not in done_ids and p['id'] not in skip])}")
     print(f"   In queue for review: {len(review)} | Published: {len(published)} | Skipped: {len(skip)}")
     print(f"   Feedback entries (used for learning): {len(feedback)}")
@@ -332,6 +355,7 @@ def main():
     t0 = time.time()
     fails = 0
     pending_batch = []  # accumulated entries waiting for batch commit
+    untaggable = []     # pending items the model could not tag (published untagged)
 
     def flush_batch(batch, token):
         if not batch: return
@@ -359,6 +383,13 @@ def main():
                     current.append(e)
             REVIEW_FILE.write_text(json.dumps(current, ensure_ascii=False, indent=2))
 
+    if stale_review:
+        # Leave the review queue first; flush_batch puts back any that fail.
+        flushed = {e["id"] for e in stale_review}
+        current = json.loads(REVIEW_FILE.read_text()) if REVIEW_FILE.exists() else []
+        REVIEW_FILE.write_text(json.dumps([r for r in current if r["id"] not in flushed], ensure_ascii=False, indent=2))
+        flush_batch(stale_review, auth_token)
+
     for i, item in enumerate(todo, 1):
         vid = item["id"]
         title = item.get("title","")
@@ -370,6 +401,7 @@ def main():
         img_b64 = download_thumb_b64(vid, item.get("thumbnailUrl", ""))
         if not img_b64:
             print(f"           ⚠ thumbnail not available (private/deleted) — skipping")
+            if args.publish_all and not item.get("untagged_board"): untaggable.append(vid)
             skip.add(vid)
             SKIP_FILE.write_text(json.dumps(sorted(skip)))
             fails += 1
@@ -391,6 +423,7 @@ def main():
 
         if not tags:
             print(f"           ⚠ no valid tags returned — skipping")
+            if args.publish_all and not item.get("untagged_board"): untaggable.append(vid)
             skip.add(vid)
             SKIP_FILE.write_text(json.dumps(sorted(skip)))
             fails += 1
@@ -410,7 +443,7 @@ def main():
         }
 
         if args.auto_approve:
-            ok, reason = looks_confident(tags, args.min_tags, args.max_tags)
+            ok, reason = (True, "") if args.publish_all else looks_confident(tags, args.min_tags, args.max_tags)
             if ok:
                 # Accumulate in batch buffer — flushed below when full or at end
                 pending_batch.append(entry)
@@ -439,6 +472,9 @@ def main():
     if args.auto_approve and pending_batch:
         flush_batch(pending_batch, auth_token)
         pending_batch.clear()
+    if untaggable:
+        ok, msg = _post_worker("/api/pending/publish", {"ids": untaggable}, auth_token)
+        print(f"   {'📤' if ok else '❌'} {len(untaggable)} untaggable items published without tags: {msg}")
 
     if args.auto_approve:
         pub_count = len(json.loads(AUTO_PUBLISHED_FILE.read_text())) if AUTO_PUBLISHED_FILE.exists() else 0

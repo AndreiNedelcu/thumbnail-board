@@ -298,7 +298,7 @@
     <button class="tab" id="tabWaiting" role="tab" aria-selected="false" onclick="setView('waiting')" hidden>Waiting for tags <span class="tab-count" id="countWaiting"></span></button>
   </div>
   <div class="spacer"></div>
-  <span class="hint" id="hint">Click to keep · right-click to reject</span>
+  <span class="hint" id="hint">Pick the ones you like · the rest are discarded</span>
   <select class="select" id="sortSel" onchange="setSort(this.value)" aria-label="Sort">
     <option value="score">Outlier score</option>
     <option value="visual">Visual quality (AI)</option>
@@ -310,10 +310,6 @@
       <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
     </button>
     <div class="menu" id="menu" onclick="event.stopPropagation()">
-      <button onclick="keepAll()">Keep all shown</button>
-      <button onclick="rejectAll()">Reject all shown</button>
-      <hr>
-      <label class="menu-check"><input type="checkbox" id="hcToggle" onchange="toggleHc(this.checked)"> High confidence only</label>
       <label class="menu-field">Collector min. outlier
         <select id="minScoreSel">
           <option value="">default</option>
@@ -353,7 +349,6 @@ let waiting = [];                      // approved earlier, still in the tagging
 let view = 'candidates';
 const decisions = new Map();           // id → "keep" | "reject"
 let sortMode = 'score';
-let hcOnly = false;
 
 function esc(s) {
   return String(s||'').replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
@@ -436,7 +431,6 @@ async function publishWaiting() {
 function filteredSorted() {
   if (view === 'waiting') return waiting.slice().reverse();   // newest approvals first
   let list = items.slice();
-  if (hcOnly) list = list.filter(it => it.outlierConfidence === 'high');
   if (sortMode === 'visual') list.sort((a,b) => (b.visualQuality ?? -1) - (a.visualQuality ?? -1));
   else if (sortMode === 'score') list.sort((a,b) => (b.outlierScore||0) - (a.outlierScore||0));
   else if (sortMode === 'recent') list.sort((a,b) => new Date(b.addedAt||0) - new Date(a.addedAt||0));
@@ -478,7 +472,7 @@ function render() {
     const age = ageLabel(it.ageDays);
     return `
       <div class="card ${cls}" data-id="${esc(it.id)}"
-           onclick="toggle('${esc(it.id)}')" ${waitingView ? '' : `oncontextmenu="return rightClickReject(event, '${esc(it.id)}')"`}>
+           onclick="toggle('${esc(it.id)}')">
         <div class="thumb">
           ${TBBoard.imageMarkup(it,true)}
           <div class="keep-tick"></div>
@@ -513,25 +507,12 @@ function render() {
   updateStats();
 }
 
+// Select the ones you like; everything else is discarded when you apply.
 function toggle(id) {
-  const cur = decisions.get(id);
-  if (!cur)               decisions.set(id, 'keep');
-  else if (cur === 'keep')   decisions.delete(id);
-  else if (cur === 'reject') decisions.set(id, 'keep');
+  if (decisions.get(id) === 'keep') decisions.delete(id);
+  else decisions.set(id, 'keep');
   refreshCard(id);
   updateStats();
-}
-function rejectCard(id) {
-  const cur = decisions.get(id);
-  if (cur === 'reject') decisions.delete(id);
-  else                  decisions.set(id, 'reject');
-  refreshCard(id);
-  updateStats();
-}
-function rightClickReject(e, id) {
-  e.preventDefault();
-  rejectCard(id);
-  return false;
 }
 
 function refreshCard(id) {
@@ -542,22 +523,16 @@ function refreshCard(id) {
   if (s === 'keep')   card.classList.add('kept');
   if (s === 'reject') card.classList.add('rejected');
 }
-function keepAll()   { closeMenu(); setView('candidates'); for (const it of filteredSorted()) decisions.set(it.id, 'keep');   render(); }
-function rejectAll() { closeMenu(); setView('candidates'); for (const it of filteredSorted()) decisions.set(it.id, 'reject'); render(); }
 function clearAll()  { decisions.clear(); render(); }
 
 function setSort(v)  { sortMode = v; render(); }
-function toggleHc(value) {
-  hcOnly = value;
-  render();
-}
 
 function updateStats() {
   const bar = document.getElementById('actionBar');
   const summary = document.getElementById('actionSummary');
   const processBtn = document.getElementById('processBtn');
   const clearBtn = document.getElementById('clearBtn');
-  document.getElementById('hint').textContent = view === 'waiting' ? 'Approved earlier, not yet on the board' : 'Click to keep · right-click to reject';
+  document.getElementById('hint').textContent = view === 'waiting' ? 'Approved earlier, not yet on the board' : 'Pick the ones you like · the rest are discarded';
   if (view === 'waiting') {
     const chosen = waiting.filter(v => decisions.get(v.id) === 'keep').length;
     summary.textContent = chosen ? `${chosen} selected` : `${waiting.length} waiting for the Mac tagger · click to choose`;
@@ -567,28 +542,26 @@ function updateStats() {
     bar.classList.toggle('show', waiting.length > 0);
     return;
   }
-  let kept=0, rejected=0;
-  for (const v of decisions.values()) { if (v==='keep') kept++; else if (v==='reject') rejected++; }
-  const parts = [];
-  if (kept) parts.push(`<b class="keep">${kept}</b> to board`);
-  if (rejected) parts.push(`<b class="reject">${rejected}</b> to reject`);
-  summary.innerHTML = parts.join(' · ');
-  processBtn.textContent = 'Apply';
+  const kept = items.filter(it => decisions.get(it.id) === 'keep').length;
+  const rest = items.length - kept;
+  summary.innerHTML = kept
+    ? `<b class="keep">${kept}</b> to the board · <b class="reject">${rest}</b> discarded`
+    : `Nothing selected · <b class="reject">${rest}</b> would be discarded`;
+  processBtn.textContent = kept ? `Add ${kept} · discard ${rest}` : `Discard all ${rest}`;
   processBtn.onclick = () => doProcess();
-  clearBtn.hidden = false;
-  bar.classList.toggle('show', kept + rejected > 0);
+  clearBtn.hidden = !kept;
+  bar.classList.toggle('show', items.length > 0);
 }
 
 
 async function doProcess() {
   const destination = 'board';
-  const entries = [...decisions.entries()];
-  const keptIds     = entries.filter(([_,v]) => v === 'keep').map(([k]) => k);
-  const rejectedIds = entries.filter(([_,v]) => v === 'reject').map(([k]) => k);
-  if (!keptIds.length && !rejectedIds.length) {
-    toast('Nothing selected', 'error');
-    return;
-  }
+  // Only candidates shown on this page are decided; new ones collected in the
+  // meantime stay in the inbox for next time.
+  const keptIds     = items.filter(it => decisions.get(it.id) === 'keep').map(it => it.id);
+  const rejectedIds = items.filter(it => decisions.get(it.id) !== 'keep').map(it => it.id);
+  if (!items.length) return;
+  if (!keptIds.length && !confirm(`Discard all ${rejectedIds.length} candidates?`)) return;
 
   const btn = document.getElementById('processBtn');
   btn.disabled = true;
@@ -616,7 +589,7 @@ async function doProcess() {
       });
       const d = await r.json();
       if (!r.ok || !d.ok) throw new Error(d.msg || `Reject failed (HTTP ${r.status})`);
-      messages.push(`Rejected ${d.moved ?? d.rejected}`);
+      messages.push(`${d.moved ?? d.rejected} discarded`);
     }
 
     toast(messages.join(' · '), 'success');

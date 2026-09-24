@@ -115,10 +115,12 @@ Storage, and a deletion tombstone prevents scraper/tagger resurrection.
 - Pages render immediately from the last board copy saved in the browser and
   refresh in the background; `/api/data` is one database query (`tb_list`) and is
   revalidated with an ETag. Cards are reused, so saving, sorting, filtering and
-  refreshing never reload images. Grids load YouTube's light 480px image first
-  and fall back to the archived copy; full views prefer the archived image.
+  refreshing never reload images. Grids load YouTube's full-resolution image
+  first and fall back to the archived copy; full views prefer the archived image.
   New archive uploads are marked immutable for browser caching.
-- Inbox "Apply" now sends kept candidates straight to the board (previously the
+- Inbox: select the candidates you like; one button adds them to the board and
+  discards every other candidate shown (only those loaded on the page).
+- Inbox approvals go straight to the board (previously the
   default sent them to `pending`, waiting for the Mac tagger). Approved items go
   to the end of the board, so "Recent" shows them first. The inbox's "Waiting for
   tags" tab lists older approvals still in `pending` and can publish them.
