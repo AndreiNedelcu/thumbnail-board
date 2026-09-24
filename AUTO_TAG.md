@@ -111,3 +111,12 @@ rm pending_review.json auto_tag_feedback.json auto_tag_skip.json pending_rejecte
 `ollama show <model>` lists `vision` under Capabilities. Reasoning is disabled
 for tagging (`think: false`) so models such as `qwen3.5` answer in seconds.
 Set `TB_TAG_MODEL` in the launchd plist to change the scheduled tagger.
+
+## Unattended mode
+
+`auto_tag_tick.sh` runs `auto_tag.py --batch 0 --publish-all` every 10 minutes
+(launchd). Nothing waits for manual review: every item with at least one valid
+tag is published, items left in `pending_review.json` by earlier runs are
+published with their proposed tags, and items the model cannot tag (image gone,
+no valid tags) are published untagged so they never stay in "Waiting for tags".
+Board items approved from the inbox only receive tags while they have none.

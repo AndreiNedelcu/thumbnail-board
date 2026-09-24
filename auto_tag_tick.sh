@@ -51,11 +51,12 @@ from board_data import load_board_file
 pending = load_board_file(Path('eagle-pending.json'), '/api/pending')
 board = load_board_file(Path('data.json'), '/api/data')
 done = {v['id'] for v in board}
-print(sum(1 for p in pending if p['id'] not in done) + sum(1 for v in board if not v.get('tags')))
+skip = set(json.loads(Path('auto_tag_skip.json').read_text())) if Path('auto_tag_skip.json').exists() else set()
+print(sum(1 for p in pending if p['id'] not in done and p['id'] not in skip) + sum(1 for v in board if not v.get('tags') and v['id'] not in skip))
 ")
 if [ "$todo" -eq 0 ]; then
   exit 0   # silent no-op; no log spam every 10 min
 fi
 
 echo "[$(date '+%F %T')] tick: processing $todo new pending items" >> "$LOG"
-exec python3 auto_tag.py --batch 0 --auto-approve --min-tags 3 --max-tags 10 >> "$LOG" 2>&1
+exec python3 auto_tag.py --batch 0 --publish-all >> "$LOG" 2>&1
